@@ -25,11 +25,7 @@ class RolViewSet(viewsets.ModelViewSet):
     serializer_class = RolSerializer
 
     def get_queryset(self):
-        if self.request.user.is_superuser:
-            return Rol.objects.all()
-        if hasattr(self.request.user, 'negocio'):
-            return Rol.objects.filter(negocio=self.request.user.negocio)
-        return Rol.objects.none()
+        return Rol.objects.all()
 
 
 # ============================================================
