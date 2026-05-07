@@ -34,7 +34,7 @@ jobs:
 
             notificar "🚀 **[BRAVA POS]** Iniciando pipeline de despliegue..."
 
-            cd BravaPos-Comercial
+            cd leybrakPOS
 
             # 📌 [1/7] Trazabilidad y Seguridad
             mkdir -p backups
