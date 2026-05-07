@@ -34,7 +34,7 @@ jobs:
 
             notificar "🚀 **[BRAVA POS]** Iniciando pipeline de despliegue..."
 
-            cd BravaPos-Comercial
+            cd leybrakPOS
 
             # 📌 [1/7] Trazabilidad y Seguridad
             mkdir -p backups
@@ -99,7 +99,7 @@ jobs:
                 "$WEBHOOK_URL" || true
             }
 
-            cd BravaPos-Comercial
+            cd leybrakPOS
             LAST_COMMIT=$(cat .last_commit)
 
             notificar "⚠️ **FALLO DETECTADO:** Revirtiendo código al commit $LAST_COMMIT..."
