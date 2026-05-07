@@ -39,6 +39,12 @@ class PinRateThrottle(ScopedRateThrottle):
 class EmpleadoViewSet(viewsets.ModelViewSet):
     serializer_class = EmpleadoSerializer
 
+    def perform_create(self, serializer):
+        if hasattr(self.request.user, 'negocio'):
+            serializer.save(negocio=self.request.user.negocio)
+        else:
+            serializer.save()
+
     def get_queryset(self):
         queryset = Empleado.objects.all()
         empleado_solicitante_id = self.request.headers.get('X-Empleado-Id')
@@ -152,3 +158,4 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             'nombre': empleado_valido.nombre,
             'rol_nombre': empleado_valido.rol.nombre if empleado_valido.rol else 'Sin Rol',
         }, status=status.HTTP_200_OK)
+    
