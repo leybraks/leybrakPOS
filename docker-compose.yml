@@ -9,13 +9,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Quitamos la exposición del puerto 5432 por seguridad. El backend lo verá internamente.
     restart: always
+    networks:
+      - leybrak_internal
 
   redis:
     image: redis:alpine
     restart: always
+    networks:
+      - leybrak_internal
 
   backend:
     build: .
@@ -23,56 +26,65 @@ services:
     volumes:
       - .:/app
     env_file:
-      - .env                          # ✅ Lee todo el .env automáticamente
+      - .env
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - EVO_GLOBAL_KEY=${EVOLUTION_API_KEY:-BravaSuperSecret2026}
-    ports:
-      - "8000:8000"
+    # Quitamos ports: - "8000:8000", NPM lo ruteará internamente
     depends_on:
       - db
       - redis
     restart: always
+    networks:
+      - leybrak_internal
+      - nginx_network # Conectamos al proxy
 
   frontend:
     build: ./pos-frontend
-    ports:
-      - "80:80"
+    container_name: pos_frontend
+    # QUITAMOS EL PUERTO 80:80 para no chocar con NPM
     depends_on:
       - backend
     restart: always
+    networks:
+      - leybrak_internal
+      - nginx_network # Conectamos al proxy
 
-  # ✨ LA NUEVA BESTIA: EVOLUTION API
   evolution-api:
     image: evoapicloud/evolution-api:latest
     container_name: brava_evolution_api
     restart: always
-    ports:
-      - "8080:8080"
+    # Quitamos ports: - "8080:8080" para que no quede expuesto al público sin pasar por Cloudflare
     environment:
-      # IMPORTANTE: Cambia 'localhost' por la IP de tu servidor Oracle (163.176.135.213)
-      - SERVER_URL=http://163.176.135.213:8080 
+      # ACTUALIZADO: Ahora apunta a tu nuevo dominio
+      - SERVER_URL=https://api.leybrak.com
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-BravaSuperSecret2026}
-      
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=evolution
-      # Conexión optimizada a tu Redis
       - REDIS_URI=redis://redis:6379/1
       - REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://redis:6379/1
       - CACHE_REDIS_TTL=604800
       - NODE_TLS_REJECT_UNAUTHORIZED=0
-      # Configuración de rendimiento
-      - CONFIG_SESSION_PHONE_CLIENT=BravaPOS
+      - CONFIG_SESSION_PHONE_CLIENT=LeybrakPOS # Actualizado a tu nueva marca
       - LOG_LEVEL=ERROR
     volumes:
       - evolution_instances:/evolution/instances
     depends_on:
       - redis
       - db
+    networks:
+      - leybrak_internal
+      - nginx_network # Conectamos al proxy
 
 volumes:
   postgres_data:
-  evolution_instances: # ✅ Creamos el volumen para guardar las sesiones de WhatsApp
+  evolution_instances:
+
+networks:
+  leybrak_internal:
+    driver: bridge
+  nginx_network:
+    external: true # Esta es la red de NPM

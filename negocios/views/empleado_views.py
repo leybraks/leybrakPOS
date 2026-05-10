@@ -25,11 +25,7 @@ class RolViewSet(viewsets.ModelViewSet):
     serializer_class = RolSerializer
 
     def get_queryset(self):
-        if self.request.user.is_superuser:
-            return Rol.objects.all()
-        if hasattr(self.request.user, 'negocio'):
-            return Rol.objects.filter(negocio=self.request.user.negocio)
-        return Rol.objects.none()
+        return Rol.objects.all()
 
 
 # ============================================================
@@ -42,6 +38,12 @@ class PinRateThrottle(ScopedRateThrottle):
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     serializer_class = EmpleadoSerializer
+
+    def perform_create(self, serializer):
+        if hasattr(self.request.user, 'negocio'):
+            serializer.save(negocio=self.request.user.negocio)
+        else:
+            serializer.save()
 
     def get_queryset(self):
         queryset = Empleado.objects.all()
@@ -156,3 +158,4 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             'nombre': empleado_valido.nombre,
             'rol_nombre': empleado_valido.rol.nombre if empleado_valido.rol else 'Sin Rol',
         }, status=status.HTTP_200_OK)
+    
