@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { loginAdministrador, validarPinEmpleado, getEstadoCaja, abrirCajaBD, getSedes } from '../api/api';
+import { loginAdministrador,loginPinEmpleado, getEstadoCaja, abrirCajaBD, getSedes } from '../api/api';
 import { useToast } from '../context/ToastContext';
 
 // =========================================================
@@ -100,6 +100,7 @@ export default function LoginView({ onAccesoConcedido }) {
     if (sedeObj) {
        localStorage.setItem('sede_id', sedeObj.id);
        localStorage.setItem('sede_nombre', sedeObj.nombre);
+       localStorage.removeItem('modo_dispositivo'); 
        setModo('empleado'); 
     }
   };
@@ -108,26 +109,30 @@ export default function LoginView({ onAccesoConcedido }) {
   const presionarTecla = (num) => { if (pin.length < 4) setPin(pin + num); };
   const borrarTecla = () => { setPin(pin.slice(0, -1)); };
 
+  // Reemplaza la llamada a validarPinEmpleado con loginPinEmpleado
+// y pasa los datos del servidor a onAccesoConcedido
+
+
+  // En procesarPin:
   const procesarPin = async (accion) => {
     if (pin.length !== 4) return;
-
-    // ── Bloqueo por intentos fallidos ─────────────────────
-    if (estaBlockeado) {
-      toast.error(`Terminal bloqueada. Intenta en ${segundosBloqueo}s.`);
-      return;
-    }
+    if (estaBlockeado) { toast.error(`Terminal bloqueada. Intenta en ${segundosBloqueo}s.`); return; }
 
     try {
-      const respuesta = await validarPinEmpleado({ pin, accion });
-      const empleado = respuesta.data;
+      // ✅ Ahora el backend setea cookie empleado_session HttpOnly
+      const respuesta = await loginPinEmpleado({
+        pin,
+        sede_id: localStorage.getItem('sede_id'),
+        accion
+      });
+      const empleado = respuesta.data; // { nombre, rol, sede_id }
 
-      // Éxito → resetear contador de intentos
       setIntentosFallidos(0);
       setBloqueadoHasta(null);
 
-      localStorage.setItem('empleado_id', empleado.id);
+      // Guardar solo datos no-sensibles en localStorage
       localStorage.setItem('empleado_nombre', empleado.nombre);
-      localStorage.setItem('usuario_rol', empleado.rol_nombre);
+      localStorage.setItem('usuario_rol', empleado.rol);
 
       if (accion === 'asistencia') {
         toast.success(`Asistencia registrada — ${empleado.nombre}`);
@@ -136,13 +141,15 @@ export default function LoginView({ onAccesoConcedido }) {
       }
 
       if (accion === 'entrar') {
-        if (['Cocina', 'Cocinero'].includes(empleado.rol_nombre)) {
-          onAccesoConcedido(empleado.rol_nombre);
+        const rolLimpio = empleado.rol.toLowerCase();
+
+        if (rolLimpio === 'cocinero' || rolLimpio === 'cocina') {
+          onAccesoConcedido(empleado); // { nombre, rol, sede_id }
           return;
         }
 
         if (estadoLocal === 'cerrado') {
-          if (['Administrador', 'Cajero', 'Admin'].includes(empleado.rol_nombre)) {
+          if (['administrador', 'cajero', 'admin'].includes(rolLimpio)) {
             setEmpleadoActual(empleado);
             setModalApertura(true);
           } else {
@@ -150,21 +157,27 @@ export default function LoginView({ onAccesoConcedido }) {
             setPin('');
           }
         } else {
-          onAccesoConcedido(empleado.rol_nombre);
+          onAccesoConcedido(empleado);
         }
       }
     } catch (error) {
-      const nuevosIntentos = intentosFallidos + 1;
-      setIntentosFallidos(nuevosIntentos);
-      setPin('');
+      const msg = error.response?.data?.error || 'PIN incorrecto.';
+      const restantes = error.response?.data?.segundos_restantes;
 
-      if (nuevosIntentos >= MAX_INTENTOS) {
-        const hasta = Date.now() + BLOQUEO_MS;
-        setBloqueadoHasta(hasta);
-        toast.error(`PIN incorrecto. Terminal bloqueada por 2 minutos por seguridad.`, 6000);
+      if (error.response?.status === 429) {
+        toast.error(msg);
+        if (restantes) setBloqueadoHasta(Date.now() + restantes * 1000);
       } else {
-        toast.error(`PIN incorrecto. Intentos restantes: ${MAX_INTENTOS - nuevosIntentos}.`);
+        const nuevos = intentosFallidos + 1;
+        setIntentosFallidos(nuevos);
+        if (nuevos >= MAX_INTENTOS) {
+          setBloqueadoHasta(Date.now() + BLOQUEO_MS);
+          toast.error('Demasiados intentos. Terminal bloqueada 2 minutos.');
+        } else {
+          toast.error(`PIN incorrecto. Intento ${nuevos}/${MAX_INTENTOS}.`);
+        }
       }
+      setPin('');
     }
   };
 

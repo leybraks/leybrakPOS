@@ -158,7 +158,7 @@ const SinPermisos = ({ onVolver }) => (
 // ==========================================
 export default function ErpDashboard({ onVolverAlPos, rolUsuario }) {
   const toast = useToast();
-  const rolesERP = ['dueño', 'administrador', 'admin'];
+  const rolesERP = ['dueño', 'administrador', 'admin','superadmin'];
   if (!rolesERP.includes((rolUsuario || '').toLowerCase().trim())) {
     return <SinPermisos onVolver={onVolverAlPos} />;
   }

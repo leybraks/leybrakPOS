@@ -9,6 +9,7 @@ from rest_framework.authtoken import views
 
 from core import settings
 urlpatterns = [
+    
     path('admin/', admin.site.urls),
     path('api/', include('negocios.urls')),
 ]

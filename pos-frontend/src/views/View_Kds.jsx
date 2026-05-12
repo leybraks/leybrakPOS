@@ -6,6 +6,7 @@ import ModalAlertaBot from '../components/modals/ModalAlertaBot';
 import { useToast } from '../context/ToastContext';
 
 export default function KdsView({ onVolver }) {
+  localStorage.setItem('modo_dispositivo', 'cocina');
   const toast = useToast();
   const { configuracionGlobal } = usePosStore();
   const setConfiguracionGlobal = usePosStore((state) => state.setConfiguracionGlobal);
@@ -16,7 +17,6 @@ export default function KdsView({ onVolver }) {
   const [verificandoAcceso, setVerificandoAcceso] = useState(true);
   const [accesoPermitido, setAccesoPermitido] = useState(false);
 
-  const wsUrl = import.meta.env.VITE_WS_URL;
   const [estacionActiva, setEstacionActiva] = useState('TODO');
   const [estacionesExpandidas, setEstacionesExpandidas] = useState(false);
   const [verConsolidado, setVerConsolidado] = useState(false);

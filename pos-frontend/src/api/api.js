@@ -208,6 +208,12 @@ export const crearWebSocket = (path) => {
 
   return ws;
 };
+// Reemplaza validarPinEmpleado
+export const loginPinEmpleado = (payload) =>
+  axios.post(`${API_URL}/empleados/login-pin/`, payload, { withCredentials: true });
+
+export const verificarSesionEmpleado = () =>
+  axios.get(`${API_URL}/empleados/verificar-sesion/`, { withCredentials: true });
 
 // ============================================================
 // CAJA Y LOGIN DE EMPLEADOS

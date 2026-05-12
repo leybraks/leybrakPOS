@@ -560,7 +560,7 @@ export default function DrawerCombosNormales({ isOpen, onClose, isDark, colorPri
 
   const abrirNuevo = () => { setComboEditando(null); setVista('formulario'); };
   const abrirEdicion = (combo) => { setComboEditando(combo); setVista('formulario'); };
-  console.log('combo editando:', comboEditando);
+  
   return (
     <>
       {/* Overlay */}

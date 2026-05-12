@@ -10,6 +10,7 @@ from negocios.views.marketing_views import (
     ReglaNegocioDetalleView,
     ReglaNegocioView,
 )
+from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 # 🛡️ IMPORTAMOS TUS VISTAS SEGURAS DE COOKIES
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
 from . import views
@@ -38,6 +39,8 @@ router.register(r'clientes', views.ClienteViewSet, basename='clientes')
 router.register(r'zonas-delivery', views.ZonaDeliveryViewSet, basename='zonadelivery')
 router.register(r'reglas-negocio', views.ReglaNegocioViewSet, basename='reglanegocio')
 urlpatterns = [
+    path('empleados/login-pin/', login_empleado_pin, name='login-empleado-pin'),
+    path('empleados/verificar-sesion/', verificar_sesion_empleado, name='verificar-sesion-empleado'),
     path('', include(router.urls)),
 
     # ==========================================
@@ -63,6 +66,7 @@ urlpatterns = [
     path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
     # 🩺 HEALTHCHECK PARA GITHUB ACTIONS (público, sin token)
     path('health/', views.health_check, name='health_check'),
+    
 
     # ==========================================
     # RUTAS PÚBLICAS (Sin Token - Carta QR)
