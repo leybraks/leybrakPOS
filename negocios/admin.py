@@ -1,4 +1,7 @@
 from django.contrib import admin
+# ✨ IMPORTAMOS LAS HERRAMIENTAS DE UNFOLD ✨
+from unfold.admin import ModelAdmin, TabularInline, StackedInline
+
 from .models import (
     InsumoSede, InsumoBase, Negocio, RecetaDetalle, Rol, MovimientoCaja, 
     Empleado, Mesa, Sede, Producto, Orden, DetalleOrden, Pago, 
@@ -7,26 +10,46 @@ from .models import (
     Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional, 
     HorarioVisibilidad, ComponenteCombo
 )
+from django.contrib import admin
+from unfold.admin import ModelAdmin, TabularInline, StackedInline
 
-admin.site.register(Rol)
-admin.site.register(Mesa)
-admin.site.register(Orden)
-admin.site.register(DetalleOrden)
-admin.site.register(Pago) 
-admin.site.register(InsumoBase)
-admin.site.register(InsumoSede)
-admin.site.register(RecetaDetalle)
-admin.site.register(ModificadorRapido)
+# ✨ 1. IMPORTAMOS LOS MODELOS NATIVOS DE DJANGO
+from django.contrib.auth.models import User, Group
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+
+# ✨ 2. LOS DESVINCULAMOS DEL DISEÑO VIEJO
+admin.site.unregister(User)
+admin.site.unregister(Group)
+
+# ✨ 3. LOS REGISTRAMOS CON UNFOLD
+@admin.register(User)
+class UserAdmin(BaseUserAdmin, ModelAdmin):
+    pass
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    pass
+# A los registros simples les pasamos ModelAdmin para que agarren el diseño
+admin.site.register(Rol, ModelAdmin)
+admin.site.register(Mesa, ModelAdmin)
+admin.site.register(Orden, ModelAdmin)
+admin.site.register(DetalleOrden, ModelAdmin)
+admin.site.register(Pago, ModelAdmin) 
+admin.site.register(InsumoBase, ModelAdmin)
+admin.site.register(InsumoSede, ModelAdmin)
+admin.site.register(RecetaDetalle, ModelAdmin)
+admin.site.register(ModificadorRapido, ModelAdmin)
 
 # ==========================================
 # 1. VARIACIONES DE PRODUCTO
 # ==========================================
-class OpcionVariacionInline(admin.TabularInline):
+class OpcionVariacionInline(TabularInline): # ✨ UNFOLD
     model = OpcionVariacion
     extra = 1  
 
 @admin.register(GrupoVariacion)
-class GrupoVariacionAdmin(admin.ModelAdmin):
+class GrupoVariacionAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ['nombre', 'producto', 'obligatorio']
     list_filter = ['producto']
     inlines = [OpcionVariacionInline] 
@@ -35,13 +58,13 @@ class GrupoVariacionAdmin(admin.ModelAdmin):
 # 2. GESTIÓN DE EMPLEADOS Y CAJA
 # ==========================================
 @admin.register(Empleado)
-class EmpleadoAdmin(admin.ModelAdmin):
+class EmpleadoAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('nombre', 'rol', 'negocio', 'sede', 'pin', 'activo', 'ultimo_ingreso')
     search_fields = ('nombre', 'pin')
     list_filter = ('negocio', 'sede', 'rol', 'activo')
 
 @admin.register(MovimientoCaja)
-class MovimientoCajaAdmin(admin.ModelAdmin):
+class MovimientoCajaAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('id', 'sede', 'sesion_caja', 'get_tipo_display', 'monto', 'concepto', 'empleado', 'fecha')
     list_filter = ('tipo', 'fecha', 'sede', 'empleado')
     search_fields = ('concepto', 'empleado__nombre')
@@ -52,12 +75,12 @@ class MovimientoCajaAdmin(admin.ModelAdmin):
 # 🚀 3. CONFIGURACIÓN DEL SAAS MULTI-TENANT
 # ==========================================
 @admin.register(PlanSaaS)
-class PlanSaaSAdmin(admin.ModelAdmin):
+class PlanSaaSAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('nombre', 'precio_mensual', 'max_sedes', 'modulo_kds', 'modulo_inventario', 'modulo_delivery')
     list_editable = ('modulo_kds', 'modulo_inventario', 'modulo_delivery')
 
 @admin.register(Negocio)
-class NegocioAdmin(admin.ModelAdmin):
+class NegocioAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('nombre', 'propietario', 'plan', 'activo')
     list_filter = ('plan', 'activo')
     search_fields = ('nombre', 'propietario__username')
@@ -66,19 +89,19 @@ class NegocioAdmin(admin.ModelAdmin):
 # 📊 4. CRM Y MARKETING (¡LO NUEVO!)
 # ==========================================
 @admin.register(Cliente)
-class ClienteAdmin(admin.ModelAdmin):
+class ClienteAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('nombre', 'telefono', 'negocio', 'puntos_acumulados', 'total_gastado', 'cantidad_pedidos')
     search_fields = ('nombre', 'telefono')
     list_filter = ('negocio', 'tags') # Permite filtrar para ver quiénes son "VIP"
     readonly_fields = ('ultima_compra',)
 
 @admin.register(ReglaNegocio)
-class ReglaNegocioAdmin(admin.ModelAdmin):
+class ReglaNegocioAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('tipo', 'valor', 'es_porcentaje', 'negocio', 'activa')
     list_filter = ('tipo', 'activa', 'negocio')
 
 @admin.register(CuponPromocional)
-class CuponPromocionalAdmin(admin.ModelAdmin):
+class CuponPromocionalAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('codigo', 'monto_descuento', 'es_porcentaje', 'fecha_expiracion', 'activo')
     list_filter = ('activo', 'negocio')
     search_fields = ('codigo',)
@@ -86,17 +109,17 @@ class CuponPromocionalAdmin(admin.ModelAdmin):
 # ==========================================
 # 🍔 5. PRODUCTOS AVANZADOS (COMBOS Y HORARIOS)
 # ==========================================
-class ComponenteComboInline(admin.TabularInline):
+class ComponenteComboInline(TabularInline): # ✨ UNFOLD
     model = ComponenteCombo
     fk_name = 'combo' # Especificamos cuál llave foránea usar (porque hay 2 hacia Producto)
     extra = 1
 
-class HorarioVisibilidadInline(admin.StackedInline):
+class HorarioVisibilidadInline(StackedInline): # ✨ UNFOLD
     model = HorarioVisibilidad
     extra = 0
 
 @admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
+class ProductoAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('nombre', 'precio_base', 'categoria', 'negocio', 'es_combo', 'destacar_como_promocion', 'disponible')
     list_filter = ('negocio', 'categoria', 'es_combo', 'destacar_como_promocion', 'disponible')
     search_fields = ('nombre',)
@@ -107,7 +130,7 @@ class ProductoAdmin(admin.ModelAdmin):
     inlines = [HorarioVisibilidadInline, ComponenteComboInline]
 
 @admin.register(Sede)
-class SedeAdmin(admin.ModelAdmin):
+class SedeAdmin(ModelAdmin): # ✨ UNFOLD
     # Agregamos los horarios a la vista rápida para que sea fácil revisarlos
     list_display = ('nombre', 'negocio', 'hora_apertura', 'hora_cierre', 'activo')
     list_editable = ('activo',) 
@@ -133,8 +156,9 @@ class SedeAdmin(admin.ModelAdmin):
             'fields': ('enlace_carta_virtual', 'carta_pdf'),
         }),
     )
+
 @admin.register(ZonaDelivery)
-class ZonaDeliveryAdmin(admin.ModelAdmin):
+class ZonaDeliveryAdmin(ModelAdmin): # ✨ UNFOLD
     # Cambiamos distritos por radio_max_km
     list_display = ('nombre', 'sede', 'radio_max_km', 'costo_envio', 'activa')
     list_editable = ('radio_max_km', 'costo_envio', 'activa')

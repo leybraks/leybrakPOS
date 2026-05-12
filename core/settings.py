@@ -31,6 +31,10 @@ ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
 # APLICACIONES
 # ============================================================
 INSTALLED_APPS = [
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.inlines",
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -76,7 +80,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    #'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -134,9 +138,9 @@ USE_TZ = True
 # ============================================================
 # ARCHIVOS ESTÁTICOS
 # ============================================================
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+#STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -247,7 +251,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # ============================================================
 # EVOLUTION API
 # ============================================================
-EVO_API_URL = os.environ.get('EVO_API_URL', 'http://163.176.135.213:8080')
+EVO_API_URL = os.environ.get('EVO_API_URL', 'https://api.leybrak.com')
 EVO_GLOBAL_KEY = os.environ.get('EVO_GLOBAL_KEY', 'BravaSuperSecret2026')
 APIS_NET_PE_TOKEN = os.environ.get('APIS_NET_PE_TOKEN', '')
 
@@ -260,3 +264,27 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = f'BravaPOS <{os.environ.get("EMAIL_HOST_USER", "")}>'
+
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+
+UNFOLD = {
+    "SITE_TITLE": "Leybrak POS",
+    "SITE_HEADER": "Leybrak POS",
+    "SITE_SYMBOL": "storefront", # Ícono de tienda moderno
+    "COLORS": {
+        "primary": {
+            "50": "250 245 255",
+            "100": "243 232 255",
+            "200": "233 213 255",
+            "300": "216 180 254",
+            "400": "192 132 252",
+            "500": "168 85 247", # El morado de Leybrak
+            "600": "147 51 234",
+            "700": "126 34 206",
+            "800": "107 33 168",
+            "900": "88 28 135",
+            "950": "59 7 100",
+        },
+    },
+}

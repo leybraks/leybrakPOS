@@ -25,6 +25,8 @@ services:
     command: daphne -b 0.0.0.0 -p 8000 core.asgi:application
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles  # 👉 Django escupe la pintura aquí
+      - media_volume:/app/media
     env_file:
       - .env
     environment:
@@ -47,10 +49,14 @@ services:
     depends_on:
       - backend
     restart: always
+    # ✨ AQUÍ ESTÁ LA MAGIA QUE FALTABA:
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/usr/share/nginx/html/static
+      - media_volume:/usr/share/nginx/html/media
     networks:
       - leybrak_internal
-      - nginx_network # Conectamos al proxy
-
+      - nginx_network
   evolution-api:
     image: evoapicloud/evolution-api:latest
     container_name: brava_evolution_api
@@ -82,6 +88,8 @@ services:
 volumes:
   postgres_data:
   evolution_instances:
+  static_volume:  # ✨ NUEVO
+  media_volume:
 
 networks:
   leybrak_internal:
