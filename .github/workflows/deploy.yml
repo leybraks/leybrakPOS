@@ -61,11 +61,11 @@ jobs:
             notificar "⚙️ Aplicando cambios en la base de datos..."
             sudo docker compose exec -T backend python manage.py migrate
 
-            # [6/7] Healthcheck — desde DENTRO del contenedor
+            # [6/7] Healthcheck — desde DENTRO del contenedor con python
             notificar "🩺 Verificando estabilidad del servicio..."
             HEALTH_SUCCESS=false
             for i in {1..20}; do
-              if sudo docker compose exec -T backend curl -sf --max-time 5 http://localhost:8000/api/health/ | grep -q "ok"; then
+              if sudo docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" 2>/dev/null; then
                 HEALTH_SUCCESS=true
                 break
               fi
