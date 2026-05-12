@@ -90,11 +90,12 @@ const VistaInternaPOS = () => {
   }, []);
 
   const handleAccesoConcedido = (datosEmpleado) => {
-    console.log('DATOS RECIBIDOS EN handleAccesoConcedido:', datosEmpleado);
-    // datosEmpleado viene del servidor, no del localStorage
-    const { rol, nombre, sede_id } = datosEmpleado;
-    console.log('ROL EXTRAIDO:', rol);
-    console.log('VISTA:', getRolVista(rol));
+    // Normalizar — dueño pasa string, empleado pasa objeto
+    const datos = typeof datosEmpleado === 'string'
+      ? { rol: datosEmpleado, nombre: null, sede_id: null }
+      : datosEmpleado;
+
+    const { rol, nombre, sede_id } = datos;
     const vistaDestino = getRolVista(rol);
 
     if (!vistaDestino) {
