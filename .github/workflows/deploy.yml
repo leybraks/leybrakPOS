@@ -52,25 +52,25 @@ jobs:
             git fetch origin V2-Estable-Cloud
             git reset --hard origin/V2-Estable-Cloud
 
-            # [4/7] Build y Recreación
+            # 🏗️ [4/7] Build y Recreación
+            # FIX 3: sin --force-recreate, Docker solo recrea lo que cambió
             notificar "🏗️ Reconstruyendo contenedores..."
             sudo docker compose up -d --build
-            sleep 20  # ← esperar que el backend arranque antes del migrate
 
-            # [5/7] Migraciones
+            # ⚙️ [5/7] Migraciones
             notificar "⚙️ Aplicando cambios en la base de datos..."
             sudo docker compose exec -T backend python manage.py migrate
 
-            # [6/7] Healthcheck
+            # [6/7] Healthcheck — desde DENTRO del contenedor
             notificar "🩺 Verificando estabilidad del servicio..."
             HEALTH_SUCCESS=false
             for i in {1..20}; do
-              if curl -sf --max-time 5 http://localhost:8000/api/health/ | grep -q "ok"; then
+              if sudo docker compose exec -T backend curl -sf --max-time 5 http://localhost:8000/api/health/ | grep -q "ok"; then
                 HEALTH_SUCCESS=true
                 break
               fi
               echo "Esperando backend... ($i/20)"
-              sleep 8
+              sleep 5
             done
 
             if [ "$HEALTH_SUCCESS" = false ]; then
