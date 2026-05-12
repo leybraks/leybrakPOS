@@ -69,7 +69,8 @@ export default function LoginView({ onAccesoConcedido }) {
       if (destino === 'erp') {
         // ✅ Leemos el rol que el backend nos manda en el JSON (ya no del token)
         const rolSeguro = res.data.rol || 'Dueño';
-        
+        console.log('ROL LOGIN DUEÑO:', rolSeguro);
+        console.log('VISTA DESTINO:', getRolVista(rolSeguro));
         // 🛡️ Guardar la palabra "Dueño" en localStorage NO es un riesgo de seguridad. 
         // El verdadero poder lo tiene la cookie HttpOnly.
         localStorage.setItem('usuario_rol', rolSeguro);

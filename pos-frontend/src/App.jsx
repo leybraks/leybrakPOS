@@ -90,8 +90,11 @@ const VistaInternaPOS = () => {
   }, []);
 
   const handleAccesoConcedido = (datosEmpleado) => {
+    console.log('DATOS RECIBIDOS EN handleAccesoConcedido:', datosEmpleado);
     // datosEmpleado viene del servidor, no del localStorage
     const { rol, nombre, sede_id } = datosEmpleado;
+    console.log('ROL EXTRAIDO:', rol);
+    console.log('VISTA:', getRolVista(rol));
     const vistaDestino = getRolVista(rol);
 
     if (!vistaDestino) {
