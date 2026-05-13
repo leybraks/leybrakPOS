@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { getMesas, getOrdenes, getSedes, getNegocio } from '../../../api/api';
+import { getMesas, getOrdenes, getSedes, getNegocio ,getEstadoCaja} from '../../../api/api';
 
-export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGlobal) => {
+export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGlobal, setEstadoCaja) => {
   const [sedes, setSedes] = useState([]);
   const [mesas, setMesas] = useState([]);
   const [ordenesLlevar, setOrdenesLlevar] = useState([]);
@@ -131,7 +131,24 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
     cargarSalon();
     return () => { isMounted = false; };
   }, [triggerRecarga, sedeActualId]);
-
+  
+  useEffect(() => {
+    if (!sedeActualId) return;
+    const cargarEstadoCaja = async () => {
+      try {
+        const res = await getEstadoCaja({ sede_id: sedeActualId });
+        const estado = res.data?.estado || 'cerrado';
+        setEstadoCaja(estado);
+        // Si hay sesion_caja_id, guardarlo
+        if (res.data?.id) {
+          localStorage.setItem('sesion_caja_id', res.data.id);
+        }
+      } catch {
+        setEstadoCaja('cerrado'); // ante la duda, cerrado
+      }
+    };
+    cargarEstadoCaja();
+  }, [sedeActualId, triggerRecarga , setEstadoCaja]);
   // Exponemos el ref para que useTerminalWS pueda ignorar eventos de otras sedes
   return {
     sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar,

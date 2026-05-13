@@ -23,7 +23,7 @@ const usePosStore = create((set, get) => ({
   // 🛒 1. ESTADO DE OPERACIÓN
   // ==========================================
   carrito: [],
-  estadoCaja: 'abierto',
+  estadoCaja: 'cerrado',
 
   setEstadoCaja: (nuevoEstado) => set({ estadoCaja: nuevoEstado }),
 
