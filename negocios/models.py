@@ -951,3 +951,53 @@ class ItemComboPromocional(models.Model):
 
     def __str__(self):
         return f"{self.cantidad}x {self.producto.nombre} → Combo {self.combo.nombre}"
+
+class PagoSuscripcion(models.Model):
+ 
+    ESTADO_CHOICES = [
+        ('pagado',      'Pagado'),
+        ('pendiente',   'Pendiente'),
+        ('fallido',     'Fallido'),
+        ('reembolsado', 'Reembolsado'),
+    ]
+ 
+    METODO_CHOICES = [
+        ('yape',         'Yape'),
+        ('plin',         'Plin'),
+        ('tarjeta',      'Tarjeta'),
+        ('transferencia','Transferencia'),
+        ('efectivo',     'Efectivo'),
+        ('otro',         'Otro'),
+    ]
+ 
+    negocio     = models.ForeignKey(
+        'Negocio',
+        on_delete=models.CASCADE,
+        related_name='pagos_suscripcion'
+    )
+    plan        = models.ForeignKey(
+        'PlanSaaS',
+        on_delete=models.PROTECT,
+        related_name='pagos',
+        null=True, blank=True     # null por si el plan se elimina después
+    )
+    monto       = models.DecimalField(max_digits=10, decimal_places=2)
+    estado      = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
+    metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES, default='otro')
+ 
+    # Período al que corresponde este pago (ej: "Mayo 2026")
+    periodo     = models.CharField(max_length=30, blank=True, null=True)
+ 
+    fecha_pago  = models.DateTimeField(default=timezone.now)
+    notas       = models.TextField(blank=True, null=True)
+ 
+    # Para pagos Culqi: guardar referencia del cargo
+    referencia_externa = models.CharField(max_length=100, blank=True, null=True)
+ 
+    creado_en   = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        ordering = ['-fecha_pago']   # más reciente primero
+ 
+    def __str__(self):
+        return f"{self.negocio.nombre} — {self.get_estado_display()} — S/ {self.monto} ({self.periodo or self.fecha_pago.strftime('%b %Y')})"

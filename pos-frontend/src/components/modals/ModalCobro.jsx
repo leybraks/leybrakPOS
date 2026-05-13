@@ -103,44 +103,36 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   };
 
   // ============================================
-  // 🔌 INTEGRACIÓN CULQI - PLACEHOLDER
+  // 🔌 INTEGRACIÓN CULQI — REAL
+  // Docs: https://docs.culqi.com
   // ============================================
-  // TODO: Reemplazar con la integración real de Culqi
-  // Documentación: https://docs.culqi.com/es/documentacion/checkout/v4/qr/
-  
+
+  // Carga el script de Culqi.js dinámicamente (solo una vez)
+  const cargarScriptCulqi = () => new Promise((resolve, reject) => {
+    if (window.Culqi) return resolve();
+    const script = document.createElement('script');
+    script.src = 'https://checkout.culqi.com/js/v4';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+  // Yape / Plin → QR dinámico vía backend (Culqi Orders API)
   const generarQRCulqi = async (monto, tipoMetodo) => {
     setGenerandoQR(true);
     setQrCulqi(null);
-    
     try {
-      // 🚧 PLACEHOLDER - Llamada real al backend que crea el QR con Culqi
-      // Ejemplo de estructura esperada:
-      /*
-      const response = await fetch('/api/culqi/generar-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          monto: Math.round(monto * 100), // Culqi usa centavos
-          metodo: tipoMetodo, // 'yape' | 'plin'
-          descripcion: `Pago POS - S/ ${monto.toFixed(2)}`
-        })
+      // El backend crea la Order en Culqi y devuelve el QR
+      const res = await api.post('/culqi/generar-qr/', {
+        monto:      Math.round(monto * 100), // Culqi usa centavos
+        metodo:     tipoMetodo,              // 'yape' | 'plin'
+        orden_id:   ordenId,
+        descripcion: `Pago POS - S/ ${monto.toFixed(2)}`,
       });
-      const data = await response.json();
       setQrCulqi({
-        url: data.qr_url,
-        orderId: data.order_id,
-        expiraEn: data.expira_en
-      });
-      */
-      
-      // Simulación de delay (1.5s)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // QR de prueba (REEMPLAZAR con respuesta real de Culqi)
-      setQrCulqi({
-        url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=CULQI-${tipoMetodo.toUpperCase()}-${monto}-${Date.now()}`,
-        orderId: `ord_${Date.now()}`,
-        expiraEn: 5 * 60
+        url:       res.data.qr_url,
+        orderId:   res.data.order_id,
+        expiraEn:  res.data.expira_en ?? 300, // segundos
       });
     } catch (error) {
       console.error('Error generando QR Culqi:', error);
@@ -150,29 +142,61 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     }
   };
 
+  // Yape / Plin → verifica estado del cargo en Culqi
   const validarPagoCulqi = async () => {
     setValidandoPago(true);
-    
     try {
-      // 🚧 PLACEHOLDER - Validación real con Culqi
-      /*
-      const response = await fetch(`/api/culqi/validar-pago/${qrCulqi.orderId}`);
-      const data = await response.json();
-
-      if (data.estado === 'pagado') {
+      const res = await api.get(`/culqi/estado-orden/${qrCulqi.orderId}/`);
+      if (res.data.estado === 'pagado') {
         registrarPago(montoCobro, 0);
       } else {
-        toast.warning('El pago aún no se ha procesado. Espera unos segundos.');
+        toast.warning('El pago aún no se ha procesado. Espera unos segundos e inténtalo de nuevo.');
       }
-      */
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      registrarPago(montoCobro, 0);
     } catch (error) {
-      console.error('Error validando pago:', error);
-      toast.error('Error al validar el pago. Intenta de nuevo.');
+      console.error('Error validando pago Culqi:', error);
+      toast.error('Error al verificar el pago. Intenta de nuevo.');
     } finally {
       setValidandoPago(false);
+    }
+  };
+
+  // Tarjeta → abre Culqi Checkout v4 (modal nativo de Culqi)
+  const abrirCheckoutTarjeta = async () => {
+    try {
+      await cargarScriptCulqi();
+
+      window.Culqi.publicKey = config.culqi_public_key;
+      window.Culqi.settings({
+        title:    'Pago POS',
+        currency: 'PEN',
+        amount:   Math.round(montoCobro * 100),
+        order:    ordenId ? String(ordenId) : undefined,
+      });
+
+      // Culqi llama a window.culqi() cuando el cliente completa el pago
+      window.culqi = async () => {
+        const token = window.Culqi.token?.id;
+        if (!token) {
+          toast.error('No se recibió token de pago. Intenta de nuevo.');
+          return;
+        }
+        try {
+          // El backend usa la private_key para hacer el cargo real
+          await api.post('/culqi/cobrar-tarjeta/', {
+            token,
+            monto:    Math.round(montoCobro * 100),
+            orden_id: ordenId,
+          });
+          window.Culqi.close();
+          registrarPago(montoCobro, 0);
+        } catch (err) {
+          toast.error('El cargo con tarjeta fue rechazado. Verifica los datos.');
+        }
+      };
+
+      window.Culqi.open();
+    } catch (err) {
+      toast.error('No se pudo cargar la pasarela Culqi. Verifica tu conexión.');
     }
   };
   // ============================================
@@ -830,21 +854,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                 </div>
 
                 <button
-                  onClick={() => {
-                    // 🚧 PLACEHOLDER - Aquí va la integración real con Culqi Checkout
-                    /*
-                    Culqi.publicKey = config.culqi_public_key;
-                    Culqi.settings({
-                      title: 'Pago POS',
-                      currency: 'PEN',
-                      amount: Math.round(montoCobro * 100),
-                      order: orderId
-                    });
-                    Culqi.open();
-                    */
-                    toast.info('Pasarela Culqi en integración. Confirmando pago manual.');
-                    registrarPago(montoCobro, 0);
-                  }}
+                  onClick={abrirCheckoutTarjeta}
                   className="w-full py-4 rounded-xl font-bold text-white transition-all"
                   style={{ backgroundColor: colorPrimario }}
                 >

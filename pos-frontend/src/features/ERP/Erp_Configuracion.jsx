@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState ,useEffect} from 'react';
 import Tab_Perfil   from './Erp_TabPerfil';
 import Tab_Plan     from './Erp_TabPlan';
 import Tab_Modulos  from './Erp_TabModulos';
-
 const TABS = [
   { id: 'perfil',   label: 'Perfil y Cobros',      icon: 'fi-rr-id-badge'      },
   { id: 'plan',     label: 'Plan SaaS y Límites',   icon: 'fi-rr-rocket-lunch'  },
@@ -16,7 +15,11 @@ export default function Erp_Configuracion({ config, setConfig, manejarGuardarCon
   const [tabActiva, setTabActiva] = useState('perfil');
 
   const tabProps = { config, setConfig, isDark, colorPrimario };
-
+  useEffect(() => {
+    const handler = (e) => setTabActiva(e.detail);
+    window.addEventListener('erp:cambiar-tab', handler);
+    return () => window.removeEventListener('erp:cambiar-tab', handler);
+  }, []);
   return (
     <div className="animate-fadeIn max-w-6xl mx-auto space-y-6 pb-24">
 

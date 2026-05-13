@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
+from negocios.views.culqi_views import cobrar_tarjeta_culqi, generar_qr_culqi
+from negocios.views.culqi_views import estado_orden_culqi
 from negocios.views.marketing_views import (
     HappyHourDetalleView,
     HappyHourView,
@@ -10,6 +12,7 @@ from negocios.views.marketing_views import (
     ReglaNegocioDetalleView,
     ReglaNegocioView,
 )
+from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 # 🛡️ IMPORTAMOS TUS VISTAS SEGURAS DE COOKIES
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
@@ -38,6 +41,8 @@ router.register(r'recetas-opcion', views.RecetaOpcionViewSet, basename='recetaop
 router.register(r'clientes', views.ClienteViewSet, basename='clientes')
 router.register(r'zonas-delivery', views.ZonaDeliveryViewSet, basename='zonadelivery')
 router.register(r'reglas-negocio', views.ReglaNegocioViewSet, basename='reglanegocio')
+router.register(r'planes-saas', PlanSaaSViewSet, basename='planes-saas')
+router.register(r'pagos-suscripcion', PagoSuscripcionViewSet, basename='pagos-suscripcion')
 urlpatterns = [
     path('empleados/login-pin/', login_empleado_pin, name='login-empleado-pin'),
     path('empleados/verificar-sesion/', verificar_sesion_empleado, name='verificar-sesion-empleado'),
@@ -80,6 +85,9 @@ urlpatterns = [
     path('reglas-negocio-v2/', ReglaNegocioView.as_view(), name='reglas_negocio'),
     path('reglas-negocio-v2/<int:pk>/', ReglaNegocioDetalleView.as_view(), name='regla_negocio_detalle'),
     path('combos-promocionales/', ComboPromocionalView.as_view(), name='combos_promocionales'),
+    path('culqi/generar-qr/', generar_qr_culqi, name='generar_qr_culqi'),
+    path('culqi/estado-orden/<str:order_id>/', estado_orden_culqi, name='culqi-estado-orden'),
+    path('culqi/cobrar-tarjeta/',          cobrar_tarjeta_culqi, name='culqi-cobrar-tarjeta'),
     path('combos-promocionales/<int:pk>/', ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
     path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
 ]

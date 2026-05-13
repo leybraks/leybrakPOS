@@ -67,3 +67,8 @@ from .publico_views import (
     orden_publica,
     verificar_sesion,
 )
+from .culqi_views import (
+    generar_qr_culqi,
+    cobrar_tarjeta_culqi,
+    estado_orden_culqi,
+)

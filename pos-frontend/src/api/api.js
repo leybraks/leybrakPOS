@@ -322,10 +322,10 @@ export const crearModificador = (data) => api.post('/modificadores-rapidos/', da
 export const actualizarModificador = (id, data) => api.put(`/modificadores-rapidos/${id}/`, data);
 export const eliminarModificador = (id) => api.delete(`/modificadores-rapidos/${id}/`);
 
-
+export const getPlanesDisponibles = () => api.get('/planes-saas/');
 export const getCombosPromocionales = () => api.get('/combos-promocionales/');
 export const crearComboPromocional = (data) => api.post('/combos-promocionales/', data);
 export const actualizarComboPromocional = (id, data) => api.put(`/combos-promocionales/${id}/`, data);
 export const eliminarComboPromocional = (id) => api.delete(`/combos-promocionales/${id}/`);
-
+export const getPagosSuscripcion = (negocioId) => api.get('/pagos-suscripcion/', { params: { negocio_id: negocioId } });
 export default api;

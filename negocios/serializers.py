@@ -2,7 +2,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 from .models import (
-    ComboPromocional, ComponenteCombo, InsumoBase, InsumoSede, ItemComboPromocional, Negocio, PlanSaaS, ReglaNegocio, Sede, Mesa, Producto, Orden, DetalleOrden, Pago,
+    ComboPromocional, ComponenteCombo, InsumoBase, InsumoSede, ItemComboPromocional, Negocio, PagoSuscripcion, PlanSaaS, ReglaNegocio, Sede, Mesa, Producto, Orden, DetalleOrden, Pago,
     ModificadorRapido, GrupoVariacion, OpcionVariacion, Rol, Empleado, SesionCaja,
     DetalleOrdenOpcion , Categoria, RecetaOpcion, Cliente, VariacionProducto, ZonaDelivery, HorarioVisibilidad
 )
@@ -10,12 +10,25 @@ from .models import (
 
 class PlanSaaSSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PlanSaaS
+        model  = PlanSaaS
         fields = [
-            'id', 'nombre', 'precio_mensual',
+            'id', 'nombre', 'precio_mensual', 'max_sedes',
             'modulo_kds', 'modulo_inventario', 'modulo_delivery',
-            'modulo_carta_qr', 'modulo_bot_wsp', 'modulo_ml', 'max_sedes',
+            'modulo_carta_qr', 'modulo_bot_wsp', 'modulo_ml',
         ]
+
+class PagoSuscripcionSerializer(serializers.ModelSerializer):
+    # Campo extra legible en el frontend: nombre del plan en lugar de ID
+    plan_nombre = serializers.CharField(source='plan.nombre', read_only=True, default=None)
+ 
+    class Meta:
+        model  = PagoSuscripcion
+        fields = [
+            'id', 'monto', 'estado', 'metodo_pago',
+            'periodo', 'fecha_pago', 'notas',
+            'referencia_externa', 'plan_nombre', 'creado_en',
+        ]
+        read_only_fields = ['id', 'creado_en', 'plan_nombre']
 
 class NegocioSerializer(serializers.ModelSerializer):
     plan_detalles = PlanSaaSSerializer(source='plan', read_only=True)
