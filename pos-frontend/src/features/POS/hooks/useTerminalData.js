@@ -8,6 +8,7 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
   const [todasLasOrdenesActivas, setTodasLasOrdenesActivas] = useState([]);
   const [vistaLocal, setVistaLocal] = useState(null);
   const [modulos, setModulos] = useState({ salon: true, delivery: true, cocina: true });
+  const [cargandoCaja, setCargandoCaja] = useState(true); // ← agregar
 
   // 🔧 Ref que siempre apunta a la sede activa — el WS lo usa para ignorar
   // eventos de mesas de otras sedes cuando se está reconectando.
@@ -139,12 +140,13 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
         const res = await getEstadoCaja({ sede_id: sedeActualId });
         const estado = res.data?.estado || 'cerrado';
         setEstadoCaja(estado);
-        // Si hay sesion_caja_id, guardarlo
         if (res.data?.id) {
           localStorage.setItem('sesion_caja_id', res.data.id);
         }
       } catch {
-        setEstadoCaja('cerrado'); // ante la duda, cerrado
+        setEstadoCaja('cerrado');
+      } finally {
+        setCargandoCaja(false); // ← siempre termina la carga
       }
     };
     cargarEstadoCaja();
@@ -153,6 +155,6 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
   return {
     sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar,
     todasLasOrdenesActivas, vistaLocal, setVistaLocal, modulos,
-    sedeActualIdRef,
+    sedeActualIdRef,cargandoCaja,
   };
 };

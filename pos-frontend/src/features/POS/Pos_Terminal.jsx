@@ -62,7 +62,7 @@ export default function PosTerminal({ onIrAErp }) {
   const { 
     sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar, 
     todasLasOrdenesActivas, vistaLocal, setVistaLocal, modulos,
-    sedeActualIdRef  // 🔧 ref para que el WS ignore eventos de sedes anteriores
+    sedeActualIdRef,cargandoCaja,  // 🔧 ref para que el WS ignore eventos de sedes anteriores
   } = useTerminalData(sedeActualId, triggerRecarga, setConfiguracionGlobal, setEstadoCaja);
 
   useTerminalWS(sedeActualId, setMesas, setOrdenesLlevar, setSolicitudesBot, sedeActualIdRef);
@@ -205,7 +205,7 @@ export default function PosTerminal({ onIrAErp }) {
     }
   };
   
-  if (!cajaAbierta && !esDueño && vistaLocal !== null) {
+  if (!cajaAbierta && !cargandoCaja && vistaLocal !== null) {
     return (
       <div className={`h-screen flex flex-col items-center justify-center text-center p-6 ${tema === 'dark' ? 'bg-[#0a0a0a]' : 'bg-[#f0f0f0]'}`}>
         <span className="text-7xl mb-6">🔒</span>
@@ -214,8 +214,8 @@ export default function PosTerminal({ onIrAErp }) {
         </h1>
         <p className="text-neutral-500 font-bold mb-8 max-w-sm">
           {puedeAbrirCaja
-            ? 'No hay una sesión de caja activa. Puedes iniciar el turno ahora.'
-            : 'No hay sesión de caja activa. Espera a que el cajero o administrador abra la caja.'}
+            ? 'No hay una sesión de caja activa. Inicia el turno para comenzar.'
+            : 'Esperando que el cajero o administrador abra la caja.'}
         </p>
 
         {puedeAbrirCaja && (
@@ -228,7 +228,6 @@ export default function PosTerminal({ onIrAErp }) {
           </button>
         )}
 
-        {/* Modal apertura */}
         {modalAperturaAbierto && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-[#1a1a1a] border border-[#333] rounded-3xl w-full max-w-sm p-8 shadow-2xl">
