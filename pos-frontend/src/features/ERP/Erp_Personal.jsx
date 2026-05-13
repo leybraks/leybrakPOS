@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRendimientoEmpleados } from '../api/api'; // ← agregar al import
+import { getRendimientoEmpleados } from '../../api/api'; // ← agregar al import
 import { 
   Users, MapPin, Plus, Edit2, UserX, UserCheck, 
   Trophy, Star, Shield, Banknote, Utensils, Briefcase,
