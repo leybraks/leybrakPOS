@@ -53,17 +53,22 @@ const VistaInternaPOS = () => {
             const vistaDestino = getRolVista(rol);
 
             if (!vistaDestino) {
-              // Rol desconocido → no muestra nada
               setVista('sin_permiso');
               return;
             }
 
-            // Sincronizar localStorage con lo que dice el servidor
             localStorage.setItem('sede_id', sede_id);
             localStorage.setItem('empleado_id', empleado_id);
             localStorage.setItem('empleado_nombre', nombre);
             localStorage.setItem('negocio_id', negocio_id);
             localStorage.setItem('usuario_rol', rol);
+
+            // ✅ Verificar suscripción también para empleados
+            const sus = await verificarSuscripcion();
+            if (sus && !sus.puede_operar) {
+              setVista('bloqueado');
+              return;
+            }
 
             setSesion({ rol, nombre, sede_id });
             setVista(vistaDestino);
@@ -109,8 +114,7 @@ const VistaInternaPOS = () => {
     verificar();
   }, []);
 
-  const handleAccesoConcedido = (datosEmpleado) => {
-    // Normalizar — dueño pasa string, empleado pasa objeto
+  const handleAccesoConcedido = async (datosEmpleado) => {
     const datos = typeof datosEmpleado === 'string'
       ? { rol: datosEmpleado, nombre: null, sede_id: null }
       : datosEmpleado;
@@ -120,6 +124,13 @@ const VistaInternaPOS = () => {
 
     if (!vistaDestino) {
       setVista('sin_permiso');
+      return;
+    }
+
+    // ✅ Verificar suscripción al hacer login
+    const sus = await verificarSuscripcion();
+    if (sus && !sus.puede_operar) {
+      setVista('bloqueado');
       return;
     }
 
