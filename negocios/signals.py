@@ -43,127 +43,139 @@ def procesar_descuento_stock(sender, instance, created, **kwargs):
                             sede=sede, insumo_base=receta_opc.insumo
                         ).update(stock_actual=F('stock_actual') - gasto_total_opcion)
 
+LOGO_URL = 'https://pos.leybrak.com/static/img/logo.png'
+ 
 def _enviar_email_auditoria(negocio, accion, objeto, detalle):
     email_dueno = negocio.propietario.email
     if not email_dueno:
         return
-    
-    # Definir color del badge según la acción
+ 
+    # Color e ícono según tipo de acción
     if 'Eliminado' in accion:
-        color_badge = '#ef4444'
-        emoji = '🗑️'
+        color = '#ef4444'; emoji = '🗑️'
     elif 'Creado' in accion:
-        color_badge = '#10b981'
-        emoji = '✅'
+        color = '#10b981'; emoji = '✅'
     elif 'Precio' in accion:
-        color_badge = '#f59e0b'
-        emoji = '💰'
+        color = '#f59e0b'; emoji = '💰'
     elif 'Pago' in accion or 'Suscripción' in accion:
-        color_badge = '#8b5cf6'
-        emoji = '💳'
+        color = '#8b5cf6'; emoji = '💳'
+    elif 'Caja' in accion:
+        color = '#06b6d4'; emoji = '🏦'
     else:
-        color_badge = '#3b82f6'
-        emoji = '✏️'
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"></head>
-    <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
-        <tr><td align="center">
-          <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-            
-            <!-- HEADER -->
-            <tr>
-              <td style="background:#0a0a0a;padding:28px 32px;text-align:center;">
-                <p style="margin:0;color:#ff5a1f;font-size:22px;font-weight:900;letter-spacing:-0.5px;">BRAVA<span style="color:#ffffff;">POS</span></p>
-                <p style="margin:6px 0 0;color:#737373;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Sistema de Gestión</p>
-              </td>
-            </tr>
-
-            <!-- BADGE ACCIÓN -->
-            <tr>
-              <td style="padding:32px 32px 0;text-align:center;">
-                <span style="display:inline-block;background:{color_badge}18;color:{color_badge};border:1px solid {color_badge}40;padding:6px 16px;border-radius:100px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
-                  {emoji} {accion}
-                </span>
-              </td>
-            </tr>
-
-            <!-- NEGOCIO -->
-            <tr>
-              <td style="padding:16px 32px 0;text-align:center;">
-                <p style="margin:0;color:#111827;font-size:20px;font-weight:900;">"{negocio.nombre}"</p>
-                <p style="margin:4px 0 0;color:#9ca3af;font-size:13px;">Se realizó el siguiente cambio en tu negocio</p>
-              </td>
-            </tr>
-
-            <!-- DETALLE -->
-            <tr>
-              <td style="padding:24px 32px;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;">
-                  <tr>
-                    <td style="padding:20px 24px;">
-                      <table width="100%" cellpadding="0" cellspacing="8">
-                        <tr>
-                          <td style="padding:6px 0;border-bottom:1px solid #e5e7eb;">
-                            <span style="color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Objeto</span><br>
-                            <span style="color:#111827;font-size:15px;font-weight:700;margin-top:2px;display:block;">{objeto}</span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:12px 0 0;">
-                            <span style="color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Detalle</span><br>
-                            <span style="color:#374151;font-size:14px;margin-top:4px;display:block;line-height:1.6;">{detalle}</span>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <!-- ALERTA -->
-            <tr>
-              <td style="padding:0 32px 24px;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border-radius:10px;border:1px solid #fde68a;">
-                  <tr>
-                    <td style="padding:14px 18px;">
-                      <p style="margin:0;color:#92400e;font-size:12px;font-weight:600;">
-                        ⚠️ Si no reconoces este cambio, contacta a soporte inmediatamente.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <!-- FOOTER -->
-            <tr>
-              <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 32px;text-align:center;">
-                <p style="margin:0;color:#9ca3af;font-size:11px;">Este es un correo automático de <strong>BravaPOS</strong> · <a href="https://leybrak.com" style="color:#ff5a1f;text-decoration:none;">leybrak.com</a></p>
-              </td>
-            </tr>
-
-          </table>
-        </td></tr>
-      </table>
-    </body>
-    </html>
-    """
-
-    texto_plano = f"[BravaPOS] {accion}: {objeto}\n\nNegocio: {negocio.nombre}\nDetalle: {detalle}\n\nSi no reconoces este cambio, contacta a soporte."
-
+        color = '#ff5a1f'; emoji = '✏️'
+ 
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 16px;">
+<tr><td align="center">
+<table width="100%" style="max-width:560px;" cellpadding="0" cellspacing="0">
+ 
+  <!-- CARD -->
+  <tr><td style="background:#111111;border-radius:20px;border:1px solid #222222;overflow:hidden;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+ 
+    <!-- HEADER -->
+    <tr>
+      <td style="background:#0a0a0a;padding:28px 32px;text-align:center;border-bottom:1px solid #1a1a1a;">
+        <img src="{LOGO_URL}" width="48" height="48" alt="Logo" style="display:block;margin:0 auto 12px;border-radius:10px;">
+        <p style="margin:0;font-size:20px;font-weight:900;letter-spacing:-0.5px;color:#ffffff;">
+          LEYBRAK <span style="color:#ff5a1f;">POS</span>
+        </p>
+        <p style="margin:4px 0 0;font-size:10px;font-weight:700;letter-spacing:3px;color:#525252;text-transform:uppercase;">
+          Notificación de Auditoría
+        </p>
+      </td>
+    </tr>
+ 
+    <!-- BADGE -->
+    <tr>
+      <td style="padding:28px 32px 0;text-align:center;">
+        <span style="display:inline-block;background:{color}18;color:{color};border:1px solid {color}40;padding:7px 18px;border-radius:100px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+          {emoji}&nbsp;&nbsp;{accion}
+        </span>
+      </td>
+    </tr>
+ 
+    <!-- NEGOCIO -->
+    <tr>
+      <td style="padding:14px 32px 0;text-align:center;">
+        <p style="margin:0;font-size:22px;font-weight:900;color:#ffffff;">"{negocio.nombre}"</p>
+        <p style="margin:6px 0 0;font-size:13px;color:#525252;">Se realizó el siguiente cambio en tu negocio</p>
+      </td>
+    </tr>
+ 
+    <!-- DETALLE CARD -->
+    <tr>
+      <td style="padding:24px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:14px;border:1px solid #2a2a2a;">
+          <tr>
+            <td style="padding:22px 24px;">
+ 
+              <!-- Objeto -->
+              <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#525252;">Objeto</p>
+              <p style="margin:0 0 18px;font-size:16px;font-weight:800;color:#ffffff;padding-bottom:16px;border-bottom:1px solid #2a2a2a;">{objeto}</p>
+ 
+              <!-- Detalle -->
+              <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#525252;">Detalle</p>
+              <p style="margin:0;font-size:14px;color:#a3a3a3;line-height:1.7;">{detalle}</p>
+ 
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+ 
+    <!-- ALERTA -->
+    <tr>
+      <td style="padding:0 32px 28px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#2a1a00;border-radius:10px;border:1px solid #451a00;">
+          <tr>
+            <td style="padding:14px 18px;">
+              <p style="margin:0;font-size:12px;font-weight:600;color:#fb923c;">
+                ⚠️&nbsp; Si no reconoces este cambio, contacta a soporte inmediatamente.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+ 
+    <!-- FOOTER -->
+    <tr>
+      <td style="background:#0a0a0a;border-top:1px solid #1a1a1a;padding:18px 32px;text-align:center;">
+        <p style="margin:0;font-size:11px;color:#404040;">
+          Correo automático de <strong style="color:#737373;">Leybrak POS</strong> &nbsp;·&nbsp;
+          <a href="https://leybrak.com" style="color:#ff5a1f;text-decoration:none;">leybrak.com</a>
+        </p>
+      </td>
+    </tr>
+ 
+  </table>
+  </td></tr>
+ 
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+ 
+    texto_plano = (
+        f"[Leybrak POS] {accion}: {objeto}\n\n"
+        f"Negocio: {negocio.nombre}\n"
+        f"Detalle: {detalle}\n\n"
+        f"Si no reconoces este cambio, contacta a soporte."
+    )
+ 
     try:
         msg = EmailMultiAlternatives(
-            subject=f'[BravaPOS] {accion}: {objeto}',
+            subject=f'[Leybrak POS] {accion}: {objeto}',
             body=texto_plano,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[email_dueno],
         )
-        msg.attach_alternative(html, "text/html")
+        msg.attach_alternative(html, 'text/html')
         msg.send(fail_silently=True)
     except Exception:
         pass
