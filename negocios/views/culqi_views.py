@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
  
-from .models import Pago, Orden
+from ..models import Pago, Orden
  
 logger = logging.getLogger(__name__)
  
@@ -32,7 +32,7 @@ def _get_negocio(user):
  
  
 def _get_sesion_caja_activa(negocio):
-    from .models import SesionCaja
+    from ..models import SesionCaja
     return SesionCaja.objects.filter(negocio=negocio, estado='abierta').first()
  
  
