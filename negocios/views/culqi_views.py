@@ -1,5 +1,6 @@
 import json
 import logging
+from time import time
 import requests
  
 from django.db import transaction, IntegrityError
@@ -80,19 +81,21 @@ def generar_qr_culqi(request):
         return Response({'error': 'Esta orden ya está pagada'}, status=400)
  
     monto_centavos = int(monto_restante * 100)
- 
+    tiempo_actual = int(time.time())
     payload = {
         'amount':        monto_centavos,
         'currency_code': 'PEN',
         'description':   descripcion[:250],
-        'order_number':  f'POS-{orden.id}-{negocio.id}',
+        # Solución 2: Hacemos el order_number estrictamente único añadiendo el timestamp
+        'order_number':  f'POS-{orden.id}-{negocio.id}-{tiempo_actual}', 
         'client_details': {
             'first_name':   negocio.nombre[:50],
             'last_name':    'POS',
-            'email':        f'pos@negocio{negocio.id}.brava.pe',
+            'email':        f'pos@negocio{negocio.id}.leybrak.com', # Ya actualizado sin 'brava.pe'
             'phone_number': (negocio.yape_numero or '999000000')[:15],
         },
-        'expiration_date': 300,
+        # Solución 1: Hora actual + 300 segundos (5 minutos en el futuro)
+        'expiration_date': tiempo_actual + 300, 
         'confirm':         False,
     }
  
@@ -220,7 +223,7 @@ def cobrar_tarjeta_culqi(request):
     payload = {
         'amount':        int(monto_restante * 100),
         'currency_code': 'PEN',
-        'email':         f'pos@negocio{negocio.id}.brava.pe',
+        'email':         f'pos@negocio{negocio.id}.leybrak.com',
         'source_id':     token,
         'description':   f'Pago POS orden #{orden_id}',
         'capture':       True,

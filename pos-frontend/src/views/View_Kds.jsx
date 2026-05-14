@@ -4,6 +4,11 @@ import api from '../api/api';
 import usePosStore from '../store/usePosStore';
 import ModalAlertaBot from '../components/modals/ModalAlertaBot';
 import { useToast } from '../context/ToastContext';
+import { 
+  ChefHat, LayoutList, BarChart2, Clock, 
+  AlertTriangle, Undo2, Bell, ShoppingBag, 
+  Wifi, PowerOff, CheckCircle2, ChevronDown, Check
+} from 'lucide-react';
 
 export default function KdsView({ onVolver }) {
   localStorage.setItem('modo_dispositivo', 'cocina');
@@ -12,7 +17,7 @@ export default function KdsView({ onVolver }) {
   const setConfiguracionGlobal = usePosStore((state) => state.setConfiguracionGlobal);
 
   const tema = configuracionGlobal?.temaFondo || 'dark';
-  const colorPrimario = configuracionGlobal?.colorPrimario || '#ff5a1f';
+  const colorPrimario = configuracionGlobal?.colorPrimario || '#3b82f6'; // Fallback al azul del SaaS
   
   const [verificandoAcceso, setVerificandoAcceso] = useState(true);
   const [accesoPermitido, setAccesoPermitido] = useState(false);
@@ -24,7 +29,7 @@ export default function KdsView({ onVolver }) {
   const estaciones = ['TODO', 'COCINA', 'BAR', 'PARRILLA'];
 
   const [ordenes, setOrdenes] = useState([]);
-  const [solicitudesBot, setSolicitudesBot] = useState([]); // ✨ ESTADO PARA EL BOT
+  const [solicitudesBot, setSolicitudesBot] = useState([]); 
   const ws = useRef(null);
 
   const sedeActualId = localStorage.getItem('sede_id');
@@ -40,7 +45,7 @@ export default function KdsView({ onVolver }) {
 
         if (setConfiguracionGlobal) {
           setConfiguracionGlobal({
-            colorPrimario: datosBD.color_primario || '#ff5a1f',
+            colorPrimario: datosBD.color_primario || '#3b82f6',
             temaFondo: datosBD.tema_fondo || 'dark',
             modulos: {
               ...(configuracionGlobal?.modulos || {}),
@@ -57,7 +62,6 @@ export default function KdsView({ onVolver }) {
     verificarPermisos();
   }, [negocioId]); 
 
-  // --- LÓGICA DE WEBSOCKET (CORREGIDA) ---
   // --- LÓGICA DE WEBSOCKET (MODO PURISTA + AUTO-RECONEXIÓN) ---
   useEffect(() => {
     if (!accesoPermitido || !sedeActualId) return;
@@ -68,11 +72,9 @@ export default function KdsView({ onVolver }) {
     const conectar = () => {
       if (unmounted) return;
 
-      // 1. URL robusta y limpia
       const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
       const baseUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://').replace('/api', '');
       
-      // 🍪 MODO PURISTA: Sin tokens en la URL. Usamos la cookie automática.
       const urlCocina = `${baseUrl}/ws/cocina/${sedeActualId}/`;
       
       ws.current = new WebSocket(urlCocina);
@@ -82,7 +84,6 @@ export default function KdsView({ onVolver }) {
       ws.current.onmessage = (event) => {
         const data = JSON.parse(event.data);
         
-        // ✅ RECEPTOR DE NUEVAS ÓRDENES
         if (data.type === 'orden_nueva' || data.type === 'nueva_orden') {
           const nuevosItems = data.orden.detalles.map(d => ({
             id: d.id,
@@ -108,7 +109,8 @@ export default function KdsView({ onVolver }) {
               kds_id: `ws_${data.orden.id}_${Date.now()}`,
               id: data.orden.id,
               real_id: data.orden.real_id || data.orden.id,
-              origen: data.orden.mesa ? `Mesa ${data.orden.mesa}` : `🛍️ DELIVERY - ${data.orden.cliente_nombre || 'Cliente'}`, 
+              origen: data.orden.mesa ? `Mesa ${data.orden.mesa}` : `DELIVERY - ${data.orden.cliente_nombre || 'Cliente'}`, 
+              is_delivery: !data.orden.mesa,
               minutos: 0, 
               estacion: 'COCINA', 
               items: nuevosItems
@@ -117,7 +119,6 @@ export default function KdsView({ onVolver }) {
           });
         }
 
-        // ✨ RECEPTOR DE LA ALERTA DEL BOT
         if (data.type === 'solicitud_cambio_nueva') {
           console.log('🤖 Solicitud del Bot recibida en KDS:', data);
           setSolicitudesBot(prev => {
@@ -167,7 +168,8 @@ export default function KdsView({ onVolver }) {
           return {
             kds_id: `mem_${o.id}_${Math.random()}`,
             id: o.id,
-            origen: o.mesa ? `Mesa ${o.mesa}` : `🛍️ LLEVAR - ${o.cliente_nombre || 'Cliente'}`,
+            origen: o.mesa ? `Mesa ${o.mesa}` : `LLEVAR - ${o.cliente_nombre || 'Cliente'}`,
+            is_delivery: !o.mesa,
             minutos: isNaN(minutosTranscurridos) ? 0 : minutosTranscurridos, 
             estacion: 'COCINA', 
             items: o.detalles.map(d => ({
@@ -222,7 +224,6 @@ export default function KdsView({ onVolver }) {
     return Object.entries(resumen);
   };
 
-  // ✨ RESOLUTOR DEL BOT PARA LA COCINA
   const manejarResolucionBot = async (solicitud_id, orden_id, decision) => {
     try {
       await api.post(`/ordenes/${orden_id}/resolver_solicitud_bot/`, {
@@ -232,10 +233,8 @@ export default function KdsView({ onVolver }) {
       setSolicitudesBot(prev => prev.filter(s => s.solicitud_id !== solicitud_id));
       
       if (decision === 'aprobar') {
-        // Recargamos silenciosamente para quitar la orden si fue cancelada
         const respuesta = await getOrdenes({ sede_id: sedeActualId });
-        const pendientes = respuesta.data.filter(o => o.estado === 'preparando');
-        // ... (lógica de formateo omitida por brevedad, pero la orden desaparecerá)
+        // Lógica silenciosa omitida para no alterar el funcionamiento
       }
     } catch (error) {
       toast.error('Error al resolver la solicitud del bot.');
@@ -244,10 +243,13 @@ export default function KdsView({ onVolver }) {
 
   const ordenesFiltradas = ordenes.filter(o => estacionActiva === 'TODO' || o.estacion === estacionActiva);
 
-  // ... (Tus validaciones de verificandoAcceso y accesoPermitido se mantienen igual)
+  // ════════════════════════════════════════════════════════════════════════
+  // ESTADOS DE CARGA Y PERMISOS (Dark SaaS Vibe)
+  // ════════════════════════════════════════════════════════════════════════
   if (verificandoAcceso) {
     return (
-      <div className={`min-h-screen flex items-center justify-center font-bold tracking-widest animate-pulse transition-colors duration-500 ${tema === 'dark' ? 'bg-[#0a0a0a] text-neutral-500' : 'bg-[#f0f0f0] text-gray-400'}`}>
+      <div className={`min-h-screen flex flex-col items-center justify-center font-bold tracking-widest animate-pulse transition-colors duration-500 ${tema === 'dark' ? 'bg-[#050505] text-gray-500' : 'bg-[#f8fafc] text-gray-400'}`}>
+        <ChefHat size={40} className="mb-4 opacity-50" />
         VERIFICANDO PERMISOS DE COCINA...
       </div>
     );
@@ -255,168 +257,202 @@ export default function KdsView({ onVolver }) {
 
   if (!accesoPermitido) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-6 text-center animate-fadeIn transition-colors duration-500 ${tema === 'dark' ? 'bg-[#0a0a0a]' : 'bg-[#f0f0f0]'}`}>
-        <div className={`max-w-md p-10 rounded-3xl border shadow-2xl ${tema === 'dark' ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
-          <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-4xl">🚫</span>
+      <div className={`min-h-screen flex items-center justify-center p-6 text-center animate-fadeIn transition-colors duration-500 ${tema === 'dark' ? 'bg-[#050505]' : 'bg-[#f8fafc]'}`}>
+        <div className={`max-w-md p-10 rounded-2xl border shadow-2xl ${tema === 'dark' ? 'bg-[#0a0a0a] border-[#1e1e1e]' : 'bg-white border-gray-200'}`}>
+          <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center mx-auto mb-6">
+            <PowerOff size={28} className="text-red-500" />
           </div>
-          <h1 className={`text-2xl font-black mb-2 uppercase tracking-tight ${tema === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <h1 className={`text-2xl font-black mb-2 tracking-tight ${tema === 'dark' ? 'text-white' : 'text-gray-900'}`}>
             Módulo Desactivado
           </h1>
-          <p className={`mb-8 leading-relaxed ${tema === 'dark' ? 'text-neutral-500' : 'text-gray-500'}`}>
-            La Pantalla de Cocina (KDS) no está habilitada para este negocio. 
+          <p className={`mb-8 text-sm leading-relaxed ${tema === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            La Pantalla de Cocina (KDS) no está habilitada para la suscripción actual de este negocio. 
           </p>
           <button 
             onClick={onVolver} 
-            className={`w-full py-4 rounded-2xl font-black transition-all active:scale-95 ${tema === 'dark' ? 'bg-white text-black hover:bg-neutral-200' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+            className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${tema === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
           >
-            VOLVER AL PANEL
+            Volver al Panel
           </button>
         </div>
       </div>
     );
   }
 
+  // ════════════════════════════════════════════════════════════════════════
+  // RENDER PRINCIPAL KDS
+  // ════════════════════════════════════════════════════════════════════════
   return (
-    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-500 ${tema === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#f0f0f0] text-gray-900'}`}>
-      {/* HEADER */}
-      <header className={`p-4 flex flex-col gap-4 shadow-md sticky top-0 z-20 transition-colors ${tema === 'dark' ? 'bg-[#111] border-b border-[#222]' : 'bg-white border-b border-gray-200'}`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center justify-between w-full md:w-auto gap-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-black tracking-widest uppercase leading-none" style={{ color: colorPrimario }}>
-                Cocina<br className="hidden sm:block md:hidden"/> Viva
-              </h1>
+    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-500 ${tema === 'dark' ? 'bg-[#050505] text-white' : 'bg-[#f8fafc] text-gray-900'}`}>
+      
+      {/* HEADER TIPO DASHBOARD */}
+      <header className={`px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md sticky top-0 z-20 border-b ${tema === 'dark' ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
+        
+        <div className="flex items-center gap-6 w-full md:w-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-opacity-10" style={{ backgroundColor: `${colorPrimario}15`, color: colorPrimario }}>
+              <ChefHat size={22} />
             </div>
-            <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 ${tema === 'dark' ? 'bg-[#222]' : 'bg-gray-100 border border-gray-200'}`}>
-              <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-              <span className={`text-[10px] sm:text-xs font-bold ${tema === 'dark' ? 'text-neutral-400' : 'text-gray-500'}`}>EN LÍNEA</span>
+            <div>
+              <h1 className="text-lg font-black tracking-tight leading-none">LEYBRAK <span style={{ color: colorPrimario }}>KDS</span></h1>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${tema === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>Sistema en línea</span>
+              </div>
             </div>
           </div>
-          <div className={`font-mono text-sm sm:text-lg font-bold px-4 py-3 md:py-2 rounded-xl border w-full md:w-auto text-center ${tema === 'dark' ? 'bg-[#1a1a1a] border-[#333] text-neutral-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
-            <span className={tema === 'dark' ? 'text-white' : 'text-gray-900'}>{ordenesFiltradas.length}</span> PEDIDOS PENDIENTES
+          
+          <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border ${tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e]' : 'bg-gray-50 border-gray-200'}`}>
+            <LayoutList size={16} className={tema === 'dark' ? 'text-gray-500' : 'text-gray-400'} />
+            <span className={`font-mono font-bold text-sm ${tema === 'dark' ? 'text-white' : 'text-gray-900'}`}>{ordenesFiltradas.length}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${tema === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>Pendientes</span>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 z-30">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="relative min-w-[200px]">
             <button 
               onClick={() => setEstacionesExpandidas(!estacionesExpandidas)}
-              className={`w-full flex justify-between items-center px-4 py-3 rounded-xl border transition-colors shadow-sm ${tema === 'dark' ? 'bg-[#1a1a1a] text-neutral-200 border-[#333] hover:bg-[#222]' : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'}`}
+              className={`w-full flex justify-between items-center px-4 py-3 rounded-xl border transition-colors ${tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e] hover:border-gray-700' : 'bg-white border-gray-200 hover:border-gray-300'}`}
             >
-              <span className="font-semibold text-sm">
-                Estación: <span className="ml-1" style={{ color: colorPrimario }}>{estacionActiva}</span>
-              </span>
-              <svg className={`w-5 h-5 transform transition-transform duration-200 ${estacionesExpandidas ? 'rotate-180' : 'text-neutral-500'}`} style={estacionesExpandidas ? { color: colorPrimario } : {}} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              <div className="flex items-center gap-2">
+                <span className={`text-[11px] font-bold uppercase tracking-widest ${tema === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>Estación:</span>
+                <span className="font-bold text-sm" style={{ color: colorPrimario }}>{estacionActiva}</span>
+              </div>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${estacionesExpandidas ? 'rotate-180' : ''} ${tema === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
             </button>
+
             {estacionesExpandidas && (
-              <div className={`absolute top-full left-0 w-full border rounded-xl mt-2 p-2 grid grid-cols-2 gap-2 shadow-2xl animate-fadeIn z-50 ${tema === 'dark' ? 'bg-[#1a1a1a] border-[#333]' : 'bg-white border-gray-200'}`}>
-                  {estaciones.map(est => {
-                    const isActivo = estacionActiva === est;
-                    return (
-                      <button 
-                        key={est} 
-                        onClick={() => { setEstacionActiva(est); setEstacionesExpandidas(false); }} 
-                        className={`py-2.5 px-3 rounded-lg text-sm font-semibold transition-colors border text-center ${!isActivo ? (tema === 'dark' ? 'bg-[#222] text-neutral-400 border-[#333] hover:bg-[#2a2a2a]' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100') : ''}`}
-                        style={isActivo ? { backgroundColor: colorPrimario, borderColor: colorPrimario, color: '#fff' } : {}}
-                      >
-                          {est}
-                      </button>
-                    )
-                  })}
+              <div className={`absolute top-full left-0 w-full border rounded-xl mt-2 p-2 grid grid-cols-2 gap-2 shadow-2xl animate-fadeIn z-50 ${tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e]' : 'bg-white border-gray-200'}`}>
+                {estaciones.map(est => {
+                  const isActivo = estacionActiva === est;
+                  return (
+                    <button 
+                      key={est} 
+                      onClick={() => { setEstacionActiva(est); setEstacionesExpandidas(false); }} 
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border text-center ${!isActivo ? (tema === 'dark' ? 'bg-[#0a0a0a] text-gray-400 border-[#1a1a1a] hover:bg-[#161616]' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100') : ''}`}
+                      style={isActivo ? { backgroundColor: colorPrimario, borderColor: colorPrimario, color: '#fff' } : {}}
+                    >
+                      {est}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
+
           <button 
             onClick={() => setVerConsolidado(!verConsolidado)}
-            className={`px-6 py-3 rounded-xl font-bold border transition-all sm:w-auto w-full flex justify-center items-center gap-2 ${!verConsolidado ? (tema === 'dark' ? 'bg-[#1a1a1a] border-[#333] text-neutral-400 hover:text-white hover:bg-[#222]' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50') : ''}`}
-            style={verConsolidado ? { backgroundColor: colorPrimario, borderColor: colorPrimario, color: '#fff', boxShadow: `0 0 15px ${colorPrimario}40` } : {}}
+            className={`px-5 py-3 rounded-xl font-bold text-sm border transition-all flex justify-center items-center gap-2 ${!verConsolidado ? (tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e] text-gray-300 hover:text-white hover:border-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50') : ''}`}
+            style={verConsolidado ? { backgroundColor: colorPrimario, borderColor: colorPrimario, color: '#fff' } : {}}
           >
-            {verConsolidado ? <><span className="text-xl">📋</span> Ver Tickets</> : <><span className="text-xl">📊</span> Ver Consolidado</>}
+            {verConsolidado ? <><LayoutList size={18} /> Ver Comandas</> : <><BarChart2 size={18} /> Consolidado</>}
           </button>
         </div>
       </header>
 
-      {/* ÁREA DE TICKETS */}
-      <div className="p-4 flex-1 overflow-y-auto">
+      {/* ÁREA PRINCIPAL */}
+      <div className="p-6 flex-1 overflow-y-auto">
         {verConsolidado ? (
-          <div className={`w-full max-w-2xl mx-auto rounded-3xl p-6 md:p-8 border animate-fadeIn ${tema === 'dark' ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200 shadow-md'}`}>
-            <h2 className="text-neutral-500 font-bold mb-6 uppercase tracking-widest text-center text-sm">Resumen de Producción: {estacionActiva}</h2>
+          /* VISTA CONSOLIDADA */
+          <div className={`w-full max-w-3xl mx-auto rounded-2xl p-8 border animate-fadeIn ${tema === 'dark' ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200 shadow-sm'}`}>
+            <h2 className={`font-bold mb-6 uppercase tracking-widest text-center text-xs flex items-center justify-center gap-2 ${tema === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+              <BarChart2 size={16} /> Resumen de Producción: {estacionActiva}
+            </h2>
             <div className="space-y-3">
               {obtenerConsolidado().length > 0 ? (
                 obtenerConsolidado().map(([nombre, cant]) => (
-                  <div key={nombre} className={`flex justify-between items-center p-4 md:p-6 rounded-2xl border ${tema === 'dark' ? 'bg-[#1a1a1a] border-[#222]' : 'bg-gray-50 border-gray-200'}`}>
-                    <span className="text-lg md:text-2xl font-bold">{nombre}</span>
-                    <span className="text-3xl md:text-4xl font-black" style={{ color: colorPrimario }}>x{cant}</span>
+                  <div key={nombre} className={`flex justify-between items-center p-5 rounded-xl border ${tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e]' : 'bg-gray-50 border-gray-100'}`}>
+                    <span className="text-lg font-bold">{nombre}</span>
+                    <span className="text-2xl font-black" style={{ color: colorPrimario }}>x{cant}</span>
                   </div>
                 ))
               ) : (
-                <div className="text-center text-neutral-600 py-10 font-bold">No hay platos pendientes.</div>
+                <div className="text-center flex flex-col items-center justify-center py-16">
+                  <CheckCircle2 size={40} className="text-gray-500 mb-3 opacity-50" />
+                  <p className="text-gray-500 font-bold text-sm">No hay platos pendientes en esta estación.</p>
+                </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start content-start">
+          /* GRID DE TICKETS */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start content-start">
             {ordenesFiltradas.length === 0 && (
-              <div className="col-span-full text-center py-20 text-neutral-500 font-bold text-xl">
-                Esperando comandas... 👨‍🍳
+              <div className="col-span-full flex flex-col items-center justify-center py-24 opacity-50">
+                <ChefHat size={64} className="text-gray-500 mb-4" />
+                <p className="text-gray-500 font-bold tracking-widest uppercase text-sm">Esperando comandas...</p>
               </div>
             )}
+
             {ordenesFiltradas.map(orden => {
-              let colorHeader = tema === 'dark' ? 'bg-[#1a1a1a] border-[#333]' : 'bg-gray-50 border-gray-200';
-              let colorTiempo = tema === 'dark' ? 'text-green-400' : 'text-green-600';
+              // Estilos base para la tarjeta (SaaS Moderno)
+              let colorHeader = tema === 'dark' ? 'bg-[#121212] border-b border-[#1e1e1e]' : 'bg-gray-50 border-b border-gray-100';
+              let badgeColor = tema === 'dark' ? 'bg-[#1a1a1a] text-green-400 border-[#222]' : 'bg-green-50 text-green-600 border-green-100';
               let textoTiempo = 'A tiempo';
               
               if (orden.minutos >= 10 && orden.minutos < 20) {
-                colorHeader = tema === 'dark' ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-yellow-50 border-yellow-300';
-                colorTiempo = tema === 'dark' ? 'text-yellow-400' : 'text-yellow-600';
+                colorHeader = tema === 'dark' ? 'bg-amber-500/5 border-b border-amber-500/10' : 'bg-amber-50/50 border-b border-amber-100';
+                badgeColor = tema === 'dark' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-100 text-amber-700 border-amber-200';
                 textoTiempo = 'Demorado';
               } else if (orden.minutos >= 20) {
-                colorHeader = tema === 'dark' ? 'bg-red-500/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse-slow' : 'bg-red-50 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse-slow';
-                colorTiempo = tema === 'dark' ? 'text-red-400 font-black' : 'text-red-600 font-black';
+                colorHeader = tema === 'dark' ? 'bg-red-500/10 border-b border-red-500/20' : 'bg-red-50 border-b border-red-100';
+                badgeColor = tema === 'dark' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-red-100 text-red-700 border-red-200';
                 textoTiempo = '¡URGENTE!';
               }
 
               const todosListos = orden.items.every(i => i.listo);
 
               return (
-                <div key={orden.kds_id} className={`w-full border rounded-2xl overflow-hidden flex flex-col shadow-xl animate-fadeIn ${tema === 'dark' ? 'bg-[#121212] border-[#2a2a2a]' : 'bg-white border-gray-200'}`}>
-                  <div className={`p-4 border-b flex justify-between items-center ${colorHeader}`}>
-                    <div>
-                      <h2 className="text-xl sm:text-2xl font-black tracking-tight truncate max-w-[150px] sm:max-w-[180px]">{orden.origen}</h2>
-                      <p className="text-neutral-400 text-xs mt-1"># {orden.id}</p>
+                <div key={orden.kds_id} className={`w-full rounded-2xl overflow-hidden flex flex-col shadow-lg transition-all animate-fadeIn border ${tema === 'dark' ? 'bg-[#0a0a0a] border-[#1e1e1e]' : 'bg-white border-gray-200'}`}>
+                  
+                  {/* Card Header */}
+                  <div className={`p-4 flex justify-between items-start ${colorHeader}`}>
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        {orden.is_delivery ? <ShoppingBag size={14} className={tema === 'dark' ? 'text-gray-400' : 'text-gray-500'}/> : null}
+                        <h2 className="text-lg font-bold tracking-tight truncate">{orden.origen}</h2>
+                      </div>
+                      <p className={`text-xs font-mono ${tema === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>#{orden.id}</p>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-2xl sm:text-3xl font-mono font-bold ${colorTiempo}`}>{orden.minutos}'</p>
-                      <p className={`text-[9px] sm:text-[10px] uppercase tracking-widest ${colorTiempo}`}>{textoTiempo}</p>
+                    
+                    <div className={`flex flex-col items-end px-3 py-1.5 rounded-lg border ${badgeColor}`}>
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={12} />
+                        <span className="text-xl font-black font-mono leading-none">{orden.minutos}'</span>
+                      </div>
+                      <span className="text-[9px] uppercase tracking-widest font-bold mt-1 opacity-80">{textoTiempo}</span>
                     </div>
                   </div>
 
-                  <div className="p-2 flex-1 space-y-1">
+                  {/* Items de la Comanda */}
+                  <div className="p-3 flex-1 space-y-2">
                     {orden.items.map(item => (
                       <button 
                         key={item.id}
                         onClick={() => tacharItem(orden.kds_id, item.id)}
-                        className={`w-full text-left p-3 rounded-xl flex items-start gap-3 transition-colors active:scale-[0.98] ${item.listo ? (tema === 'dark' ? 'bg-[#1a1a1a] opacity-50' : 'bg-gray-50 opacity-60') : (tema === 'dark' ? 'bg-[#222] hover:bg-[#2a2a2a]' : 'bg-white border border-gray-100 shadow-sm hover:bg-gray-50')}`}
+                        className={`w-full text-left p-3 rounded-xl flex items-start gap-3 transition-all active:scale-[0.98] border ${item.listo ? (tema === 'dark' ? 'bg-[#050505] border-[#121212] opacity-40' : 'bg-gray-50 border-gray-100 opacity-50') : (tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e] hover:border-gray-700' : 'bg-white border-gray-100 shadow-sm hover:border-gray-300')}`}
                       >
-                        <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-lg border ${item.listo ? 'bg-green-500/20 border-green-500/50 text-green-500' : (tema === 'dark' ? 'bg-[#111] border-[#444]' : 'bg-white border-gray-300')}`} style={!item.listo ? { color: colorPrimario } : {}}>
-                          {item.cant}
+                        {/* Cantidad Badge */}
+                        <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-bold text-sm border transition-colors ${item.listo ? 'bg-green-500/20 border-green-500/30 text-green-500' : (tema === 'dark' ? 'bg-[#1a1a1a] border-[#222]' : 'bg-gray-50 border-gray-200')}`} style={!item.listo ? { color: colorPrimario } : {}}>
+                          {item.listo ? <Check size={16} /> : item.cant}
                         </div>
                         
-                        <div className="flex-1 pt-0.5">
+                        <div className="flex-1 pt-0.5 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className={`font-bold text-[15px] sm:text-[17px] leading-tight ${item.listo ? 'line-through text-neutral-500' : (tema === 'dark' ? 'text-neutral-100' : 'text-gray-900')}`}>
+                            <p className={`font-semibold text-[15px] leading-tight truncate ${item.listo ? 'line-through' : (tema === 'dark' ? 'text-gray-200' : 'text-gray-800')}`}>
                               {item.nombre}
                             </p>
                             {item.agregado_reciente && !item.listo && (
-                              <span className="bg-blue-500/20 text-blue-500 border border-blue-500/30 text-[9px] uppercase tracking-widest font-black px-1.5 py-0.5 rounded flex items-center gap-1">
-                                🔔 Agregado {item.hora_agregado}
+                              <span className="bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                                <Bell size={10} /> Nuevo
                               </span>
                             )}
                           </div>
                           {item.notas && !item.listo && (
-                            <p className={`text-xs mt-1 font-semibold flex gap-1 items-center ${tema === 'dark' ? 'text-yellow-400' : 'text-orange-500'}`}>
-                              <span className="text-[10px]">⚠️</span> {item.notas}
+                            <p className={`text-xs mt-1.5 font-medium flex gap-1.5 items-start ${tema === 'dark' ? 'text-amber-400' : 'text-orange-600'}`}>
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" /> 
+                              <span className="leading-snug">{item.notas}</span>
                             </p>
                           )}
                         </div>
@@ -424,15 +460,17 @@ export default function KdsView({ onVolver }) {
                     ))}
                   </div>
 
-                  <div className={`p-3 border-t ${tema === 'dark' ? 'bg-[#111] border-[#222]' : 'bg-gray-50 border-gray-200'}`}>
+                  {/* Card Footer / Botón Despachar */}
+                  <div className={`p-3 border-t ${tema === 'dark' ? 'bg-[#050505] border-[#1e1e1e]' : 'bg-gray-50 border-gray-100'}`}>
                     <button 
                       onClick={() => despacharOrden(orden)}
-                      className={`w-full py-4 rounded-xl font-black text-lg sm:text-xl tracking-widest transition-all active:scale-95 text-white ${todosListos ? 'bg-green-500 hover:bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]' : 'hover:brightness-110'}`}
+                      className={`w-full py-3.5 rounded-xl font-bold text-sm tracking-widest uppercase transition-all flex items-center justify-center gap-2 active:scale-[0.98] text-white ${todosListos ? 'bg-green-600 hover:bg-green-500 shadow-[0_4px_15px_rgba(22,163,74,0.3)]' : 'opacity-90 hover:opacity-100'}`}
                       style={!todosListos ? { backgroundColor: colorPrimario } : {}}
                     >
-                      {todosListos ? '¡DESPACHAR!' : 'MARCAR LISTO ✓'}
+                      {todosListos ? <><CheckCircle2 size={18} /> Despachar Ticket</> : 'Marcar Listo'}
                     </button>
                   </div>
+
                 </div>
               );
             })}
@@ -440,24 +478,27 @@ export default function KdsView({ onVolver }) {
         )}
       </div>
 
-      {/* HISTORIAL */}
+      {/* FOOTER: HISTORIAL */}
       {historial.length > 0 && (
-        <footer className={`p-4 border-t flex gap-3 items-center overflow-x-auto scrollbar-hide ${tema === 'dark' ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200 shadow-inner'}`}>
-          <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${tema === 'dark' ? 'text-neutral-500' : 'text-gray-500'}`}>Recién Despachados:</span>
+        <footer className={`p-4 border-t flex gap-3 items-center overflow-x-auto scrollbar-hide z-10 ${tema === 'dark' ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center gap-2 pr-2 border-r border-gray-700/30">
+            <Clock size={14} className={tema === 'dark' ? 'text-gray-500' : 'text-gray-400'} />
+            <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${tema === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>Recientes:</span>
+          </div>
           {historial.map(h => (
             <button 
               key={h.kds_id}
               onClick={() => recuperarOrden(h)} 
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-colors whitespace-nowrap flex items-center gap-2 hover:border-red-500 hover:text-red-500 ${tema === 'dark' ? 'bg-[#1a1a1a] border-[#333] text-white' : 'bg-gray-50 border-gray-200 text-gray-800'}`}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-2 group ${tema === 'dark' ? 'bg-[#121212] border-[#1e1e1e] text-gray-300 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400' : 'bg-white border-gray-200 text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600'}`}
             >
-              <span className="text-red-500 text-lg leading-none">↩</span> 
+              <Undo2 size={14} className="text-gray-500 group-hover:text-red-500 transition-colors" />
               Recuperar {h.origen}
             </button>
           ))}
         </footer>
       )}
       
-      {/* ✨ RENDERIZAMOS EL MODAL DEL BOT EN LA COCINA */}
+      {/* MODAL DEL BOT */}
       {solicitudesBot.length > 0 && (
         <ModalAlertaBot 
           solicitud={solicitudesBot[0]} 

@@ -93,7 +93,7 @@ export default function Erp_Sidebar({
         <div className={`p-6 flex items-center shrink-0 h-24 relative ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className={`overflow-hidden transition-all duration-300 flex flex-col ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
             <h1 className="text-2xl font-black text-white tracking-tight whitespace-nowrap">
-              BRAVA <span style={{ color: colorPrimario }}>POS</span>
+              LEYBRAK <span style={{ color: colorPrimario }}>POS</span>
             </h1>
             <p className="text-[10px] text-neutral-500 font-bold tracking-widest uppercase mt-0.5">SaaS Platform</p>
           </div>
