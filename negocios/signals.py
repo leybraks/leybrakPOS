@@ -4,7 +4,7 @@ from django.db.models import F
 from django.db import transaction
 from django.core.mail import send_mail
 from core import settings # ✨ 1. Importamos la transacción
-from .models import HorarioVisibilidad, Pago, InsumoSede, RecetaDetalle, RecetaOpcion, ReglaNegocio
+from .models import HorarioVisibilidad, Negocio, Pago, InsumoSede, PagoSuscripcion, RecetaDetalle, RecetaOpcion, ReglaNegocio
 
 @receiver(post_save, sender=Pago)
 def procesar_descuento_stock(sender, instance, created, **kwargs):
@@ -107,3 +107,12 @@ def auditoria_regla_delete(sender, instance, **kwargs):
         objeto=instance.nombre or instance.get_tipo_display(),
         detalle=f'Tipo: {instance.get_tipo_display()}'
     )
+
+@receiver(post_save, sender=PagoSuscripcion)
+def reactivar_negocio_al_pagar(sender, instance, created, **kwargs):
+    """
+    Cuando un PagoSuscripcion se confirma, reactiva el negocio
+    si estaba bloqueado (activo=False).
+    """
+    if instance.estado == 'confirmado' and not instance.negocio.activo:
+        Negocio.objects.filter(id=instance.negocio.id).update(activo=True)

@@ -73,3 +73,7 @@ from .culqi_views import (
     estado_orden_culqi,
     generar_qr_culqi,
 )
+
+from .suscripcion_views import (
+    estado_suscripcion,
+)

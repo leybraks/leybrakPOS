@@ -14,10 +14,10 @@ from negocios.views.marketing_views import (
 )
 from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
+from negocios.views.suscripcion_views import estado_suscripcion
 # 🛡️ IMPORTAMOS TUS VISTAS SEGURAS DE COOKIES
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
 from . import views
-
 # El Router crea las URLs mágicamente
 router = DefaultRouter()
 
@@ -89,6 +89,7 @@ urlpatterns = [
     path('culqi/estado-orden/<str:order_id>/', estado_orden_culqi, name='culqi-estado-orden'),
     path('culqi/cobrar-tarjeta/',          cobrar_tarjeta_culqi, name='culqi-cobrar-tarjeta'),
     path('culqi/webhook/',                     webhook_culqi,        name='culqi-webhook'),
+    path('negocio/estado-suscripcion/', estado_suscripcion, name='estado-suscripcion'),
     path('combos-promocionales/<int:pk>/', ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
     path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
 ]

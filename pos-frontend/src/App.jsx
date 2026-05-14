@@ -26,9 +26,21 @@ const getRolVista = (rol) =>
   ROL_A_VISTA[rol?.toLowerCase().trim()] || null;
 
 const VistaInternaPOS = () => {
-  const [vista, setVista] = useState(null); // null mientras carga
-  const [sesion, setSesion] = useState(null); // datos del usuario activo
-  const [cargando, setCargando] = useState(true);
+  const [vista, setVista]           = useState(null);
+  const [sesion, setSesion]         = useState(null);
+  const [cargando, setCargando]     = useState(true);
+  const [suscripcion, setSuscripcion] = useState(null); // estado de suscripción
+
+  // Verifica suscripción solo para roles que usan el ERP/POS
+  const verificarSuscripcion = async () => {
+    try {
+      const res = await api.get('/negocio/estado-suscripcion/');
+      setSuscripcion(res.data);
+      return res.data;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const verificar = async () => {
@@ -74,6 +86,14 @@ const VistaInternaPOS = () => {
 
           if (negocio_id) localStorage.setItem('negocio_id', negocio_id);
           setSesion({ rol });
+
+          // ✅ Verificar suscripción para dueño/admin
+          const sus = await verificarSuscripcion();
+          if (sus && !sus.puede_operar) {
+            setVista('bloqueado');
+            return;
+          }
+
           setVista(vistaDestino);
           return;
         }
@@ -118,8 +138,6 @@ const VistaInternaPOS = () => {
     );
   }
 
-  // 🛡️ Pantalla de acceso denegado — si alguien manipula localStorage
-  // y no tiene cookie válida, ve esto en lugar de los datos
   if (vista === 'sin_permiso') {
     return (
       <div className="bg-[#0a0a0a] h-screen flex flex-col items-center justify-center text-center p-6">
@@ -129,10 +147,7 @@ const VistaInternaPOS = () => {
           No tienes permisos para ver esta sección. Contacta al administrador.
         </p>
         <button
-          onClick={async () => {
-            await cerrarSesionGlobal();
-            setVista('login');
-          }}
+          onClick={async () => { await cerrarSesionGlobal(); setVista('login'); }}
           className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest"
         >
           Volver al Inicio
@@ -141,8 +156,76 @@ const VistaInternaPOS = () => {
     );
   }
 
+  // ✅ Pantalla de bloqueo por suscripción vencida o suspendida
+  if (vista === 'bloqueado') {
+    const esVencido   = suscripcion?.estado === 'vencido';
+    const esBloqueado = suscripcion?.estado === 'bloqueado';
+    return (
+      <div className="bg-[#0a0a0a] h-screen flex flex-col items-center justify-center text-center p-6">
+        <div className="w-24 h-24 rounded-3xl bg-[#ff5a1f]/10 flex items-center justify-center mb-6">
+          <span className="text-5xl">{esBloqueado ? '🚫' : '⏰'}</span>
+        </div>
+        <h1 className="text-3xl font-black text-white mb-3 uppercase tracking-tighter">
+          {esBloqueado ? 'Cuenta Suspendida' : 'Periodo de Prueba Vencido'}
+        </h1>
+        <p className="text-neutral-400 font-bold mb-2 max-w-md text-sm">
+          {suscripcion?.mensaje}
+        </p>
+        {esVencido && (
+          <p className="text-neutral-600 text-xs mb-8 max-w-sm">
+            Plan actual: <span className="text-neutral-400">{suscripcion?.plan_nombre ?? 'Sin plan'}</span>
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={() => {
+              const msg = encodeURIComponent(
+                `Hola, necesito renovar mi suscripción del sistema POS.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`
+              );
+              window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
+            }}
+            className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/20 active:scale-95 transition-all"
+          >
+            Contratar Plan →
+          </button>
+          <button
+            onClick={async () => { await cerrarSesionGlobal(); setVista('login'); }}
+            className="px-8 py-3 rounded-2xl bg-[#1a1a1a] border border-[#333] text-neutral-400 font-black uppercase tracking-widest text-sm active:scale-95 transition-all"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Banner de alerta cuando quedan ≤3 días de prueba
+  const mostrarBannerAlerta = suscripcion?.estado === 'prueba' && suscripcion?.alerta;
+
   return (
     <div className="bg-[#121212] h-screen text-neutral-100 font-sans flex flex-col relative overflow-hidden">
+
+      {/* Banner de alerta de vencimiento */}
+      {mostrarBannerAlerta && (
+        <div className="bg-amber-500 text-black text-xs font-black px-4 py-2 flex items-center justify-between gap-4 z-50 shrink-0">
+          <span>
+            ⚠️ Tu periodo de prueba vence en {suscripcion.dias_restantes} {suscripcion.dias_restantes === 1 ? 'día' : 'días'}.
+            Adquiere un plan para no perder el acceso.
+          </span>
+          <button
+            onClick={() => {
+              const msg = encodeURIComponent(
+                `Hola, quiero contratar un plan del sistema POS antes de que venza mi prueba.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`
+              );
+              window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
+            }}
+            className="shrink-0 bg-black text-white px-3 py-1 rounded-lg uppercase tracking-widest hover:bg-neutral-900 transition-all"
+          >
+            Contratar →
+          </button>
+        </div>
+      )}
+
       {vista === 'login' && (
         <LoginView onAccesoConcedido={handleAccesoConcedido} />
       )}
