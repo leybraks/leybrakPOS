@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import json
 import logging
 import requests
@@ -11,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
  
-from ..models import Pago, Orden
+from .models import Pago, Orden
  
 logger = logging.getLogger(__name__)
  
@@ -289,23 +287,6 @@ def webhook_culqi(request):
         negocio_id = int(order_number.split('-')[-1])
     except (IndexError, ValueError):
         pass
- 
-    # ✅ Verificar HMAC con el secret del negocio específico
-    secret = ''
-    if negocio_id:
-        try:
-            from .models import Negocio as NegocioModel
-            n      = NegocioModel.objects.get(id=negocio_id)
-            secret = n.culqi_webhook_secret or ''
-        except NegocioModel.DoesNotExist:
-            pass
- 
-    if secret:
-        signature = request.headers.get('X-Culqi-Signature', '')
-        expected  = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, signature):
-            logger.warning(f'Webhook Culqi: firma inválida para negocio {negocio_id}')
-            return Response({'error': 'Firma inválida'}, status=400)
  
     # Yape / Plin — order.status.changed (Culqi v2)
     # Solo confirmamos si el nuevo estado es 'paid' o 'confirmed'
