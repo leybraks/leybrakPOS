@@ -65,23 +65,23 @@ jobs:
             sudo docker compose exec -T backend python manage.py migrate
 
             # [6/7] Healthcheck — desde DENTRO del contenedor con python
-            #notificar "🩺 Verificando estabilidad del servicio..."
-            #HEALTH_SUCCESS=false
-            #for i in {1..20}; do
-            #  if sudo docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" 2>/dev/null; then
-            #    HEALTH_SUCCESS=true
-            #    break
-            #  fi
-            #  echo "Esperando backend... ($i/20)"
-            #  sleep 5
-            #done
+            notificar "🩺 Verificando estabilidad del servicio..."
+            HEALTH_SUCCESS=false
+            for i in {1..20}; do
+              if sudo docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" 2>/dev/null; then
+                HEALTH_SUCCESS=true
+                break
+              fi
+              echo "Esperando backend... ($i/20)"
+              sleep 5
+            done
 
-            #if [ "$HEALTH_SUCCESS" = false ]; then
-            #  notificar "🚨 **ERROR:** El sistema no responde tras el deploy."
-            #  exit 1
-            #fi
+            if [ "$HEALTH_SUCCESS" = false ]; then
+              notificar "🚨 **ERROR:** El sistema no responde tras el deploy."
+              exit 1
+            fi
 
-            #DEPLOY_SECS=$(( SECONDS - DEPLOY_START ))
+            DEPLOY_SECS=$(( SECONDS - DEPLOY_START ))
             notificar "✅ **[BRAVA POS]** ¡Sistema online y estable! Commit: $COMMIT_NUEVO — ⏱️ ${DEPLOY_SECS}s"
 
       - name: ⏪ Rollback Seguro de Código
