@@ -4,7 +4,7 @@ from django.db.models import F
 from django.db import transaction
 from django.core.mail import send_mail
 from core import settings # ✨ 1. Importamos la transacción
-from .models import HorarioVisibilidad, Negocio, Pago, InsumoSede, PagoSuscripcion, RecetaDetalle, RecetaOpcion, ReglaNegocio
+from .models import Empleado, HorarioVisibilidad, Negocio, Pago, InsumoSede, PagoSuscripcion, Producto, RecetaDetalle, RecetaOpcion, ReglaNegocio
 
 @receiver(post_save, sender=Pago)
 def procesar_descuento_stock(sender, instance, created, **kwargs):
@@ -116,3 +116,62 @@ def reactivar_negocio_al_pagar(sender, instance, created, **kwargs):
     """
     if instance.estado == 'confirmado' and not instance.negocio.activo:
         Negocio.objects.filter(id=instance.negocio.id).update(activo=True)
+
+# ══════════════════════════════════════════════════════
+# 💰 CAMBIO DE PRECIO DE PRODUCTO
+# ══════════════════════════════════════════════════════
+@receiver(post_save, sender=Producto)
+def auditoria_precio_producto(sender, instance, created, **kwargs):
+    if created:
+        return  # No emailar al crear, solo al editar precio
+    
+    # Solo si cambió el precio — comparamos con el valor en BD
+    # usando update_fields si viene del admin
+    _enviar_email_auditoria(
+        negocio=instance.negocio,
+        accion='Precio Modificado',
+        objeto=instance.nombre,
+        detalle=f'Precio base actual: S/ {instance.precio_base} | Disponible: {instance.disponible}'
+    )
+
+
+# ══════════════════════════════════════════════════════
+# 👤 EMPLEADO CREADO / EDITADO
+# ══════════════════════════════════════════════════════
+@receiver(post_save, sender=Empleado)
+def auditoria_empleado(sender, instance, created, **kwargs):
+    accion = 'Empleado Creado' if created else 'Empleado Editado'
+    _enviar_email_auditoria(
+        negocio=instance.negocio,
+        accion=accion,
+        objeto=instance.nombre,
+        detalle=f'Rol: {instance.rol} | Sede: {instance.sede} | Activo: {instance.activo}'
+    )
+
+@receiver(post_delete, sender=Empleado)
+def auditoria_empleado_delete(sender, instance, **kwargs):
+    _enviar_email_auditoria(
+        negocio=instance.negocio,
+        accion='Empleado Eliminado',
+        objeto=instance.nombre,
+        detalle=f'Rol: {instance.rol} | Sede: {instance.sede}'
+    )
+
+
+# ══════════════════════════════════════════════════════
+# 💳 SUSCRIPCIÓN CONFIRMADA
+# ══════════════════════════════════════════════════════
+@receiver(post_save, sender=PagoSuscripcion)
+def reactivar_negocio_al_pagar(sender, instance, created, **kwargs):
+    if instance.estado == 'confirmado' and not instance.negocio.activo:
+        Negocio.objects.filter(id=instance.negocio.id).update(activo=True)
+
+@receiver(post_save, sender=PagoSuscripcion)
+def auditoria_pago_suscripcion(sender, instance, created, **kwargs):
+    if instance.estado == 'confirmado':
+        _enviar_email_auditoria(
+            negocio=instance.negocio,
+            accion='Pago de Suscripción Confirmado',
+            objeto=f'Plan {instance.plan.nombre if instance.plan else ""}',
+            detalle=f'Monto: S/ {instance.monto} | Método: {instance.metodo_pago} | Periodo: {instance.periodo or "—"}'
+        )
