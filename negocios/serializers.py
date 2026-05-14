@@ -32,42 +32,19 @@ class PagoSuscripcionSerializer(serializers.ModelSerializer):
 
 class NegocioSerializer(serializers.ModelSerializer):
     plan_detalles = PlanSaaSSerializer(source='plan', read_only=True)
-    
-    culqi_private_key    = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
-    culqi_webhook_secret = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Negocio
         fields = [
             'id', 'propietario', 'nombre', 'ruc', 'razon_social', 'logo',
             'yape_numero', 'yape_qr', 'plin_numero', 'plin_qr',
-            'usa_culqi', 'culqi_public_key', 'culqi_private_key', 'culqi_webhook_secret',
+            'usa_mercado_pago', 'mp_user_id', 'mp_public_key',
             'plan', 'plan_detalles', 'fecha_registro', 'fin_prueba', 'activo',
             'mod_salon_activo', 'mod_cocina_activo', 'mod_inventario_activo',
             'mod_delivery_activo', 'mod_clientes_activo', 'mod_facturacion_activo',
             'mod_carta_qr_activo', 'mod_bot_wsp_activo', 'mod_ml_activo',
             'color_primario', 'tema_fondo', 'carta_config',
         ]
-
-    def update(self, instance, validated_data):
-        pk = validated_data.pop('culqi_private_key', None)
-        ws = validated_data.pop('culqi_webhook_secret', None)
-
-        instance = super().update(instance, validated_data)
-
-        # EncryptedCharField encripta automáticamente al asignar y guardar
-        campos_a_guardar = []
-        if pk is not None:
-            instance.culqi_private_key = pk
-            campos_a_guardar.append('culqi_private_key')
-        if ws is not None:
-            instance.culqi_webhook_secret = ws
-            campos_a_guardar.append('culqi_webhook_secret')
-
-        if campos_a_guardar:
-            instance.save(update_fields=campos_a_guardar)
-
-        return instance
 
 class SedeSerializer(serializers.ModelSerializer):
     class Meta:

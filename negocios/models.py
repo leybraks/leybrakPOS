@@ -51,12 +51,14 @@ class Negocio(models.Model):
     plin_qr = models.ImageField(upload_to='negocios/qrs/plin/', blank=True, null=True)
 
     # ==========================================
-    # 💳 3. PASARELA DE PAGO (Culqi)
+    # 💳 3. PASARELA DE PAGO (Mercado Pago)
     # ==========================================
-    usa_culqi             = models.BooleanField(default=False)
-    culqi_public_key      = models.CharField(max_length=255, blank=True, null=True)
-    culqi_private_key     = EncryptedCharField(max_length=255, blank=True, null=True)
-    culqi_webhook_secret  = EncryptedCharField(max_length=255, blank=True, null=True)
+    usa_mercado_pago  = models.BooleanField(default=False)
+    mp_user_id        = models.CharField(max_length=100, blank=True, null=True, help_text="ID del Collector/Vendedor en MP")
+    mp_public_key     = models.CharField(max_length=255, blank=True, null=True)
+    mp_access_token   = EncryptedCharField(max_length=255, blank=True, null=True)
+    mp_webhook_secret = EncryptedCharField(max_length=255, blank=True, null=True, help_text="Firma secreta para validar webhooks")
+
     # ==========================================
     # ⚙️ CONFIGURACIÓN DEL PLAN
     # ==========================================
@@ -89,8 +91,10 @@ class Negocio(models.Model):
         blank=True,
         help_text="Configuración visual de la carta digital (fuentes, fondos, colores, estilos)"
     )
+
     def __str__(self):
         return self.nombre
+
     def save(self, *args, **kwargs):
         # Si el RUC llega como un string vacío, lo forzamos a ser estrictamente NULL
         if self.ruc == "":
@@ -449,19 +453,41 @@ class Pago(models.Model):
         ('plin', 'Plin'),
     ]
     
+    # Mantenemos tus estados originales
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('confirmado', 'Confirmado'),
+        ('cancelado', 'Cancelado'),
+        ('manual', 'Manual'),
+    ]
+
     orden = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='pagos')
     metodo = models.CharField(max_length=20, choices=METODOS)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     sesion_caja = models.ForeignKey(SesionCaja, on_delete=models.PROTECT, null=True, related_name='pagos')
     fecha_pago = models.DateTimeField(auto_now_add=True)
+    
+    # ==========================================
+    # NUEVOS CAMPOS PARA INTEGRACIÓN CON MERCADO PAGO
+    # ==========================================
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='confirmado')
+    mp_order_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="ID de la orden presencial generada")
+    mp_payment_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="ID de la transacción una vez pagada")
+    # Mercado Pago devuelve decimales (ej. 10.50), no céntimos
+    mp_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Monto real cobrado devuelto por MP")
+
     class Meta:
         indexes = [
             models.Index(fields=['sesion_caja', 'fecha_pago']),
             models.Index(fields=['orden']),
+            # Índices actualizados para los webhooks de MP
+            models.Index(fields=['mp_order_id']),
+            models.Index(fields=['mp_payment_id']),
         ]
+
     def __str__(self):
-        return f"S/ {self.monto} en {self.get_metodo_display()} (Orden #{self.orden.id})"
-    
+        return f"S/ {self.monto} en {self.get_metodo_display()} (Orden #{self.orden.id}) - {self.get_estado_display()}"
+
 class ModificadorRapido(models.Model):
     negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=50)

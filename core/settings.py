@@ -292,3 +292,8 @@ UNFOLD = {
 }
 
 
+MP_APP_ID         = os.getenv('MP_APP_ID', '')
+MP_CLIENT_SECRET  = os.getenv('MP_CLIENT_SECRET', '')
+MP_REDIRECT_URI   = os.getenv('MP_REDIRECT_URI', 'http://localhost:8000/api/mp/oauth/callback/')
+MP_WEBHOOK_SECRET = os.getenv('MP_WEBHOOK_SECRET', '')
+FRONTEND_URL      = os.getenv('FRONTEND_URL', 'http://localhost:5173')

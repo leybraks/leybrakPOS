@@ -1,8 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from negocios.views.culqi_views import cobrar_tarjeta_culqi, generar_qr_culqi, webhook_culqi
-from negocios.views.culqi_views import estado_orden_culqi
+from negocios.views import mercadopago_views
+from negocios.views.mercadopago_oauth_views import (
+    mp_oauth_iniciar,
+    mp_oauth_callback,
+    mp_oauth_desconectar,
+    mp_oauth_estado,
+)
+from negocios.views.mercadopago_webhook_views import (
+    mp_webhook,
+    mp_estado_pago,
+)
 from negocios.views.marketing_views import (
     HappyHourDetalleView,
     HappyHourView,
@@ -15,10 +24,9 @@ from negocios.views.marketing_views import (
 from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 from negocios.views.suscripcion_views import estado_suscripcion
-# 🛡️ IMPORTAMOS TUS VISTAS SEGURAS DE COOKIES
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
 from . import views
-# El Router crea las URLs mágicamente
+
 router = DefaultRouter()
 
 router.register(r'negocios', views.NegocioViewSet, basename='negocio')
@@ -43,23 +51,18 @@ router.register(r'zonas-delivery', views.ZonaDeliveryViewSet, basename='zonadeli
 router.register(r'reglas-negocio', views.ReglaNegocioViewSet, basename='reglanegocio')
 router.register(r'planes-saas', PlanSaaSViewSet, basename='planes-saas')
 router.register(r'pagos-suscripcion', PagoSuscripcionViewSet, basename='pagos-suscripcion')
+
 urlpatterns = [
     path('empleados/login-pin/', login_empleado_pin, name='login-empleado-pin'),
     path('empleados/verificar-sesion/', verificar_sesion_empleado, name='verificar-sesion-empleado'),
     path('', include(router.urls)),
 
     # ==========================================
-    # 🛡️ ENDPOINTS DE AUTENTICACIÓN (COOKIES)
+    # 🛡️ AUTENTICACIÓN (COOKIES)
     # ==========================================
-    # Login: Te da las cookies HttpOnly y la info del usuario
     path('login-admin/', CustomTokenObtainPairView.as_view(), name='login-admin'),
-
-    # Refresh: Renueva el Access Token leyendo la cookie de Refresh automáticamente
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token-refresh'),
-
-    # Logout: Destruye las cookies en el navegador del usuario
     path('token/logout/', LogoutView.as_view(), name='token-logout'),
-
 
     # ==========================================
     # RUTAS INDEPENDIENTES
@@ -69,9 +72,7 @@ urlpatterns = [
     path('movimientos-caja/', views.registrar_movimiento_caja, name='registrar_movimiento_caja'),
     path('verificar-sesion/', views.verificar_sesion, name='verificar_sesion'),
     path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
-    # 🩺 HEALTHCHECK PARA GITHUB ACTIONS (público, sin token)
     path('health/', views.health_check, name='health_check'),
-    
 
     # ==========================================
     # RUTAS PÚBLICAS (Sin Token - Carta QR)
@@ -84,12 +85,22 @@ urlpatterns = [
     path('happy-hours/<int:pk>/', HappyHourDetalleView.as_view(), name='happy_hour_detalle'),
     path('reglas-negocio-v2/', ReglaNegocioView.as_view(), name='reglas_negocio'),
     path('reglas-negocio-v2/<int:pk>/', ReglaNegocioDetalleView.as_view(), name='regla_negocio_detalle'),
-    path('combos-promocionales/', ComboPromocionalView.as_view(), name='combos_promocionales'),
-    path('culqi/generar-qr/', generar_qr_culqi, name='generar_qr_culqi'),
-    path('culqi/estado-orden/<str:order_id>/', estado_orden_culqi, name='culqi-estado-orden'),
-    path('culqi/cobrar-tarjeta/',          cobrar_tarjeta_culqi, name='culqi-cobrar-tarjeta'),
-    path('culqi/webhook/',                     webhook_culqi,        name='culqi-webhook'),
     path('negocio/estado-suscripcion/', estado_suscripcion, name='estado-suscripcion'),
-    path('combos-promocionales/<int:pk>/', ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
-    path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
+
+    # ==========================================
+    # 💳 MERCADO PAGO — QR Instore
+    # ==========================================
+    path('pagos/generar-qr/', mercadopago_views.generar_qr_mercadopago, name='mp-generar-qr'),
+
+    # OAuth — conexión del comerciante
+    path('mp/oauth/iniciar/',      mp_oauth_iniciar,      name='mp-oauth-iniciar'),
+    path('mp/oauth/callback/',     mp_oauth_callback,     name='mp-oauth-callback'),   # AllowAny — MP redirige aquí
+    path('mp/oauth/desconectar/',  mp_oauth_desconectar,  name='mp-oauth-desconectar'),
+    path('mp/oauth/estado/',       mp_oauth_estado,       name='mp-oauth-estado'),
+
+    # Webhook — MP notifica pagos (AllowAny + verificación HMAC interna)
+    path('mp/webhook/',            mp_webhook,            name='mp-webhook'),
+
+    # Polling — el frontend consulta el estado del pago cada 3s
+    path('mp/estado-pago/<int:pago_id>/', mp_estado_pago, name='mp-estado-pago'),
 ]

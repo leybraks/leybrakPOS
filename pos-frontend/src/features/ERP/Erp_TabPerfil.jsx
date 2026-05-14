@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
-import { Building2, Search, Upload, Smartphone, CreditCard, Lock, CheckCircle2, Loader2 } from 'lucide-react';
+import React, { useState,useEffect } from 'react';
+import { Building2, ExternalLink, Unlink, Wifi, WifiOff,Search, Upload, Smartphone, CreditCard, Lock, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../../api/api';
+// 1. Import — al inicio del archivo (junto a los otros imports)
+import { useToast } from '../../context/ToastContext';
 export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario }) {
   // Estado local para la animación de SUNAT
   const [buscandoRuc, setBuscandoRuc] = useState(false);
-
+  const [mpEstado, setMpEstado]       = useState({ conectado: false, mp_user_id: null });
+  const [mpCargando, setMpCargando]   = useState(false);
+  const [mpConectando, setMpConectando] = useState(false);
+  const toast = useToast();
   // Función simulada (pronto real) de SUNAT
   const consultarSunat = async () => {
     if (!config.ruc || config.ruc.length !== 11) {
-        return alert("⚠️ El RUC debe tener exactamente 11 dígitos.");
+        return toast.error("⚠️ El RUC debe tener exactamente 11 dígitos.");
     }
     setBuscandoRuc(true);
     try {
@@ -16,18 +21,31 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         const data = response.data;
 
         if (data.estado !== "ACTIVO") {
-        alert(`❌ El RUC se encuentra ${data.estado}.`);
+        toast.error(`❌ El RUC se encuentra ${data.estado}.`);
         setConfig({ ...config, razon_social: '' });
         } else {
         setConfig({ ...config, razon_social: data.razon_social });
         }
     } catch (error) {
-        alert("❌ No se pudo consultar SUNAT. Verifica el RUC o intenta más tarde.");
+        toast.error("❌ No se pudo consultar SUNAT. Verifica el RUC o intenta más tarde.");
     } finally {
         setBuscandoRuc(false);
     }
     };
+    useEffect(() => {
+      api.get('/mp/oauth/estado/').then(r => setMpEstado(r.data)).catch(() => {});
 
+      // MP redirige con ?mp_status=ok|error tras el OAuth
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('mp_status') === 'ok') {
+        toast.success('✅ Mercado Pago conectado correctamente');
+        window.history.replaceState({}, '', window.location.pathname);
+        api.get('/mp/oauth/estado/').then(r => setMpEstado(r.data));
+      } else if (params.get('mp_status') === 'error') {
+        toast.error(`Error conectando Mercado Pago: ${params.get('msg') || 'intenta de nuevo'}`);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }, []);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
 
@@ -187,59 +205,111 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         {/* 💳 3. PASARELA DE PAGO (CULQI) */}
         {/* ========================================== */}
         <div className={`p-6 md:p-8 rounded-[2rem] border shadow-sm ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
+ 
+          {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl border bg-blue-500/10 border-blue-500/20 text-blue-500">
+              <div className={`p-2.5 rounded-xl border ${
+                mpEstado.conectado
+                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                  : isDark ? 'bg-[#1a1a1a] border-[#333] text-neutral-400' : 'bg-gray-100 border-gray-200 text-gray-400'
+              }`}>
                 <CreditCard size={20} />
               </div>
-              <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Pagos Culqi</h3>
+              <div>
+                <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  Mercado Pago
+                </h3>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${
+                  mpEstado.conectado ? 'text-green-500' : isDark ? 'text-neutral-500' : 'text-gray-400'
+                }`}>
+                  {mpEstado.conectado ? '● Conectado' : '○ No conectado'}
+                </span>
+              </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={config.usa_culqi || false}
-                onChange={(e) => setConfig({ ...config, usa_culqi: e.target.checked })}
-              />
-              <div
-                className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${isDark ? 'bg-[#333]' : 'bg-gray-300'}`}
-                style={config.usa_culqi ? { backgroundColor: colorPrimario } : {}}
-              ></div>
-            </label>
           </div>
-
+        
           <p className={`text-xs mb-6 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
-            Activa la validación de pagos reales con tarjeta de crédito/débito y billeteras móviles.
+            Genera QR dinámicos en caja. El cliente escanea con cualquier billetera compatible
+            (Yape, Plin, MP, etc.) y el cobro se confirma automáticamente.
           </p>
-
-          {config.usa_culqi && (
-            <div className="space-y-4 animate-fadeIn">
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Llave Pública (Public Key)</label>
-                <input
-                  type="text"
-                  value={config.culqi_public_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_public_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="pk_test_..."
-                />
+        
+          {/* Estado: NO conectado */}
+          {!mpEstado.conectado && (
+            <button
+              type="button"
+              disabled={mpConectando}
+              onClick={async () => {
+                setMpConectando(true);
+                try {
+                  const res = await api.get('/mp/oauth/iniciar/');
+                  // Redirige al comerciante a la pantalla de autorización de MP
+                  window.location.href = res.data.auth_url;
+                } catch {
+                  toast.error('No se pudo iniciar la conexión. Intenta de nuevo.');
+                  setMpConectando(false);
+                }
+              }}
+              style={{ backgroundColor: colorPrimario }}
+              className="w-full py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {mpConectando
+                ? <><Loader2 size={16} className="animate-spin" /> Redirigiendo a Mercado Pago...</>
+                : <><ExternalLink size={16} /> Conectar con Mercado Pago</>
+              }
+            </button>
+          )}
+        
+          {/* Estado: SÍ conectado */}
+          {mpEstado.conectado && (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-2xl border flex items-center gap-3 ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-green-50 border-green-200'}`}>
+                <div className="w-9 h-9 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Cuenta vinculada
+                  </p>
+                  {mpEstado.mp_user_id && (
+                    <p className={`text-[11px] font-mono truncate ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
+                      User ID: {mpEstado.mp_user_id}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
-                  Llave Privada (Private Key) <Lock size={10} />
-                </label>
-                <input
-                  type="password"
-                  value={config.culqi_private_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_private_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="sk_test_..."
-                />
-              </div>
+        
+              <button
+                type="button"
+                disabled={mpCargando}
+                onClick={async () => {
+                  if (!window.confirm('¿Seguro que quieres desvincular Mercado Pago?')) return;
+                  setMpCargando(true);
+                  try {
+                    await api.post('/mp/oauth/desconectar/');
+                    setMpEstado({ conectado: false, mp_user_id: null });
+                    toast.success('Mercado Pago desvinculado.');
+                  } catch {
+                    toast.error('Error al desvincular. Intenta de nuevo.');
+                  } finally {
+                    setMpCargando(false);
+                  }
+                }}
+                className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all ${
+                  isDark
+                    ? 'border-red-500/30 text-red-400 hover:bg-red-500/10'
+                    : 'border-red-200 text-red-600 hover:bg-red-50'
+                } disabled:opacity-50`}
+              >
+                {mpCargando
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <Unlink size={14} />
+                }
+                Desvincular cuenta
+              </button>
             </div>
           )}
+        
         </div>
 
       </div>

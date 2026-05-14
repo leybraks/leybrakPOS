@@ -1,6 +1,6 @@
 import json
 import logging
-from time import time
+from django.utils import timezone
 import requests
  
 from django.db import transaction, IntegrityError
@@ -34,7 +34,8 @@ def _get_negocio(user):
  
 def _get_sesion_caja_activa(negocio):
     from ..models import SesionCaja
-    return SesionCaja.objects.filter(negocio=negocio, estado='abierta').first()
+    # Cruzamos a través de 'sede' para llegar a 'negocio'
+    return SesionCaja.objects.filter(sede__negocio=negocio, estado='abierta').first()
  
  
 def _monto_restante(orden):
@@ -81,7 +82,7 @@ def generar_qr_culqi(request):
         return Response({'error': 'Esta orden ya está pagada'}, status=400)
  
     monto_centavos = int(monto_restante * 100)
-    tiempo_actual = int(time.time())
+    tiempo_actual = int(timezone.now().timestamp())
     payload = {
         'amount':        monto_centavos,
         'currency_code': 'PEN',
@@ -95,7 +96,7 @@ def generar_qr_culqi(request):
             'phone_number': (negocio.yape_numero or '999000000')[:15],
         },
         # Solución 1: Hora actual + 300 segundos (5 minutos en el futuro)
-        'expiration_date': tiempo_actual + 300, 
+        'expiration_date': tiempo_actual + 86400, 
         'confirm':         False,
     }
  
@@ -107,6 +108,9 @@ def generar_qr_culqi(request):
             timeout=10,
         )
         data = res.json()
+        print("====== RESPUESTA DE CULQI ======")
+        print(data) 
+        print("================================")
     except requests.Timeout:
         return Response({'error': 'Timeout conectando con Culqi'}, status=504)
     except Exception as e:
@@ -132,11 +136,11 @@ def generar_qr_culqi(request):
             'estado':      'pendiente',
         }
     )
- 
+    codigo_qr_texto = data.get('payment_code', '')
     return Response({
         'order_id':  culqi_order_id,
         'pago_id':   pago.id,
-        'qr_url':    qr_url,
+        'qr_data':    codigo_qr_texto,
         'expira_en': 300,
         'monto':     float(monto_restante),
     })

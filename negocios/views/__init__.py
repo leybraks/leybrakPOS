@@ -1,8 +1,5 @@
 # ============================================================
 # views/__init__.py
-#
-# Re-exporta todo para que urls.py no necesite cambiar ni una línea.
-# Django ve este package exactamente igual que el views.py original.
 # ============================================================
 
 from .helpers import (
@@ -57,8 +54,9 @@ from .cliente_views import (
     ReglaNegocioViewSet,
     calcular_distancia_km,
 )
+
 from .marketing_views import (
-    MarketingGlobalView
+    MarketingGlobalView,
 )
 
 from .publico_views import (
@@ -67,13 +65,23 @@ from .publico_views import (
     orden_publica,
     verificar_sesion,
 )
-from .culqi_views import (
-    webhook_culqi,
-    cobrar_tarjeta_culqi,
-    estado_orden_culqi,
-    generar_qr_culqi,
-)
 
 from .suscripcion_views import (
     estado_suscripcion,
+)
+
+from .mercadopago_views import (
+    generar_qr_mercadopago,
+)
+
+from .mercadopago_oauth_views import (
+    mp_oauth_iniciar,
+    mp_oauth_callback,
+    mp_oauth_desconectar,
+    mp_oauth_estado,
+)
+
+from .mercadopago_webhook_views import (
+    mp_webhook,
+    mp_estado_pago,
 )
