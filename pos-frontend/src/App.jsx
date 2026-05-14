@@ -116,22 +116,31 @@ const VistaInternaPOS = () => {
 
   const handleAccesoConcedido = async (datosEmpleado) => {
     const datos = typeof datosEmpleado === 'string'
-      ? { rol: datosEmpleado, nombre: null, sede_id: null }
+      ? { rol: datosEmpleado, nombre: null, sede_id: null, suscripcion: null }
       : datosEmpleado;
 
-    const { rol, nombre, sede_id } = datos;
-    const vistaDestino = getRolVista(rol);
+    const { rol, nombre, sede_id, suscripcion } = datos;
 
+    // Si el login ya viene con estado de suscripción bloqueado, mostrar bloqueo
+    if (suscripcion && !suscripcion.puede_operar) {
+      setSuscripcion(suscripcion);
+      setVista('bloqueado');
+      return;
+    }
+
+    const vistaDestino = getRolVista(rol);
     if (!vistaDestino) {
       setVista('sin_permiso');
       return;
     }
 
-    // ✅ Verificar suscripción al hacer login
-    const sus = await verificarSuscripcion();
-    if (sus && !sus.puede_operar) {
-      setVista('bloqueado');
-      return;
+    // Si no venía suscripcion en el objeto, verificar ahora
+    if (!suscripcion) {
+      const sus = await verificarSuscripcion();
+      if (sus && !sus.puede_operar) {
+        setVista('bloqueado');
+        return;
+      }
     }
 
     setSesion({ rol, nombre, sede_id });

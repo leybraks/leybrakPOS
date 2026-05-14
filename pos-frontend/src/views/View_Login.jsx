@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { loginAdministrador, loginPinEmpleado, getEstadoCaja, abrirCajaBD, getSedes } from '../api/api';
+import api from '../api/api';
 import { useToast } from '../context/ToastContext';
 
 export default function LoginView({ onAccesoConcedido }) {
@@ -56,6 +57,17 @@ export default function LoginView({ onAccesoConcedido }) {
     try {
       const res = await loginAdministrador({ username: email, password });
       localStorage.setItem('negocio_id', res.data.negocio_id);
+
+      // ✅ Verificar suscripción inmediatamente después del login
+      try {
+        const resSus = await api.get('/negocio/estado-suscripcion/');
+        if (!resSus.data.puede_operar) {
+          // Pasar el estado al padre para mostrar pantalla de bloqueo
+          onAccesoConcedido({ rol: res.data.rol || 'dueño', suscripcion: resSus.data });
+          return;
+        }
+      } catch { /* Si falla la verificación, dejamos pasar — mejor disponible que bloqueado */ }
+
       if (destino === 'erp') {
         const rolSeguro = res.data.rol || 'Dueño';
         localStorage.setItem('usuario_rol', rolSeguro);
@@ -100,6 +112,15 @@ export default function LoginView({ onAccesoConcedido }) {
       setBloqueadoHasta(null);
       localStorage.setItem('empleado_nombre', empleado.nombre);
       localStorage.setItem('usuario_rol', empleado.rol);
+
+      // ✅ Verificar suscripción del negocio al hacer login con PIN
+      try {
+        const resSus = await api.get('/negocio/estado-suscripcion/');
+        if (!resSus.data.puede_operar) {
+          onAccesoConcedido({ rol: empleado.rol, suscripcion: resSus.data });
+          return;
+        }
+      } catch { /* Si falla, dejamos pasar */ }
 
       if (accion === 'asistencia') {
         toast.success(`Asistencia registrada — ${empleado.nombre}`);
