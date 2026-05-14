@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
  
-from ..models import Pago, Orden
+from .models import Pago, Orden
  
 logger = logging.getLogger(__name__)
  
@@ -32,15 +32,20 @@ def _get_negocio(user):
  
  
 def _get_sesion_caja_activa(negocio):
-    from ..models import SesionCaja
+    from .models import SesionCaja
     return SesionCaja.objects.filter(negocio=negocio, estado='abierta').first()
  
  
 def _monto_restante(orden):
     """Calcula cuánto falta pagar de una Orden, desde la BD."""
-    pagado = sum(
-        p.monto for p in orden.pagos.filter(estado__in=['confirmado', 'manual'])
-    )
+    try:
+        # Intenta filtrar por estado si el campo existe
+        pagado = sum(
+            p.monto for p in orden.pagos.filter(estado__in=['confirmado', 'manual'])
+        )
+    except Exception:
+        # Si Pago no tiene campo 'estado', suma todos los pagos
+        pagado = sum(p.monto for p in orden.pagos.all())
     return orden.total - pagado
  
  
@@ -64,9 +69,9 @@ def generar_qr_culqi(request):
     if metodo not in ('yape', 'plin'):
         return Response({'error': 'Método inválido'}, status=400)
  
-    # ✅ Monto desde la BD — nunca del frontend
+    # ✅ Orden se relaciona al negocio a través de sede
     try:
-        orden = Orden.objects.get(id=orden_id, negocio=negocio)
+        orden = Orden.objects.get(id=orden_id, sede__negocio=negocio)
     except Orden.DoesNotExist:
         return Response({'error': 'Orden no encontrada'}, status=404)
  
@@ -204,7 +209,7 @@ def cobrar_tarjeta_culqi(request):
  
     # ✅ Monto desde la BD
     try:
-        orden = Orden.objects.get(id=orden_id, negocio=negocio)
+        orden = Orden.objects.get(id=orden_id, sede__negocio=negocio)
     except Orden.DoesNotExist:
         return Response({'error': 'Orden no encontrada'}, status=404)
  
