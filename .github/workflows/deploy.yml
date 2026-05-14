@@ -52,10 +52,13 @@ jobs:
             git fetch origin V2-Estable-Cloud
             git reset --hard origin/V2-Estable-Cloud
 
-            # 🏗️ [4/7] Build y Recreación
-            # FIX 3: sin --force-recreate, Docker solo recrea lo que cambió
-            notificar "🏗️ Reconstruyendo contenedores..."
-            sudo docker compose up -d --build
+            # [4/7] Build secuencial para evitar picos de RAM (Status 137)
+            notificar "🏗️ Construyendo Backend..."
+            sudo docker compose build backend
+            notificar "🏗️ Construyendo Frontend..."
+            sudo docker compose build frontend
+            notificar "🚀 Levantando servicios..."
+            sudo docker compose up -d
 
             # ⚙️ [5/7] Migraciones
             notificar "⚙️ Aplicando cambios en la base de datos..."
