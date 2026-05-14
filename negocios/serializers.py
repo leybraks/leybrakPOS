@@ -47,6 +47,7 @@ class NegocioSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             # 🛡️ La clave privada de pago NUNCA debe aparecer en respuestas GET
             'culqi_private_key': {'write_only': True},
+            'culqi_webhook_secret': {'write_only': True},
         }
 
 class SedeSerializer(serializers.ModelSerializer):

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import usePosStore from '../../store/usePosStore';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/api';
@@ -29,10 +29,24 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const [generandoQR, setGenerandoQR] = useState(false);
   const [qrCulqi, setQrCulqi] = useState(null);
   const [validandoPago, setValidandoPago] = useState(false);
+  // Polling automático
+  const [pollingActivo, setPollingActivo] = useState(false);
+  const [segundosRestantes, setSegundosRestantes] = useState(300);
+  const pollingRef  = useRef(null);
+  const countdownRef = useRef(null);
 
   // Preview de descuento por método de pago
-  const [preview, setPreview] = useState(null); // { subtotal, descuento_total, recargo_total, total }
+  const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Limpia los intervals al desmontar o cerrar
+  const detenerPolling = useCallback(() => {
+    if (pollingRef.current)   clearInterval(pollingRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    pollingRef.current   = null;
+    countdownRef.current = null;
+    setPollingActivo(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,8 +62,12 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       setQrCulqi(null);
       setValidandoPago(false);
       setPreview(null);
+      setPollingActivo(false);
+      setSegundosRestantes(300);
+      detenerPolling();
     }
-  }, [isOpen]);
+    return () => detenerPolling(); // limpia al desmontar
+  }, [isOpen, detenerPolling]);
 
   // Consulta el preview de descuento cuando el método cambia (solo si hay ordenId)
   const fetchPreview = useCallback(async (metodoActual) => {
@@ -103,11 +121,9 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   };
 
   // ============================================
-  // 🔌 INTEGRACIÓN CULQI — REAL
-  // Docs: https://docs.culqi.com
+  // 🔌 INTEGRACIÓN CULQI — CON POLLING AUTOMÁTICO
   // ============================================
 
-  // Carga el script de Culqi.js dinámicamente (solo una vez)
   const cargarScriptCulqi = () => new Promise((resolve, reject) => {
     if (window.Culqi) return resolve();
     const script = document.createElement('script');
@@ -117,23 +133,56 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     document.head.appendChild(script);
   });
 
-  // Yape / Plin → QR dinámico vía backend (Culqi Orders API)
+  // Arranca el polling cada 3s — confirma solo si Culqi dice 'pagado'
+  const iniciarPolling = useCallback((orderId, montoACobrar) => {
+    setPollingActivo(true);
+    setSegundosRestantes(300);
+
+    // Countdown visual
+    countdownRef.current = setInterval(() => {
+      setSegundosRestantes(prev => {
+        if (prev <= 1) {
+          detenerPolling();
+          toast.warning('El QR expiró. Genera uno nuevo.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Polling cada 3 segundos
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/culqi/estado-orden/${orderId}/`);
+        if (res.data.estado === 'pagado') {
+          detenerPolling();
+          // Pequeña pausa para que el toast sea visible
+          await new Promise(r => setTimeout(r, 400));
+          toast.success('✅ ¡Pago confirmado por Culqi!');
+          registrarPago(montoACobrar, 0);
+        }
+      } catch {
+        // Error de red: seguimos intentando, no cortamos el polling
+      }
+    }, 3000);
+  }, [detenerPolling, toast]); // eslint-disable-line
+
+  // Yape / Plin → QR dinámico
   const generarQRCulqi = async (monto, tipoMetodo) => {
     setGenerandoQR(true);
     setQrCulqi(null);
+    detenerPolling();
     try {
-      // El backend crea la Order en Culqi y devuelve el QR
       const res = await api.post('/culqi/generar-qr/', {
-        monto:      Math.round(monto * 100), // Culqi usa centavos
-        metodo:     tipoMetodo,              // 'yape' | 'plin'
-        orden_id:   ordenId,
+        monto:       Math.round(monto * 100),
+        metodo:      tipoMetodo,
+        orden_id:    ordenId,
         descripcion: `Pago POS - S/ ${monto.toFixed(2)}`,
       });
-      setQrCulqi({
-        url:       res.data.qr_url,
-        orderId:   res.data.order_id,
-        expiraEn:  res.data.expira_en ?? 300, // segundos
-      });
+      const { order_id, qr_url, monto: montoConfirmado } = res.data;
+      setQrCulqi({ url: qr_url, orderId: order_id, expiraEn: 300 });
+      // Arranca polling automático inmediatamente
+      iniciarPolling(order_id, montoConfirmado ?? monto);
     } catch (error) {
       console.error('Error generando QR Culqi:', error);
       toast.error('Error al generar el QR. Intenta de nuevo.');
@@ -142,29 +191,29 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     }
   };
 
-  // Yape / Plin → verifica estado del cargo en Culqi
+  // Verificación manual (botón "Verificar Pago")
   const validarPagoCulqi = async () => {
     setValidandoPago(true);
     try {
       const res = await api.get(`/culqi/estado-orden/${qrCulqi.orderId}/`);
       if (res.data.estado === 'pagado') {
+        detenerPolling();
+        toast.success('✅ ¡Pago confirmado!');
         registrarPago(montoCobro, 0);
       } else {
-        toast.warning('El pago aún no se ha procesado. Espera unos segundos e inténtalo de nuevo.');
+        toast.warning('El pago aún no se ha procesado. Espera unos segundos.');
       }
-    } catch (error) {
-      console.error('Error validando pago Culqi:', error);
+    } catch {
       toast.error('Error al verificar el pago. Intenta de nuevo.');
     } finally {
       setValidandoPago(false);
     }
   };
 
-  // Tarjeta → abre Culqi Checkout v4 (modal nativo de Culqi)
+  // Tarjeta → Culqi Checkout v4
   const abrirCheckoutTarjeta = async () => {
     try {
       await cargarScriptCulqi();
-
       window.Culqi.publicKey = config.culqi_public_key;
       window.Culqi.settings({
         title:    'Pago POS',
@@ -172,30 +221,20 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
         amount:   Math.round(montoCobro * 100),
         order:    ordenId ? String(ordenId) : undefined,
       });
-
-      // Culqi llama a window.culqi() cuando el cliente completa el pago
       window.culqi = async () => {
         const token = window.Culqi.token?.id;
-        if (!token) {
-          toast.error('No se recibió token de pago. Intenta de nuevo.');
-          return;
-        }
+        if (!token) { toast.error('No se recibió token. Intenta de nuevo.'); return; }
         try {
-          // El backend usa la private_key para hacer el cargo real
-          await api.post('/culqi/cobrar-tarjeta/', {
-            token,
-            monto:    Math.round(montoCobro * 100),
-            orden_id: ordenId,
-          });
+          await api.post('/culqi/cobrar-tarjeta/', { token, orden_id: ordenId });
           window.Culqi.close();
+          toast.success('✅ ¡Pago con tarjeta confirmado!');
           registrarPago(montoCobro, 0);
-        } catch (err) {
-          toast.error('El cargo con tarjeta fue rechazado. Verifica los datos.');
+        } catch {
+          toast.error('El cargo fue rechazado. Verifica los datos de la tarjeta.');
         }
       };
-
       window.Culqi.open();
-    } catch (err) {
+    } catch {
       toast.error('No se pudo cargar la pasarela Culqi. Verifica tu conexión.');
     }
   };
@@ -727,6 +766,18 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                     }`}>
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                       <span className="text-xs font-bold">QR ACTIVO</span>
+                      {pollingActivo && (
+                        <span className={`text-xs font-bold ml-1 ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
+                          · Verificando automáticamente...
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Countdown */}
+                    <div className={`text-xs font-black mb-4 tabular-nums ${
+                      segundosRestantes < 60 ? 'text-red-500' : isDark ? 'text-neutral-500' : 'text-gray-400'
+                    }`}>
+                      Expira en {Math.floor(segundosRestantes / 60)}:{String(segundosRestantes % 60).padStart(2, '0')}
                     </div>
 
                     <p className={`text-xs font-bold uppercase tracking-wider mb-4 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
@@ -741,26 +792,25 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                       />
                     </div>
                     
-                    <div className={`p-3 rounded-xl mb-6 ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
+                    <div className={`p-3 rounded-xl mb-4 ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
                       <p className={`text-xs ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
                         ✓ El cliente escanea con su app de {metodo.charAt(0).toUpperCase() + metodo.slice(1)}<br/>
-                        ✓ Validación automática del pago
+                        ✓ El pago se confirma automáticamente al instante
                       </p>
                     </div>
 
+                    {/* Botón manual como respaldo */}
                     <button
                       onClick={validarPagoCulqi}
                       disabled={validandoPago}
-                      className="w-full py-4 rounded-xl font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                      style={{ backgroundColor: colorPrimario }}
+                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                        isDark ? 'bg-[#1a1a1a] text-neutral-300 hover:bg-[#222]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       {validandoPago ? (
-                        <>
-                          <Loader2 size={18} className="animate-spin" />
-                          Verificando pago...
-                        </>
+                        <><Loader2 size={16} className="animate-spin" /> Verificando...</>
                       ) : (
-                        'Verificar Pago'
+                        'Verificar manualmente'
                       )}
                     </button>
                   </>

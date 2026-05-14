@@ -46,9 +46,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'encrypted_model_fields',
     'corsheaders',
     'negocios',
 ]
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
 
 ASGI_APPLICATION = 'core.asgi.application'
 
@@ -288,3 +290,5 @@ UNFOLD = {
         },
     },
 }
+
+

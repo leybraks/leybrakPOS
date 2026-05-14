@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from negocios.views.culqi_views import cobrar_tarjeta_culqi, generar_qr_culqi
+from negocios.views.culqi_views import cobrar_tarjeta_culqi, generar_qr_culqi, webhook_culqi
 from negocios.views.culqi_views import estado_orden_culqi
 from negocios.views.marketing_views import (
     HappyHourDetalleView,
@@ -88,6 +88,7 @@ urlpatterns = [
     path('culqi/generar-qr/', generar_qr_culqi, name='generar_qr_culqi'),
     path('culqi/estado-orden/<str:order_id>/', estado_orden_culqi, name='culqi-estado-orden'),
     path('culqi/cobrar-tarjeta/',          cobrar_tarjeta_culqi, name='culqi-cobrar-tarjeta'),
+    path('culqi/webhook/',                     webhook_culqi,        name='culqi-webhook'),
     path('combos-promocionales/<int:pk>/', ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
     path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
 ]

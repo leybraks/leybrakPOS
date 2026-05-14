@@ -238,6 +238,19 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
                   placeholder="sk_test_..."
                 />
               </div>
+              <div>
+                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
+                  Webhook Secret <Lock size={10} />
+                </label>
+                <input
+                  type="password"
+                  value={config.culqi_webhook_secret || ''}
+                  onChange={(e) => setConfig({ ...config, culqi_webhook_secret: e.target.value })}
+                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
+                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
+                  placeholder="Culqi → Developers → Webhooks → Secret"
+                />
+              </div>
             </div>
           )}
         </div>

@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from openlocationcode import openlocationcode as olc
 from django.utils import timezone
-
+from encrypted_model_fields.fields import EncryptedCharField
 class ActivoManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(activo=True)
@@ -53,10 +53,10 @@ class Negocio(models.Model):
     # ==========================================
     # 💳 3. PASARELA DE PAGO (Culqi)
     # ==========================================
-    usa_culqi = models.BooleanField(default=False)
-    culqi_public_key = models.CharField(max_length=255, blank=True, null=True)
-    culqi_private_key = models.CharField(max_length=255, blank=True, null=True)
-
+    usa_culqi             = models.BooleanField(default=False)
+    culqi_public_key      = models.CharField(max_length=255, blank=True, null=True)
+    culqi_private_key     = EncryptedCharField(max_length=255, blank=True, null=True)
+    culqi_webhook_secret  = EncryptedCharField(max_length=255, blank=True, null=True)
     # ==========================================
     # ⚙️ CONFIGURACIÓN DEL PLAN
     # ==========================================
