@@ -5,7 +5,8 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 logger = logging.getLogger(__name__)
 
 
@@ -64,9 +65,13 @@ def mp_oauth_iniciar(request):
 # ──────────────────────────────────────────────────────────────
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@csrf_exempt
 def mp_oauth_callback(request):
-    code       = request.query_params.get('code')
-    negocio_id = request.query_params.get('state')
+    if request.method != 'GET':
+        return HttpResponse('Method not allowed', status=405)
+    
+    code       = request.GET.get('code')
+    negocio_id = request.GET.get('state')
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
 
     if not code or not negocio_id:

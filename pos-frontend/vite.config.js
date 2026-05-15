@@ -7,15 +7,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'], 
+      includeAssets: ['favicon.svg'],
+      workbox: {
+        // El service worker NUNCA intercepta rutas /api/
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [],
+      },
       manifest: {
         name: 'Brava POS ERP',
         short_name: 'BravaPOS',
         description: 'Sistema ERP y Punto de Venta',
-        theme_color: '#ff5a1f', 
-        background_color: '#0a0a0a', 
-        display: 'standalone', 
-        orientation: 'portrait', 
+        theme_color: '#ff5a1f',
+        background_color: '#0a0a0a',
+        display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: '/pwa-192x192.png',
