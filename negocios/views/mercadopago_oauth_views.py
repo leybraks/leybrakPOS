@@ -76,7 +76,7 @@ def mp_oauth_callback(request):
             "https://api.mercadopago.com/oauth/token",
             json={
                 "client_id":     settings.MP_APP_ID,
-                "client_secret": settings.MP_CLIENT_SECRET,
+                "client_secret": settings.MP_CLIENT_SECRET,  # Access Token del dueño de la app
                 "grant_type":    "authorization_code",
                 "code":          code,
                 "redirect_uri":  settings.MP_REDIRECT_URI,
