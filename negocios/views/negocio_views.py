@@ -155,7 +155,6 @@ class NegocioViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'RUC no encontrado en SUNAT.'}, status=404)
 
             data = response.json()
-            print(f"DATA: {data}")
             return Response({
                 'ruc':          data.get('numero_documento', ruc),
                 'razon_social': data.get('razon_social', ''),
@@ -330,7 +329,6 @@ class SedeViewSet(viewsets.ModelViewSet):
         headers = {"apikey": settings.EVO_GLOBAL_KEY}
         try:
             response = requests.delete(url, headers=headers)
-            print(f"DEBUG Evolution Delete: {response.status_code} - {response.text}")
         except Exception as e:
             print(f"Error de conexión con Evolution API: {e}")
         sede.whatsapp_instancia = None

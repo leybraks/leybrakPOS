@@ -1,16 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from negocios.views import mercadopago_views
-from negocios.views.mercadopago_oauth_views import (
-    mp_oauth_iniciar,
-    mp_oauth_callback,
-    mp_oauth_desconectar,
-    mp_oauth_estado,
-)
-from negocios.views.mercadopago_webhook_views import (
-    mp_webhook,
-    mp_estado_pago,
+from negocios.views.culqi_views import (
+    generar_qr_culqi,
+    estado_orden_culqi,
+    cobrar_tarjeta_culqi,
+    webhook_culqi,
 )
 from negocios.views.marketing_views import (
     HappyHourDetalleView,
@@ -29,78 +24,69 @@ from . import views
 
 router = DefaultRouter()
 
-router.register(r'negocios', views.NegocioViewSet, basename='negocio')
-router.register(r'sedes', views.SedeViewSet, basename='sede')
-router.register(r'detalles', views.DetalleOrdenViewSet, basename='detalleorden')
-router.register(r'pagos', views.PagoViewSet, basename='pago')
-router.register(r'roles', views.RolViewSet, basename='rol')
-router.register(r'sesiones_caja', views.SesionCajaViewSet, basename='sesioncaja')
-router.register(r'categorias', views.CategoriaViewSet, basename='categoria')
-router.register(r'mesas', views.MesaViewSet, basename='mesa')
-router.register(r'productos', views.ProductoViewSet, basename='producto')
-router.register(r'ordenes', views.OrdenViewSet, basename='orden')
-router.register(r'empleados', views.EmpleadoViewSet, basename='empleado')
-router.register(r'insumo-base', views.InsumoBaseViewSet, basename='insumobase')
-router.register(r'insumo-sede', views.InsumoSedeViewSet, basename='insumosede')
+router.register(r'negocios',            views.NegocioViewSet,          basename='negocio')
+router.register(r'sedes',               views.SedeViewSet,             basename='sede')
+router.register(r'detalles',            views.DetalleOrdenViewSet,     basename='detalleorden')
+router.register(r'pagos',               views.PagoViewSet,             basename='pago')
+router.register(r'roles',               views.RolViewSet,              basename='rol')
+router.register(r'sesiones_caja',       views.SesionCajaViewSet,       basename='sesioncaja')
+router.register(r'categorias',          views.CategoriaViewSet,        basename='categoria')
+router.register(r'mesas',               views.MesaViewSet,             basename='mesa')
+router.register(r'productos',           views.ProductoViewSet,         basename='producto')
+router.register(r'ordenes',             views.OrdenViewSet,            basename='orden')
+router.register(r'empleados',           views.EmpleadoViewSet,         basename='empleado')
+router.register(r'insumo-base',         views.InsumoBaseViewSet,       basename='insumobase')
+router.register(r'insumo-sede',         views.InsumoSedeViewSet,       basename='insumosede')
 router.register(r'modificadores-rapidos', views.ModificadorRapidoViewSet, basename='modificadorrapido')
-router.register(r'grupos-variacion', views.GrupoVariacionViewSet, basename='grupovariacion')
-router.register(r'opciones-variacion', views.OpcionVariacionViewSet, basename='opcionvariacion')
-router.register(r'recetas-opcion', views.RecetaOpcionViewSet, basename='recetaopcion')
-router.register(r'clientes', views.ClienteViewSet, basename='clientes')
-router.register(r'zonas-delivery', views.ZonaDeliveryViewSet, basename='zonadelivery')
-router.register(r'reglas-negocio', views.ReglaNegocioViewSet, basename='reglanegocio')
-router.register(r'planes-saas', PlanSaaSViewSet, basename='planes-saas')
-router.register(r'pagos-suscripcion', PagoSuscripcionViewSet, basename='pagos-suscripcion')
+router.register(r'grupos-variacion',    views.GrupoVariacionViewSet,   basename='grupovariacion')
+router.register(r'opciones-variacion',  views.OpcionVariacionViewSet,  basename='opcionvariacion')
+router.register(r'recetas-opcion',      views.RecetaOpcionViewSet,     basename='recetaopcion')
+router.register(r'clientes',            views.ClienteViewSet,          basename='clientes')
+router.register(r'zonas-delivery',      views.ZonaDeliveryViewSet,     basename='zonadelivery')
+router.register(r'reglas-negocio',      views.ReglaNegocioViewSet,     basename='reglanegocio')
+router.register(r'planes-saas',         PlanSaaSViewSet,               basename='planes-saas')
+router.register(r'pagos-suscripcion',   PagoSuscripcionViewSet,        basename='pagos-suscripcion')
 
 urlpatterns = [
-    path('empleados/login-pin/', login_empleado_pin, name='login-empleado-pin'),
+    path('empleados/login-pin/',      login_empleado_pin,          name='login-empleado-pin'),
     path('empleados/verificar-sesion/', verificar_sesion_empleado, name='verificar-sesion-empleado'),
     path('', include(router.urls)),
 
     # ==========================================
     # 🛡️ AUTENTICACIÓN (COOKIES)
     # ==========================================
-    path('login-admin/', CustomTokenObtainPairView.as_view(), name='login-admin'),
-    path('token/refresh/', CustomTokenRefreshView.as_view(), name='token-refresh'),
-    path('token/logout/', LogoutView.as_view(), name='token-logout'),
+    path('login-admin/',   CustomTokenObtainPairView.as_view(), name='login-admin'),
+    path('token/refresh/', CustomTokenRefreshView.as_view(),   name='token-refresh'),
+    path('token/logout/',  LogoutView.as_view(),               name='token-logout'),
 
     # ==========================================
     # RUTAS INDEPENDIENTES
     # ==========================================
-    path('negocio/configuracion/', views.configuracion_negocio, name='configuracion_negocio'),
-    path('dashboard/metricas/', views.metricas_dashboard, name='metricas_dashboard'),
-    path('movimientos-caja/', views.registrar_movimiento_caja, name='registrar_movimiento_caja'),
-    path('verificar-sesion/', views.verificar_sesion, name='verificar_sesion'),
-    path('marketing/guardar-global/', MarketingGlobalView.as_view(), name='guardar_marketing_global'),
-    path('health/', views.health_check, name='health_check'),
+    path('negocio/configuracion/',  views.configuracion_negocio,      name='configuracion_negocio'),
+    path('dashboard/metricas/',     views.metricas_dashboard,          name='metricas_dashboard'),
+    path('movimientos-caja/',       views.registrar_movimiento_caja,   name='registrar_movimiento_caja'),
+    path('verificar-sesion/',       views.verificar_sesion,            name='verificar_sesion'),
+    path('marketing/guardar-global/', MarketingGlobalView.as_view(),   name='guardar_marketing_global'),
+    path('health/',                 views.health_check,                name='health_check'),
 
     # ==========================================
     # RUTAS PÚBLICAS (Sin Token - Carta QR)
     # ==========================================
-    path('menu-publico/<int:sede_id>/', views.menu_publico, name='menu_publico'),
-    path('orden-publica/<int:sede_id>/<int:mesa_id>/', views.orden_publica, name='orden_publica'),
-    path('combos-promocionales/', ComboPromocionalView.as_view(), name='combos_promocionales'),
-    path('combos-promocionales/<int:pk>/', ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
-    path('happy-hours/', HappyHourView.as_view(), name='happy_hours'),
-    path('happy-hours/<int:pk>/', HappyHourDetalleView.as_view(), name='happy_hour_detalle'),
-    path('reglas-negocio-v2/', ReglaNegocioView.as_view(), name='reglas_negocio'),
-    path('reglas-negocio-v2/<int:pk>/', ReglaNegocioDetalleView.as_view(), name='regla_negocio_detalle'),
-    path('negocio/estado-suscripcion/', estado_suscripcion, name='estado-suscripcion'),
+    path('menu-publico/<int:sede_id>/',                views.menu_publico,               name='menu_publico'),
+    path('orden-publica/<int:sede_id>/<int:mesa_id>/', views.orden_publica,              name='orden_publica'),
+    path('combos-promocionales/',                      ComboPromocionalView.as_view(),   name='combos_promocionales'),
+    path('combos-promocionales/<int:pk>/',             ComboPromocionalDetalleView.as_view(), name='combo_promocional_detalle'),
+    path('happy-hours/',                               HappyHourView.as_view(),          name='happy_hours'),
+    path('happy-hours/<int:pk>/',                      HappyHourDetalleView.as_view(),   name='happy_hour_detalle'),
+    path('reglas-negocio-v2/',                         ReglaNegocioView.as_view(),       name='reglas_negocio'),
+    path('reglas-negocio-v2/<int:pk>/',                ReglaNegocioDetalleView.as_view(), name='regla_negocio_detalle'),
+    path('negocio/estado-suscripcion/',                estado_suscripcion,               name='estado-suscripcion'),
 
     # ==========================================
-    # 💳 MERCADO PAGO — QR Instore
+    # 💳 CULQI — Yape / Plin / Tarjeta
     # ==========================================
-    path('pagos/generar-qr/', mercadopago_views.generar_qr_mercadopago, name='mp-generar-qr'),
-
-    # OAuth — conexión del comerciante
-    path('mp/oauth/iniciar/',      mp_oauth_iniciar,      name='mp-oauth-iniciar'),
-    path('mp-callback/', mp_oauth_callback, name='mp-oauth-callback'),   # AllowAny — MP redirige aquí
-    path('mp/oauth/desconectar/',  mp_oauth_desconectar,  name='mp-oauth-desconectar'),
-    path('mp/oauth/estado/',       mp_oauth_estado,       name='mp-oauth-estado'),
-
-    # Webhook — MP notifica pagos (AllowAny + verificación HMAC interna)
-    path('mp/webhook/',            mp_webhook,            name='mp-webhook'),
-
-    # Polling — el frontend consulta el estado del pago cada 3s
-    path('mp/estado-pago/<int:pago_id>/', mp_estado_pago, name='mp-estado-pago'),
+    path('culqi/generar-qr/',                  generar_qr_culqi,    name='culqi-generar-qr'),
+    path('culqi/estado-orden/<str:order_id>/', estado_orden_culqi,  name='culqi-estado-orden'),
+    path('culqi/cobrar-tarjeta/',              cobrar_tarjeta_culqi, name='culqi-cobrar-tarjeta'),
+    path('culqi/webhook/',                     webhook_culqi,        name='culqi-webhook'),
 ]

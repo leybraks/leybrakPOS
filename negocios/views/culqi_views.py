@@ -1,59 +1,58 @@
 import json
 import logging
+from decimal import Decimal
+
 from django.utils import timezone
-import requests
- 
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
- 
+
+import requests
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
- 
+
 from ..models import Pago, Orden
- 
+
 logger = logging.getLogger(__name__)
- 
+
 CULQI_ORDERS_URL  = 'https://api.culqi.com/v2/orders'
 CULQI_CHARGES_URL = 'https://api.culqi.com/v2/charges'
- 
- 
+
+
 def _headers_culqi(private_key: str) -> dict:
     return {
         'Authorization': f'Bearer {private_key}',
         'Content-Type':  'application/json',
     }
- 
- 
+
+
 def _get_negocio(user):
     try:
         return user.negocio
     except Exception:
         return None
- 
- 
+
+
 def _get_sesion_caja_activa(negocio):
     from ..models import SesionCaja
-    # Cruzamos a través de 'sede' para llegar a 'negocio'
     return SesionCaja.objects.filter(sede__negocio=negocio, estado='abierta').first()
- 
- 
+
+
 def _monto_restante(orden):
     """Calcula cuánto falta pagar de una Orden, desde la BD."""
+    orden.refresh_from_db()
     try:
-        # Intenta filtrar por estado si el campo existe
         pagado = sum(
             p.monto for p in orden.pagos.filter(estado__in=['confirmado', 'manual'])
         )
     except Exception:
-        # Si Pago no tiene campo 'estado', suma todos los pagos
         pagado = sum(p.monto for p in orden.pagos.all())
     return orden.total - pagado
- 
- 
+
 # ──────────────────────────────────────────────────────────────
 # POST /api/culqi/generar-qr/
-# Crea Order en Culqi + Pago pendiente en BD
+# Crea Order en Culqi — NO crea Pago hasta que el cliente pague
 # ──────────────────────────────────────────────────────────────
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -63,43 +62,41 @@ def generar_qr_culqi(request):
         return Response({'error': 'Negocio no encontrado'}, status=404)
     if not negocio.usa_culqi or not negocio.culqi_private_key:
         return Response({'error': 'Culqi no está configurado en este negocio'}, status=400)
- 
-    orden_id    = request.data.get('orden_id')
-    metodo      = request.data.get('metodo')
-    descripcion = request.data.get('descripcion', 'Pago POS')
- 
+
+    orden_id = request.data.get('orden_id')
+    metodo   = request.data.get('metodo')
+    descripcion = request.data.get('descripcion', 'Pago POS') 
+
     if metodo not in ('yape', 'plin'):
         return Response({'error': 'Método inválido'}, status=400)
- 
-    # ✅ Orden se relaciona al negocio a través de sede
+
     try:
         orden = Orden.objects.get(id=orden_id, sede__negocio=negocio)
     except Orden.DoesNotExist:
         return Response({'error': 'Orden no encontrada'}, status=404)
- 
+
     monto_restante = _monto_restante(orden)
     if monto_restante <= 0:
         return Response({'error': 'Esta orden ya está pagada'}, status=400)
- 
+
     monto_centavos = int(monto_restante * 100)
-    tiempo_actual = int(timezone.now().timestamp())
+    tiempo_actual  = int(timezone.now().timestamp())
+
     payload = {
         'amount':        monto_centavos,
         'currency_code': 'PEN',
         'description':   descripcion[:250],
-        # Solución 2: Hacemos el order_number estrictamente único añadiendo el timestamp
-        'order_number':  f'POS-{orden.id}-{negocio.id}-{tiempo_actual}', 
+        'order_number':  f'POS-{orden.id}-{negocio.id}-{tiempo_actual}',
         'client_details': {
             'first_name':   negocio.nombre[:50],
             'last_name':    'POS',
-            'email':        f'pos@negocio{negocio.id}.leybrak.com', # Ya actualizado sin 'brava.pe'
+            'email':        f'pos@negocio{negocio.id}.leybrak.com',
             'phone_number': (negocio.yape_numero or '999000000')[:15],
         },
-        # Solución 1: Hora actual + 300 segundos (5 minutos en el futuro)
-        'expiration_date': tiempo_actual + 86400, 
+        'expiration_date': tiempo_actual + 300,  # 5 minutos
         'confirm':         False,
     }
- 
+
     try:
         res = requests.post(
             CULQI_ORDERS_URL,
@@ -108,47 +105,37 @@ def generar_qr_culqi(request):
             timeout=10,
         )
         data = res.json()
-        print("====== RESPUESTA DE CULQI ======")
-        print(data) 
-        print("================================")
     except requests.Timeout:
         return Response({'error': 'Timeout conectando con Culqi'}, status=504)
     except Exception as e:
         logger.error(f'Culqi generar-qr: {e}')
         return Response({'error': str(e)}, status=500)
- 
+
     if res.status_code not in (200, 201):
         logger.error(f'Culqi generar-qr {res.status_code}: {data}')
         return Response({'error': data.get('user_message', 'Error en Culqi')}, status=400)
- 
-    culqi_order_id = data.get('id', '')
-    qr_url         = data.get('qr_url') or data.get('metadata', {}).get('qr_url', '')
- 
-    # ✅ Pago en BD en estado 'pendiente' — get_or_create evita duplicados si se reintenta
-    sesion = _get_sesion_caja_activa(negocio)
-    pago, _ = Pago.objects.get_or_create(
-        culqi_order_id=culqi_order_id,
-        defaults={
-            'orden':       orden,
-            'metodo':      metodo,
-            'monto':       monto_restante,
-            'sesion_caja': sesion,
-            'estado':      'pendiente',
-        }
-    )
+
+    culqi_order_id  = data.get('id', '')
     codigo_qr_texto = data.get('payment_code', '')
+
+    # Guardamos el order_id y metodo en sesión para que el webhook sepa a qué orden pertenece
+    # No creamos Pago aquí — solo cuando el cliente realmente pague
+    logger.info(f'QR generado: order={culqi_order_id} orden={orden.id} metodo={metodo}')
+
     return Response({
-        'order_id':  culqi_order_id,
-        'pago_id':   pago.id,
-        'qr_data':    codigo_qr_texto,
+        'order_id': culqi_order_id,
+        'qr_data':  codigo_qr_texto,
         'expira_en': 300,
-        'monto':     float(monto_restante),
+        'monto':    float(monto_restante),
+        # Guardamos metodo y orden_id para usarlos en el polling
+        'metodo':   metodo,
+        'orden_id': orden.id,
     })
- 
- 
+
+
 # ──────────────────────────────────────────────────────────────
 # GET /api/culqi/estado-orden/<order_id>/
-# Polling: consulta si el QR fue pagado y confirma el Pago
+# Polling: consulta si el QR fue pagado
 # ──────────────────────────────────────────────────────────────
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -156,15 +143,16 @@ def estado_orden_culqi(request, order_id):
     negocio = _get_negocio(request.user)
     if not negocio or not negocio.culqi_private_key:
         return Response({'error': 'Culqi no configurado'}, status=400)
- 
-    # Si el webhook ya lo confirmó, respondemos directo sin llamar a Culqi
+
+    # Si el webhook ya creó y confirmó el pago, respondemos directo
     try:
         pago = Pago.objects.get(culqi_order_id=order_id)
         if pago.estado == 'confirmado':
             return Response({'estado': 'pagado', 'pago_id': pago.id})
     except Pago.DoesNotExist:
         pago = None
- 
+
+    # Consultamos a Culqi el estado real
     try:
         res = requests.get(
             f'{CULQI_ORDERS_URL}/{order_id}',
@@ -176,30 +164,55 @@ def estado_orden_culqi(request, order_id):
         return Response({'error': 'Timeout'}, status=504)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
- 
+
     if res.status_code != 200:
         return Response({'error': data.get('user_message', 'Error consultando orden')}, status=400)
- 
+
     estado_culqi = data.get('state', '')
     pagado       = estado_culqi in ('paid', 'confirmed')
- 
-    if pagado and pago:
-        # ✅ Confirmación atómica con select_for_update — evita race conditions
+
+    if pagado:
+        # Obtener orden_id y metodo del order_number: POS-{orden_id}-{negocio_id}-{ts}
+        order_number = data.get('order_number', '')
+        metodo_pago  = request.query_params.get('metodo', 'yape')
+        sesion       = _get_sesion_caja_activa(negocio)
+
+        try:
+            partes   = order_number.split('-')
+            orden_id_real = int(partes[1])
+            orden_obj = Orden.objects.get(id=orden_id_real)
+        except Exception:
+            return Response({'estado': 'pendiente'})
+
         with transaction.atomic():
-            pago = Pago.objects.select_for_update().get(pk=pago.pk)
-            if pago.estado != 'confirmado':
-                pago.estado       = 'confirmado'
-                pago.culqi_amount = data.get('amount')
-                pago.save(update_fields=['estado', 'culqi_amount'])
- 
+            if pago:
+                # Ya existe (creado por webhook), solo confirma
+                pago = Pago.objects.select_for_update().get(pk=pago.pk)
+                if pago.estado != 'confirmado':
+                    pago.estado       = 'confirmado'
+                    pago.culqi_amount = data.get('amount')
+                    pago.save(update_fields=['estado', 'culqi_amount'])
+            else:
+                # Crear el pago confirmado ahora
+                pago, creado = Pago.objects.get_or_create(
+                    culqi_order_id=order_id,
+                    defaults={
+                        'orden':        orden_obj,
+                        'metodo':       metodo_pago,
+                        'monto':        _monto_restante(orden_obj),
+                        'sesion_caja':  sesion,
+                        'estado':       'confirmado',
+                        'culqi_amount': data.get('amount'),
+                    }
+                )
+
         return Response({'estado': 'pagado', 'pago_id': pago.id})
- 
+
     return Response({'estado': 'pendiente', 'estado_culqi': estado_culqi})
- 
- 
+
+
 # ──────────────────────────────────────────────────────────────
 # POST /api/culqi/cobrar-tarjeta/
-# Cargo real con token de Culqi.js — atómico e idempotente
 # ──────────────────────────────────────────────────────────────
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -207,23 +220,37 @@ def cobrar_tarjeta_culqi(request):
     negocio = _get_negocio(request.user)
     if not negocio or not negocio.culqi_private_key:
         return Response({'error': 'Culqi no configurado'}, status=400)
- 
+
     token    = request.data.get('token')
     orden_id = request.data.get('orden_id')
- 
+
     if not token or not orden_id:
         return Response({'error': 'token y orden_id son requeridos'}, status=400)
- 
-    # ✅ Monto desde la BD
+
     try:
         orden = Orden.objects.get(id=orden_id, sede__negocio=negocio)
     except Orden.DoesNotExist:
         return Response({'error': 'Orden no encontrada'}, status=404)
- 
+
     monto_restante = _monto_restante(orden)
     if monto_restante <= 0:
         return Response({'error': 'Esta orden ya está pagada'}, status=400)
- 
+
+    sesion = _get_sesion_caja_activa(negocio)
+
+    # Cancelar cualquier pago pendiente anterior (Yape/Plin cancelados, etc.)
+    Pago.objects.filter(orden=orden, estado='pendiente').update(estado='cancelado')
+
+    # Crear pago pendiente ANTES de llamar a Culqi
+    # Así el webhook lo encuentra cuando llega
+    pago = Pago.objects.create(
+        orden       = orden,
+        metodo      = 'tarjeta',
+        monto       = monto_restante,
+        sesion_caja = sesion,
+        estado      = 'pendiente',
+    )
+
     payload = {
         'amount':        int(monto_restante * 100),
         'currency_code': 'PEN',
@@ -232,7 +259,7 @@ def cobrar_tarjeta_culqi(request):
         'description':   f'Pago POS orden #{orden_id}',
         'capture':       True,
     }
- 
+
     try:
         res = requests.post(
             CULQI_CHARGES_URL,
@@ -242,42 +269,35 @@ def cobrar_tarjeta_culqi(request):
         )
         data = res.json()
     except requests.Timeout:
+        pago.estado = 'cancelado'
+        pago.save(update_fields=['estado'])
         return Response({'error': 'Timeout procesando tarjeta'}, status=504)
     except Exception as e:
+        pago.estado = 'cancelado'
+        pago.save(update_fields=['estado'])
         logger.error(f'Culqi cobrar-tarjeta: {e}')
         return Response({'error': str(e)}, status=500)
- 
+
     if res.status_code not in (200, 201):
+        pago.estado = 'cancelado'
+        pago.save(update_fields=['estado'])
         logger.error(f'Culqi cobrar-tarjeta error: {data}')
         return Response({'error': data.get('user_message', 'Cargo rechazado')}, status=400)
- 
+
     cargo_id      = data.get('id')
     monto_cobrado = data.get('amount')
-    sesion        = _get_sesion_caja_activa(negocio)
- 
-    # ✅ unique=True en culqi_charge_id → IntegrityError si se intenta cobrar dos veces
-    try:
-        with transaction.atomic():
-            pago = Pago.objects.create(
-                orden           = orden,
-                metodo          = 'tarjeta',
-                monto           = monto_restante,
-                sesion_caja     = sesion,
-                estado          = 'confirmado',
-                culqi_charge_id = cargo_id,
-                culqi_amount    = monto_cobrado,
-            )
-    except IntegrityError:
-        logger.warning(f'Intento de doble cobro charge_id={cargo_id}')
-        return Response({'ok': True, 'cargo_id': cargo_id, 'duplicado': True})
- 
+
+    pago.culqi_charge_id = cargo_id
+    pago.culqi_amount    = monto_cobrado
+    pago.estado          = 'confirmado'
+    pago.save(update_fields=['culqi_charge_id', 'culqi_amount', 'estado'])
+
+    logger.info(f'Tarjeta cobrada: pago #{pago.id} charge={cargo_id}')
     return Response({'ok': True, 'cargo_id': cargo_id, 'pago_id': pago.id})
- 
- 
+
+
 # ──────────────────────────────────────────────────────────────
 # POST /api/culqi/webhook/
-# Red de seguridad: Culqi avisa aunque el cajero cierre el modal.
-# El secret es POR NEGOCIO — se lee de la BD, no de settings.py.
 # ──────────────────────────────────────────────────────────────
 @csrf_exempt
 @api_view(['POST'])
@@ -285,54 +305,106 @@ def cobrar_tarjeta_culqi(request):
 def webhook_culqi(request):
     try:
         body_bytes = request.body
-        event      = json.loads(body_bytes)
+        event = json.loads(body_bytes)
+        if isinstance(event, str):
+            event = json.loads(event)
     except Exception:
         return Response({'error': 'Body inválido'}, status=400)
- 
+
     event_type = event.get('type', '')
-    obj        = event.get('data', {}).get('object', {})
- 
-    # Identificar negocio por order_number: "POS-{orden_id}-{negocio_id}"
-    order_number = obj.get('order_number', '')
+
+    # Culqi manda 'data' como string JSON escapado
+    raw_data = event.get('data', '{}')
+    if isinstance(raw_data, str):
+        try:
+            obj = json.loads(raw_data)
+        except Exception:
+            obj = {}
+    elif isinstance(raw_data, dict):
+        obj = raw_data.get('object', raw_data)
+    else:
+        obj = {}
+
+    order_number = obj.get('order_number', '') or obj.get('description', '')
     negocio_id   = None
     try:
-        negocio_id = int(order_number.split('-')[-1])
+        partes = order_number.split('-')
+        if len(partes) >= 3:
+            negocio_id = int(partes[2])
     except (IndexError, ValueError):
         pass
- 
-    # Yape / Plin — order.status.changed (Culqi v2)
-    # Solo confirmamos si el nuevo estado es 'paid' o 'confirmed'
+
+    logger.info(f"Culqi webhook: type={event_type} negocio={negocio_id}")
+
+    # ── Yape / Plin — order.status.changed ─────────────────────
     if event_type == 'order.status.changed':
         order_id     = obj.get('id')
         monto        = obj.get('amount')
-        estado_order = obj.get('state', '')   # 'paid', 'confirmed', 'expired', etc.
- 
+        estado_order = obj.get('state', '')
+        wh_order_number = obj.get('order_number', '')
+
         if order_id and estado_order in ('paid', 'confirmed'):
-            try:
-                with transaction.atomic():
+            with transaction.atomic():
+                try:
+                    # Intenta encontrar pago existente
                     pago = Pago.objects.select_for_update().get(culqi_order_id=order_id)
                     if pago.estado != 'confirmado':
                         pago.estado       = 'confirmado'
                         pago.culqi_amount = monto
                         pago.save(update_fields=['estado', 'culqi_amount'])
-                        logger.info(f'Webhook: Pago #{pago.id} confirmado via order.status.changed (negocio {negocio_id})')
-            except Pago.DoesNotExist:
-                logger.warning(f'Webhook: order {order_id} no encontrada en BD')
- 
-    # Tarjeta — charge.creation.succeeded (Culqi v2)
+                        logger.info(f'Webhook: Pago #{pago.id} confirmado via order.status.changed')
+                except Pago.DoesNotExist:
+                    # No existe — crear el pago confirmado directamente
+                    try:
+                        partes = wh_order_number.split('-')
+                        orden_id_real = int(partes[1])
+                        metodo_pago   = 'yape'  # default — Culqi no distingue en el webhook
+                        orden_obj     = Orden.objects.get(id=orden_id_real)
+                        pago = Pago.objects.create(
+                            orden          = orden_obj,
+                            metodo         = metodo_pago,
+                            monto          = Decimal(str(monto)) / 100,
+                            estado         = 'confirmado',
+                            culqi_order_id = order_id,
+                            culqi_amount   = monto,
+                        )
+                        logger.info(f'Webhook: Pago #{pago.id} creado y confirmado via order.status.changed')
+                    except Exception as e:
+                        logger.error(f'Webhook: error creando pago Yape/Plin: {e}')
+
+    # ── Tarjeta — charge.creation.succeeded ────────────────────
     elif event_type == 'charge.creation.succeeded':
         charge_id = obj.get('id')
         monto     = obj.get('amount')
+
         if charge_id:
             try:
                 with transaction.atomic():
-                    pago = Pago.objects.select_for_update().get(culqi_charge_id=charge_id)
+                    try:
+                        pago = Pago.objects.select_for_update().get(culqi_charge_id=charge_id)
+                    except Pago.DoesNotExist:
+                        # Busca pago pendiente de tarjeta por orden
+                        descripcion = obj.get('description', '')
+                        try:
+                            orden_id_real = int(descripcion.split('#')[-1])
+                            pago = Pago.objects.select_for_update().filter(
+                                orden_id=orden_id_real,
+                                metodo='tarjeta',
+                                culqi_charge_id=None,
+                                estado='pendiente',
+                            ).latest('fecha_pago')
+                            pago.culqi_charge_id = charge_id
+                        except (Pago.DoesNotExist, ValueError, IndexError):
+                            logger.warning(f'Webhook: charge {charge_id} no encontrado en BD')
+                            return Response({'ok': True})
+
                     if pago.estado != 'confirmado':
                         pago.estado       = 'confirmado'
                         pago.culqi_amount = monto
-                        pago.save(update_fields=['estado', 'culqi_amount'])
-                        logger.info(f'Webhook: Charge #{pago.id} confirmado (negocio {negocio_id})')
-            except Pago.DoesNotExist:
-                logger.warning(f'Webhook: charge {charge_id} no encontrado en BD')
- 
+                        pago.save(update_fields=['estado', 'culqi_amount', 'culqi_charge_id'])
+                        logger.info(f'Webhook: Charge #{pago.id} confirmado')
+
+            except Exception as e:
+                logger.error(f'Webhook charge error: {e}')
+
     return Response({'ok': True})

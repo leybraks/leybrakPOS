@@ -26,12 +26,11 @@ const getRolVista = (rol) =>
   ROL_A_VISTA[rol?.toLowerCase().trim()] || null;
 
 const VistaInternaPOS = () => {
-  const [vista, setVista]           = useState(null);
-  const [sesion, setSesion]         = useState(null);
-  const [cargando, setCargando]     = useState(true);
-  const [suscripcion, setSuscripcion] = useState(null); // estado de suscripción
+  const [vista, setVista]             = useState(null);
+  const [sesion, setSesion]           = useState(null);
+  const [cargando, setCargando]       = useState(true);
+  const [suscripcion, setSuscripcion] = useState(null);
 
-  // Verifica suscripción solo para roles que usan el ERP/POS
   const verificarSuscripcion = async () => {
     try {
       const res = await api.get('/negocio/estado-suscripcion/');
@@ -43,17 +42,6 @@ const VistaInternaPOS = () => {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const mpStatus = params.get('mp_status');
-    if (mpStatus === 'ok') {
-      // Limpiar la URL
-      window.history.replaceState({}, '', '/');
-      // El toast se mostrará cuando el ERP cargue — guardamos en sessionStorage
-      sessionStorage.setItem('mp_oauth_ok', '1');
-    } else if (mpStatus === 'error') {
-      window.history.replaceState({}, '', '/');
-      sessionStorage.setItem('mp_oauth_error', params.get('msg') || 'error');
-    }
     const verificar = async () => {
       try {
         // 1. ¿Hay sesión de empleado activa? (cookie empleado_session)
@@ -63,23 +51,16 @@ const VistaInternaPOS = () => {
             const { rol, sede_id, nombre, empleado_id, negocio_id } = res.data.empleado;
             const vistaDestino = getRolVista(rol);
 
-            if (!vistaDestino) {
-              setVista('sin_permiso');
-              return;
-            }
+            if (!vistaDestino) { setVista('sin_permiso'); return; }
 
-            localStorage.setItem('sede_id', sede_id);
-            localStorage.setItem('empleado_id', empleado_id);
+            localStorage.setItem('sede_id',         sede_id);
+            localStorage.setItem('empleado_id',     empleado_id);
             localStorage.setItem('empleado_nombre', nombre);
-            localStorage.setItem('negocio_id', negocio_id);
-            localStorage.setItem('usuario_rol', rol);
+            localStorage.setItem('negocio_id',      negocio_id);
+            localStorage.setItem('usuario_rol',     rol);
 
-            // ✅ Verificar suscripción también para empleados
             const sus = await verificarSuscripcion();
-            if (sus && !sus.puede_operar) {
-              setVista('bloqueado');
-              return;
-            }
+            if (sus && !sus.puede_operar) { setVista('bloqueado'); return; }
 
             setSesion({ rol, nombre, sede_id });
             setVista(vistaDestino);
@@ -95,20 +76,13 @@ const VistaInternaPOS = () => {
           const { rol, negocio_id } = res.data.user;
           const vistaDestino = getRolVista(rol);
 
-          if (!vistaDestino) {
-            setVista('sin_permiso');
-            return;
-          }
+          if (!vistaDestino) { setVista('sin_permiso'); return; }
 
           if (negocio_id) localStorage.setItem('negocio_id', negocio_id);
           setSesion({ rol });
 
-          // ✅ Verificar suscripción para dueño/admin
           const sus = await verificarSuscripcion();
-          if (sus && !sus.puede_operar) {
-            setVista('bloqueado');
-            return;
-          }
+          if (sus && !sus.puede_operar) { setVista('bloqueado'); return; }
 
           setVista(vistaDestino);
           return;
@@ -132,7 +106,6 @@ const VistaInternaPOS = () => {
 
     const { rol, nombre, sede_id, suscripcion } = datos;
 
-    // Si el login ya viene con estado de suscripción bloqueado, mostrar bloqueo
     if (suscripcion && !suscripcion.puede_operar) {
       setSuscripcion(suscripcion);
       setVista('bloqueado');
@@ -140,18 +113,11 @@ const VistaInternaPOS = () => {
     }
 
     const vistaDestino = getRolVista(rol);
-    if (!vistaDestino) {
-      setVista('sin_permiso');
-      return;
-    }
+    if (!vistaDestino) { setVista('sin_permiso'); return; }
 
-    // Si no venía suscripcion en el objeto, verificar ahora
     if (!suscripcion) {
       const sus = await verificarSuscripcion();
-      if (sus && !sus.puede_operar) {
-        setVista('bloqueado');
-        return;
-      }
+      if (sus && !sus.puede_operar) { setVista('bloqueado'); return; }
     }
 
     setSesion({ rol, nombre, sede_id });
@@ -187,7 +153,6 @@ const VistaInternaPOS = () => {
     );
   }
 
-  // ✅ Pantalla de bloqueo por suscripción vencida o suspendida
   if (vista === 'bloqueado') {
     const esVencido   = suscripcion?.estado === 'vencido';
     const esBloqueado = suscripcion?.estado === 'bloqueado';
@@ -199,9 +164,7 @@ const VistaInternaPOS = () => {
         <h1 className="text-3xl font-black text-white mb-3 uppercase tracking-tighter">
           {esBloqueado ? 'Cuenta Suspendida' : 'Periodo de Prueba Vencido'}
         </h1>
-        <p className="text-neutral-400 font-bold mb-2 max-w-md text-sm">
-          {suscripcion?.mensaje}
-        </p>
+        <p className="text-neutral-400 font-bold mb-2 max-w-md text-sm">{suscripcion?.mensaje}</p>
         {esVencido && (
           <p className="text-neutral-600 text-xs mb-8 max-w-sm">
             Plan actual: <span className="text-neutral-400">{suscripcion?.plan_nombre ?? 'Sin plan'}</span>
@@ -210,9 +173,7 @@ const VistaInternaPOS = () => {
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
           <button
             onClick={() => {
-              const msg = encodeURIComponent(
-                `Hola, necesito renovar mi suscripción del sistema POS.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`
-              );
+              const msg = encodeURIComponent(`Hola, necesito renovar mi suscripción del sistema POS.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`);
               window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
             }}
             className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/20 active:scale-95 transition-all"
@@ -230,13 +191,10 @@ const VistaInternaPOS = () => {
     );
   }
 
-  // ✅ Banner de alerta cuando quedan ≤3 días de prueba
   const mostrarBannerAlerta = suscripcion?.estado === 'prueba' && suscripcion?.alerta;
 
   return (
     <div className="bg-[#121212] h-screen text-neutral-100 font-sans flex flex-col relative overflow-hidden">
-
-      {/* Banner de alerta de vencimiento */}
       {mostrarBannerAlerta && (
         <div className="bg-amber-500 text-black text-xs font-black px-4 py-2 flex items-center justify-between gap-4 z-50 shrink-0">
           <span>
@@ -245,9 +203,7 @@ const VistaInternaPOS = () => {
           </span>
           <button
             onClick={() => {
-              const msg = encodeURIComponent(
-                `Hola, quiero contratar un plan del sistema POS antes de que venza mi prueba.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`
-              );
+              const msg = encodeURIComponent(`Hola, quiero contratar un plan del sistema POS antes de que venza mi prueba.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`);
               window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
             }}
             className="shrink-0 bg-black text-white px-3 py-1 rounded-lg uppercase tracking-widest hover:bg-neutral-900 transition-all"
@@ -257,19 +213,14 @@ const VistaInternaPOS = () => {
         </div>
       )}
 
-      {vista === 'login' && (
-        <LoginView onAccesoConcedido={handleAccesoConcedido} />
-      )}
+      {vista === 'login'    && <LoginView onAccesoConcedido={handleAccesoConcedido} />}
       {vista === 'terminal' && <PosTerminal rolUsuario={sesion?.rol} onIrAErp={() => setVista('erp')} />}
-      {vista === 'cocina' && <KdsView onVolver={() => setVista('login')} />}
-      {vista === 'erp' && <ErpDashboard onVolverAlPos={() => setVista('terminal')} rolUsuario={sesion?.rol} />}
+      {vista === 'cocina'   && <KdsView onVolver={() => setVista('login')} />}
+      {vista === 'erp'      && <ErpDashboard onVolverAlPos={() => setVista('terminal')} rolUsuario={sesion?.rol} />}
     </div>
   );
 };
 
-// ============================================================
-// APP ROOT
-// ============================================================
 export default function App() {
   return (
     <ToastProvider>
@@ -282,7 +233,7 @@ export default function App() {
               <span className="text-8xl mb-4">🏮</span>
               <h1 className="text-4xl font-black text-white mb-2">404</h1>
               <p className="text-neutral-500 font-bold mb-6">Parece que este local no existe o se movió de sitio.</p>
-              <button 
+              <button
                 onClick={() => window.location.href = '/'}
                 className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest shadow-lg shadow-orange-900/20 active:scale-95 transition-all"
               >

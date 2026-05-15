@@ -312,9 +312,15 @@ function FormularioCombo({ combo, isDark, colorPrimario, productosReales, catego
   const precioRealEstimado = form.items.reduce((total, item) => {
     const prod = productosReales.find(p => String(p.id) === String(item.producto_hijo_id));
     if (!prod) return total;
-    const precio = parseFloat(prod.precio_base) || 0;
+    let precio = parseFloat(prod.precio_base) || 0;
+    if (precio === 0 && prod.grupos_variacion?.length > 0) {
+        const precios = prod.grupos_variacion
+            .flatMap(g => g.opciones?.map(o => parseFloat(o.precio_adicional)) ?? [])
+            .filter(p => p > 0);
+        if (precios.length > 0) precio = Math.min(...precios);
+    }
     return total + precio * item.cantidad;
-    }, 0);
+}, 0);
   return (
     <>
       <div className="flex flex-col h-full overflow-hidden">

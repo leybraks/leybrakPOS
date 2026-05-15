@@ -70,18 +70,9 @@ from .suscripcion_views import (
     estado_suscripcion,
 )
 
-from .mercadopago_views import (
-    generar_qr_mercadopago,
-)
-
-from .mercadopago_oauth_views import (
-    mp_oauth_iniciar,
-    mp_oauth_callback,
-    mp_oauth_desconectar,
-    mp_oauth_estado,
-)
-
-from .mercadopago_webhook_views import (
-    mp_webhook,
-    mp_estado_pago,
+from .culqi_views import (
+    generar_qr_culqi,
+    estado_orden_culqi,
+    cobrar_tarjeta_culqi,
+    webhook_culqi,
 )

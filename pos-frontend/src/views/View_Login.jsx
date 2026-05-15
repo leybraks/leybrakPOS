@@ -299,6 +299,16 @@ export default function LoginView({ onAccesoConcedido }) {
             </div>
           </div>
         )}
+        {/* Enlace Legal - Siempre visible */}
+        <a
+          href="/legal.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#121212] border border-[#1e1e1e] hover:border-[#1e1e1e] text-gray-600 hover:text-gray-400 px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+        >
+          <AlertCircle size={12} />
+          Legal
+        </a>
       </div>
     );
   }
@@ -495,6 +505,16 @@ export default function LoginView({ onAccesoConcedido }) {
           </div>
         </div>
       </div>
+
+      <a
+        href="/legal.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#121212] border border-[#1e1e1e] hover:border-[#3b82f6]/50 text-gray-500 hover:text-[#3b82f6] px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+      >
+        <AlertCircle size={12} />
+        Legal
+      </a>
 
     </div>
   );

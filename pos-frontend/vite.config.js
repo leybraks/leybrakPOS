@@ -9,9 +9,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       workbox: {
-        // El service worker NUNCA intercepta rutas /api/
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/mp-callback\//],
         runtimeCaching: [],
+        skipWaiting: true,      // ← AGREGA
+        clientsClaim: true,     // ← AGREGA
       },
       manifest: {
         name: 'Brava POS ERP',

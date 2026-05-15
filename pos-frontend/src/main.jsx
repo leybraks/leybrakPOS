@@ -3,11 +3,18 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-// Fuerza actualización del service worker al cargar
+// Fuerza que el nuevo SW tome control inmediatamente
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(r => r.update());
+  navigator.serviceWorker.ready.then(registration => {
+    registration.update().then(() => {
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    });
   });
+
+  // Cuando el SW cambie, recarga la página automáticamente
+
 }
 
 createRoot(document.getElementById('root')).render(

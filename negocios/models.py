@@ -50,14 +50,14 @@ class Negocio(models.Model):
     plin_numero = models.CharField(max_length=15, blank=True, null=True)
     plin_qr = models.ImageField(upload_to='negocios/qrs/plin/', blank=True, null=True)
 
+
     # ==========================================
-    # 💳 3. PASARELA DE PAGO (Mercado Pago)
+    # 💳 4. PASARELA DE PAGO (Culqi)
     # ==========================================
-    usa_mercado_pago  = models.BooleanField(default=False)
-    mp_user_id        = models.CharField(max_length=100, blank=True, null=True, help_text="ID del Collector/Vendedor en MP")
-    mp_public_key     = models.CharField(max_length=255, blank=True, null=True)
-    mp_access_token   = EncryptedCharField(max_length=255, blank=True, null=True)
-    mp_webhook_secret = EncryptedCharField(max_length=255, blank=True, null=True, help_text="Firma secreta para validar webhooks")
+    usa_culqi            = models.BooleanField(default=False)
+    culqi_public_key     = models.CharField(max_length=255, blank=True, null=True)
+    culqi_private_key    = EncryptedCharField(max_length=255, blank=True, null=True)
+    culqi_webhook_secret = EncryptedCharField(max_length=255, blank=True, null=True)
 
     # ==========================================
     # ⚙️ CONFIGURACIÓN DEL PLAN
@@ -453,36 +453,34 @@ class Pago(models.Model):
         ('plin', 'Plin'),
     ]
     
-    # Mantenemos tus estados originales
     ESTADOS = [
         ('pendiente', 'Pendiente'),
         ('confirmado', 'Confirmado'),
         ('cancelado', 'Cancelado'),
         ('manual', 'Manual'),
+        ('fallido', 'Fallido'),
     ]
 
-    orden = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='pagos')
-    metodo = models.CharField(max_length=20, choices=METODOS)
-    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    orden       = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='pagos')
+    metodo      = models.CharField(max_length=20, choices=METODOS)
+    monto       = models.DecimalField(max_digits=10, decimal_places=2)
     sesion_caja = models.ForeignKey(SesionCaja, on_delete=models.PROTECT, null=True, related_name='pagos')
-    fecha_pago = models.DateTimeField(auto_now_add=True)
-    
+    fecha_pago  = models.DateTimeField(auto_now_add=True)
+    estado      = models.CharField(max_length=20, choices=ESTADOS, default='confirmado')
+
     # ==========================================
-    # NUEVOS CAMPOS PARA INTEGRACIÓN CON MERCADO PAGO
+    # CULQI — QR Yape/Plin + Tarjeta
     # ==========================================
-    estado = models.CharField(max_length=20, choices=ESTADOS, default='confirmado')
-    mp_order_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="ID de la orden presencial generada")
-    mp_payment_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="ID de la transacción una vez pagada")
-    # Mercado Pago devuelve decimales (ej. 10.50), no céntimos
-    mp_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Monto real cobrado devuelto por MP")
+    culqi_order_id  = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    culqi_charge_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    culqi_amount    = models.IntegerField(null=True, blank=True)
 
     class Meta:
         indexes = [
             models.Index(fields=['sesion_caja', 'fecha_pago']),
             models.Index(fields=['orden']),
-            # Índices actualizados para los webhooks de MP
-            models.Index(fields=['mp_order_id']),
-            models.Index(fields=['mp_payment_id']),
+            models.Index(fields=['culqi_order_id']),
+            models.Index(fields=['culqi_charge_id']),
         ]
 
     def __str__(self):

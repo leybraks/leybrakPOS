@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Términos, Políticas y Libro de Reclamaciones - Leybrak POS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e5e5e5; line-height: 1.7; }
+  .hero { background: linear-gradient(135deg, #ff5a1f15, #ff5a1f05); border-bottom: 1px solid #1a1a1a; padding: 3rem 2rem; text-align: center; }
+  .hero h1 { font-size: 2rem; font-weight: 900; color: #fff; margin-bottom: 0.5rem; }
+  .hero p { color: #666; font-size: 0.9rem; }
+  .logo { font-size: 1.5rem; font-weight: 900; color: #ff5a1f; margin-bottom: 1rem; letter-spacing: -0.5px; }
+  nav { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; padding: 1.5rem 2rem; border-bottom: 1px solid #1a1a1a; background: #111; position: sticky; top: 0; z-index: 100; }
+  nav a { color: #aaa; text-decoration: none; font-size: 0.85rem; font-weight: 600; padding: 0.4rem 1rem; border-radius: 999px; border: 1px solid #222; transition: all 0.2s; }
+  nav a:hover, nav a.active { background: #ff5a1f; color: #fff; border-color: #ff5a1f; }
+  .container { max-width: 860px; margin: 0 auto; padding: 3rem 2rem; }
+  section { margin-bottom: 4rem; scroll-margin-top: 80px; }
+  h2 { font-size: 1.6rem; font-weight: 900; color: #fff; margin-bottom: 0.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #ff5a1f; display: inline-block; }
+  h3 { font-size: 1.05rem; font-weight: 700; color: #fff; margin: 1.5rem 0 0.5rem; }
+  p { color: #aaa; margin-bottom: 0.75rem; font-size: 0.95rem; }
+  ul { color: #aaa; padding-left: 1.5rem; margin-bottom: 0.75rem; font-size: 0.95rem; }
+  ul li { margin-bottom: 0.4rem; }
+  .badge { display: inline-block; background: #ff5a1f20; color: #ff5a1f; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 4px; margin-bottom: 1rem; border: 1px solid #ff5a1f30; text-transform: uppercase; letter-spacing: 1px; }
+  .info-box { background: #111; border: 1px solid #1a1a1a; border-left: 3px solid #ff5a1f; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .info-box p { margin: 0; color: #888; font-size: 0.9rem; }
+  .info-box strong { color: #ccc; }
+
+  /* Libro de Reclamaciones */
+  .form-section { background: #111; border: 1px solid #1a1a1a; border-radius: 16px; padding: 2rem; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 0.8rem; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select, textarea { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 0.65rem 0.9rem; color: #fff; font-size: 0.9rem; font-family: inherit; transition: border-color 0.2s; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #ff5a1f; }
+  select option { background: #111; }
+  textarea { resize: vertical; min-height: 100px; }
+  .submit-btn { background: #ff5a1f; color: #fff; border: none; padding: 0.85rem 2rem; border-radius: 10px; font-weight: 800; font-size: 0.95rem; cursor: pointer; width: 100%; margin-top: 0.5rem; transition: all 0.2s; letter-spacing: 0.3px; }
+  .submit-btn:hover { background: #e04d18; transform: translateY(-1px); }
+  .success-msg { display: none; background: #0d2d1a; border: 1px solid #1a5c32; border-radius: 10px; padding: 1.5rem; text-align: center; margin-top: 1rem; }
+  .success-msg h4 { color: #4ade80; font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .success-msg p { color: #6ee7b7; font-size: 0.85rem; margin: 0; }
+  .folio { font-family: monospace; font-size: 1.2rem; color: #4ade80; font-weight: 700; }
+
+  footer { border-top: 1px solid #1a1a1a; padding: 2rem; text-align: center; color: #444; font-size: 0.8rem; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } h2 { font-size: 1.3rem; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">Leybrak Tech</div>
+  <h1>Legal y Reclamaciones</h1>
+  <p>Última actualización: Mayo 2025 · leybrak.com</p>
+</div>
+
+<nav>
+  <a href="#terminos" class="active">Términos y condiciones</a>
+  <a href="#devoluciones">Política de devoluciones</a>
+  <a href="#reclamaciones">Libro de reclamaciones</a>
+</nav>
+
+<div class="container">
+
+  <!-- TÉRMINOS Y CONDICIONES -->
+  <section id="terminos">
+    <div class="badge">Legal</div><br>
+    <h2>Términos y condiciones</h2>
+
+    <h3>1. Aceptación de los términos</h3>
+    <p>Al acceder y utilizar los servicios de Leybrak Tech (en adelante "Leybrak"), incluyendo la plataforma Leybrak POS accesible mediante <strong>pos.leybrak.com</strong>, usted acepta quedar vinculado por los presentes Términos y Condiciones.</p>
+
+    <h3>2. Descripción del servicio</h3>
+    <p>Leybrak POS es una plataforma de gestión empresarial (ERP) y punto de venta (POS) en la nube, diseñada para negocios de alimentos y restaurantes. El servicio incluye:</p>
+    <ul>
+      <li>Gestión de órdenes y mesas en tiempo real</li>
+      <li>Procesamiento de pagos digitales (Yape, Plin, tarjetas)</li>
+      <li>Control de inventario y caja</li>
+      <li>Módulo de cocina (KDS)</li>
+      <li>Carta digital QR</li>
+      <li>Reportes y métricas del negocio</li>
+    </ul>
+
+    <h3>3. Registro y cuenta</h3>
+    <p>Para utilizar Leybrak POS debe registrarse con información veraz y actualizada. Usted es responsable de mantener la confidencialidad de sus credenciales de acceso. Leybrak no se hace responsable por pérdidas derivadas del uso no autorizado de su cuenta.</p>
+
+    <h3>4. Planes y pagos</h3>
+    <p>Leybrak ofrece planes de suscripción mensual. Los precios están expresados en soles peruanos (PEN) e incluyen IGV. El pago debe realizarse según el plan contratado. La falta de pago puede resultar en la suspensión temporal del servicio.</p>
+
+    <div class="info-box">
+      <p><strong>Periodo de prueba:</strong> Todos los negocios nuevos tienen acceso a un periodo gratuito de 15 días con todas las funcionalidades habilitadas, sin necesidad de ingresar datos de pago.</p>
+    </div>
+
+    <h3>5. Propiedad intelectual</h3>
+    <p>Todos los derechos sobre la plataforma Leybrak POS, incluyendo su código fuente, diseño, marca y contenidos, son propiedad exclusiva de Leybrak  Queda prohibida su reproducción, distribución o modificación sin autorización expresa.</p>
+
+    <h3>6. Limitación de responsabilidad</h3>
+    <p>Leybrak no será responsable por interrupciones del servicio causadas por fuerza mayor, fallas en servicios de terceros (Internet, proveedores de pago), o uso indebido de la plataforma por parte del usuario.</p>
+
+    <h3>7. Procesamiento de pagos</h3>
+    <p>Los pagos digitales son procesados por terceros autorizados (Culqi, Yape, Plin). Leybrak no almacena datos de tarjetas de crédito/débito. Cada negocio es responsable de sus propias transacciones comerciales con sus clientes.</p>
+
+    <h3>8. Privacidad de datos</h3>
+    <p>Leybrak recopila y trata datos personales conforme a la Ley N° 29733 — Ley de Protección de Datos Personales del Perú. Los datos son utilizados exclusivamente para brindar el servicio contratado y no son compartidos con terceros sin consentimiento.</p>
+
+    <h3>9. Modificaciones</h3>
+    <p>Leybrak se reserva el derecho de modificar estos términos en cualquier momento. Los cambios serán notificados a los usuarios con al menos 30 días de anticipación mediante correo electrónico o aviso en la plataforma.</p>
+
+    <h3>10. Ley aplicable</h3>
+    <p>Los presentes términos se rigen por las leyes de la República del Perú. Cualquier controversia será sometida a los tribunales competentes de la ciudad de Lima, Perú.</p>
+
+    <div class="info-box">
+      <p><strong>Contacto legal:</strong> legal@leybrak.com · Leybrak Tech · Lima, Perú</p>
+    </div>
+  </section>
+
+  <!-- POLÍTICA DE DEVOLUCIONES -->
+  <section id="devoluciones">
+    <div class="badge">Política</div><br>
+    <h2>Política de cambios y devoluciones</h2>
+
+    <h3>1. Naturaleza del servicio</h3>
+    <p>Leybrak POS es un servicio de software por suscripción (SaaS). Al ser un servicio digital de acceso inmediato, las condiciones de devolución se rigen según lo establecido por la legislación peruana para servicios digitales.</p>
+
+    <h3>2. Derecho de desistimiento</h3>
+    <p>Usted puede cancelar su suscripción en cualquier momento desde el panel de administración de su cuenta. La cancelación tiene efecto al término del periodo de facturación vigente.</p>
+
+    <div class="info-box">
+      <p><strong>Importante:</strong> No se realizan reembolsos proporcionales por periodos no utilizados dentro de un ciclo de facturación ya cobrado, salvo en los casos descritos a continuación.</p>
+    </div>
+
+    <h3>3. Casos con derecho a reembolso</h3>
+    <p>Leybrak otorgará reembolso completo en los siguientes casos:</p>
+    <ul>
+      <li>Cobro duplicado o error técnico atribuible a Leybrak</li>
+      <li>Imposibilidad de acceder al servicio por más de 72 horas continuas por causas imputables a Leybrak</li>
+      <li>Solicitud de cancelación dentro de las primeras 48 horas tras el primer cobro de suscripción (no aplica al periodo de prueba gratuita)</li>
+    </ul>
+
+    <h3>4. Proceso de solicitud</h3>
+    <p>Para solicitar un reembolso o reportar un cobro incorrecto:</p>
+    <ul>
+      <li>Escribir a <strong>soporte@leybrak.com</strong> con asunto "Solicitud de reembolso"</li>
+      <li>Adjuntar comprobante de pago y descripción del problema</li>
+      <li>El tiempo de respuesta es de máximo 5 días hábiles</li>
+      <li>Los reembolsos aprobados se procesan en 7-15 días hábiles según el método de pago</li>
+    </ul>
+
+    <h3>5. Cambio de plan</h3>
+    <p>El cambio entre planes (upgrade o downgrade) puede realizarse en cualquier momento desde el panel de configuración. Los cambios aplican a partir del siguiente ciclo de facturación.</p>
+
+    <h3>6. Datos tras cancelación</h3>
+    <p>Tras la cancelación, sus datos se mantienen disponibles por 30 días adicionales para exportación. Pasado ese periodo, los datos son eliminados permanentemente de nuestros servidores.</p>
+
+    <div class="info-box">
+      <p><strong>Soporte:</strong> soporte@leybrak.com · WhatsApp: +51 976 267 494</p>
+    </div>
+  </section>
+
+  <!-- LIBRO DE RECLAMACIONES -->
+  <section id="reclamaciones">
+    <div class="badge">INDECOPI</div><br>
+    <h2>Libro de reclamaciones</h2>
+    <p>Conforme al Código de Protección y Defensa del Consumidor (Ley N° 29571) y el D.S. N° 011-2011-PCM, Leybrak Tech pone a disposición su Libro de Reclamaciones Virtual.</p>
+
+    <div class="info-box" style="margin-bottom: 1.5rem;">
+      <p><strong>Tu reclamo o queja será atendido en un plazo máximo de 30 días calendario</strong>, conforme a lo establecido por INDECOPI. Recibirás confirmación a tu correo electrónico.</p>
+    </div>
+
+    <div class="form-section">
+      <form id="reclamacion-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nombre completo *</label>
+            <input type="text" id="nombre" placeholder="Juan Pérez" required>
+          </div>
+          <div class="form-group">
+            <label>DNI / RUC *</label>
+            <input type="text" id="dni" placeholder="12345678" maxlength="11" required>
+          </div>
+          <div class="form-group">
+            <label>Correo electrónico *</label>
+            <input type="email" id="email" placeholder="correo@ejemplo.com" required>
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" id="telefono" placeholder="999 000 000">
+          </div>
+          <div class="form-group full">
+            <label>Dirección</label>
+            <input type="text" id="direccion" placeholder="Av. Ejemplo 123, Lima">
+          </div>
+
+          <div class="form-group full" style="margin-top: 0.5rem;">
+            <label style="color: #ff5a1f;">Detalle del bien o servicio</label>
+          </div>
+
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select id="tipo-bien" required>
+              <option value="">Seleccionar...</option>
+              <option value="servicio">Servicio (suscripción Leybrak POS)</option>
+              <option value="pago">Cobro / Pago digital</option>
+              <option value="soporte">Atención al cliente</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Monto reclamado (S/)</label>
+            <input type="number" id="monto" placeholder="0.00" step="0.01">
+          </div>
+          <div class="form-group full">
+            <label>Descripción del bien/servicio *</label>
+            <input type="text" id="descripcion-bien" placeholder="Ej: Suscripción mensual Plan Pro — Leybrak POS" required>
+          </div>
+
+          <div class="form-group full" style="margin-top: 0.5rem;">
+            <label style="color: #ff5a1f;">Detalle de la reclamación</label>
+          </div>
+
+          <div class="form-group full">
+            <label>Tipo de reclamación *</label>
+            <select id="tipo-reclamacion" required>
+              <option value="">Seleccionar...</option>
+              <option value="reclamo">Reclamo (disconformidad con el servicio)</option>
+              <option value="queja">Queja (mala atención o trato)</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Descripción detallada *</label>
+            <textarea id="detalle" placeholder="Describe con detalle lo ocurrido, incluyendo fechas y hechos relevantes..." required></textarea>
+          </div>
+          <div class="form-group full">
+            <label>¿Qué solución solicitas?</label>
+            <textarea id="pedido" placeholder="Indica qué esperas como resolución de tu reclamo o queja..." style="min-height: 80px;"></textarea>
+          </div>
+        </div>
+
+        <p style="font-size: 0.78rem; color: #444; margin: 1rem 0 0.5rem;">
+          Al enviar este formulario, autorizo a Leybrak Tech a tratar mis datos personales para atender mi reclamación, conforme a la Ley N° 29733.
+        </p>
+        <button type="submit" class="submit-btn">Enviar reclamación</button>
+      </form>
+
+      <div class="success-msg" id="success-msg">
+        <h4>✓ Reclamación registrada</h4>
+        <p>Tu número de folio es: <span class="folio" id="folio-num"></span></p>
+        <p style="margin-top: 0.5rem;">Recibirás confirmación en tu correo. Atenderemos tu caso en un máximo de 30 días calendario conforme a la Ley N° 29571.</p>
+      </div>
+    </div>
+
+    <div class="info-box" style="margin-top: 1.5rem;">
+      <p><strong>Domicilio:</strong> Lima, Perú</p>
+      <p><strong>Correo:</strong> soporte@leybrak.com</p>
+      <p><strong>WhatsApp:</strong> +51 976 267 494</p>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <p>© 2025 Leybrak Tech · Lima, Perú · Todos los derechos reservados</p>
+  <p style="margin-top: 0.5rem;">RUC: 10607865154 · soporte@leybrak.com · +51 976 267 494</p>
+</footer>
+
+<script>
+  // Navegación activa
+  const sections = document.querySelectorAll('section');
+  const navLinks = document.querySelectorAll('nav a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+
+  // Formulario de reclamaciones
+  document.getElementById('reclamacion-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const folio = 'LBK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 90000) + 10000);
+    document.getElementById('folio-num').textContent = folio;
+    this.style.display = 'none';
+    document.getElementById('success-msg').style.display = 'block';
+  });
+</script>
+</body>
+</html>

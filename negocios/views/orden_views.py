@@ -283,7 +283,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
                         opcion_variacion=opcion,
                         precio_adicional_aplicado=opcion.precio_adicional
                     )
-
+            orden.refresh_from_db()
             aplicar_reglas_negocio(orden)
             orden.save()
 
@@ -381,17 +381,29 @@ class OrdenViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 sesion_caja = SesionCaja.objects.get(id=sesion_caja_id) if sesion_caja_id else None
                 total_pagado_ahora = Decimal('0.00')
-
+                Pago.objects.filter(orden=orden, estado='pendiente').update(estado='cancelado')
                 # 1. REGISTRAR LOS PAGOS
                 for p in pagos_data:
                     monto_pago = Decimal(str(p.get('monto', '0.00')))
+                    metodo_pago = p.get('metodo', 'efectivo')
                     if monto_pago > 0:
-                        Pago.objects.create(
+                        # Si ya existe un pago confirmado de Culqi para este método, no crear duplicado
+                        ya_confirmado = Pago.objects.filter(
                             orden=orden,
-                            metodo=p.get('metodo', 'efectivo'),
-                            monto=monto_pago,
-                            sesion_caja=sesion_caja
-                        )
+                            metodo=metodo_pago,
+                            estado='confirmado',
+                        ).filter(
+                            models.Q(culqi_charge_id__isnull=False) |
+                            models.Q(culqi_order_id__isnull=False)
+                        ).exists()
+
+                        if not ya_confirmado:
+                            Pago.objects.create(
+                                orden=orden,
+                                metodo=metodo_pago,
+                                monto=monto_pago,
+                                sesion_caja=sesion_caja
+                            )
                         total_pagado_ahora += monto_pago
 
                 # Re-aplicar reglas con el método de pago real (activa descuento_yape_efectivo si aplica)
