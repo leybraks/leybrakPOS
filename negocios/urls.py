@@ -94,7 +94,7 @@ urlpatterns = [
 
     # OAuth — conexión del comerciante
     path('mp/oauth/iniciar/',      mp_oauth_iniciar,      name='mp-oauth-iniciar'),
-    path('mp/oauth/callback/',     mp_oauth_callback,     name='mp-oauth-callback'),   # AllowAny — MP redirige aquí
+    path('mp-callback/', mp_oauth_callback, name='mp-oauth-callback'),   # AllowAny — MP redirige aquí
     path('mp/oauth/desconectar/',  mp_oauth_desconectar,  name='mp-oauth-desconectar'),
     path('mp/oauth/estado/',       mp_oauth_estado,       name='mp-oauth-estado'),
 
