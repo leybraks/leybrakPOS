@@ -43,6 +43,17 @@ const VistaInternaPOS = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mpStatus = params.get('mp_status');
+    if (mpStatus === 'ok') {
+      // Limpiar la URL
+      window.history.replaceState({}, '', '/');
+      // El toast se mostrará cuando el ERP cargue — guardamos en sessionStorage
+      sessionStorage.setItem('mp_oauth_ok', '1');
+    } else if (mpStatus === 'error') {
+      window.history.replaceState({}, '', '/');
+      sessionStorage.setItem('mp_oauth_error', params.get('msg') || 'error');
+    }
     const verificar = async () => {
       try {
         // 1. ¿Hay sesión de empleado activa? (cookie empleado_session)

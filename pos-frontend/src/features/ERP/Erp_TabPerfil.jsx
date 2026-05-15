@@ -34,16 +34,16 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
     };
     useEffect(() => {
       api.get('/mp/oauth/estado/').then(r => setMpEstado(r.data)).catch(() => {});
-
+      const mpOk    = sessionStorage.getItem('mp_oauth_ok');
+      const mpError = sessionStorage.getItem('mp_oauth_error');
       // MP redirige con ?mp_status=ok|error tras el OAuth
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('mp_status') === 'ok') {
+      if (mpOk) {
+        sessionStorage.removeItem('mp_oauth_ok');
         toast.success('✅ Mercado Pago conectado correctamente');
-        window.history.replaceState({}, '', window.location.pathname);
         api.get('/mp/oauth/estado/').then(r => setMpEstado(r.data));
-      } else if (params.get('mp_status') === 'error') {
-        toast.error(`Error conectando Mercado Pago: ${params.get('msg') || 'intenta de nuevo'}`);
-        window.history.replaceState({}, '', window.location.pathname);
+      } else if (mpError) {
+        sessionStorage.removeItem('mp_oauth_error');
+        toast.error(`Error conectando MP: ${mpError}`);
       }
     }, []);
   return (

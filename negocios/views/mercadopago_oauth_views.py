@@ -68,7 +68,7 @@ def mp_oauth_callback(request):
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
 
     if not code or not negocio_id:
-        return redirect(f"{frontend_url}/erp/configuracion?mp_status=error&msg=parametros_invalidos")
+        return redirect(f"{frontend_url}/?mp_status=error&msg=parametros_invalidos")
 
     # Intercambiamos el code por los tokens
     try:
@@ -86,19 +86,19 @@ def mp_oauth_callback(request):
         data = res.json()
     except Exception as e:
         logger.error(f"MP OAuth callback error: {e}")
-        return redirect(f"{frontend_url}/erp/configuracion?mp_status=error&msg=timeout")
+        return redirect(f"{frontend_url}/?mp_status=error&msg=timeout")
 
     if res.status_code != 200:
         logger.error(f"MP OAuth token error {res.status_code}: {data}")
         msg = data.get('message', 'error_mp')
-        return redirect(f"{frontend_url}/erp/configuracion?mp_status=error&msg={msg}")
+        return redirect(f"{frontend_url}/?mp_status=error&msg={msg}")
 
     # Guardamos los tokens en el negocio correspondiente
     from negocios.models import Negocio
     try:
         negocio = Negocio.objects.get(id=negocio_id)
     except Negocio.DoesNotExist:
-        return redirect(f"{frontend_url}/erp/configuracion?mp_status=error&msg=negocio_no_encontrado")
+        return redirect(f"{frontend_url}/?mp_status=error&msg=negocio_no_encontrado")
 
     negocio.usa_mercado_pago  = True
     negocio.mp_user_id        = str(data.get('user_id', ''))
@@ -112,7 +112,7 @@ def mp_oauth_callback(request):
     logger.info(f"MP OAuth OK para negocio {negocio.nombre} (user_id={negocio.mp_user_id})")
 
     # Redirigimos al ERP con éxito — el frontend leerá el query param
-    return redirect(f"{frontend_url}/erp/configuracion?mp_status=ok")
+    return redirect(f"{frontend_url}/?mp_status=ok")
 
 
 # ──────────────────────────────────────────────────────────────
