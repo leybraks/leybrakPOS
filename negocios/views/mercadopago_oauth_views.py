@@ -18,24 +18,31 @@ def _get_negocio(user):
 
 
 def _html_redirect(frontend_url, ok=True, msg=''):
-    """Devuelve una página HTML que setea sessionStorage y redirige al frontend."""
     if ok:
         script = "sessionStorage.setItem('mp_oauth_ok', '1');"
     else:
         script = f"sessionStorage.setItem('mp_oauth_error', '{msg}');"
 
     return HttpResponse(f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body>
-<script>
-{script}
-window.location.replace('{frontend_url}/');
-</script>
-Redirigiendo...
-</body>
-</html>""", content_type='text/html')
-
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body>
+        <script>
+        {script}
+        if ('serviceWorker' in navigator) {{
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {{
+            var promises = registrations.map(function(r) {{ return r.unregister(); }});
+            return Promise.all(promises);
+        }}).then(function() {{
+            window.location.replace('{frontend_url}/');
+        }});
+        }} else {{
+        window.location.replace('{frontend_url}/');
+        }}
+        </script>
+        Redirigiendo...
+        </body>
+        </html>""", content_type='text/html')
 
 # ──────────────────────────────────────────────────────────────
 # GET /api/mp/oauth/iniciar/
