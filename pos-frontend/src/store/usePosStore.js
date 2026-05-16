@@ -10,7 +10,10 @@ const usePosStore = create((set, get) => ({
     ruc: '', razon_social: '', logo: null,
     yape_numero: '', yape_qr: null,
     plin_numero: '', plin_qr: null,
-    usa_culqi: false, culqi_public_key: '',
+    // ✅ Automatización Yape/Plin (reemplaza Culqi)
+    confirmacion_automatica: false,
+    device_token: null,
+    negocio_id: null,
     modulos: {
       salon: true, cocina: false, delivery: false, inventario: false,
       clientes: false, facturacion: false, cartaQr: false, botWsp: false, machineLearning: false
@@ -23,7 +26,7 @@ const usePosStore = create((set, get) => ({
   // 🛒 1. ESTADO DE OPERACIÓN
   // ==========================================
   carrito: [],
-  estadoCaja: 'abierto',
+  estadoCaja: 'cerrado',
 
   setEstadoCaja: (nuevoEstado) => set({ estadoCaja: nuevoEstado }),
 
@@ -73,9 +76,8 @@ const usePosStore = create((set, get) => ({
     }
   }),
 
-  // ✨ NUEVO: Agregar un combo al carrito
+  // Agregar un combo al carrito
   agregarCombo: (combo, tipo = 'promo') => set((state) => {
-    // tipo: 'promo' para ComboPromocional, 'normal' para Producto con es_combo=true
     const cartId = tipo === 'promo'
       ? `combo_promo_${combo.id}`
       : `combo_normal_${combo.id}`;
@@ -93,7 +95,6 @@ const usePosStore = create((set, get) => ({
       notas_cocina: '',
       _es_combo: true,
       _tipo_combo: tipo,
-      // Items del combo para mostrar en el drawer
       _items_combo: (combo.items || combo.items_combo || []).map(i => ({
         id: i.producto ?? i.producto_hijo,
         nombre: i.producto_detalle?.nombre ?? i.producto_hijo_nombre ?? '',

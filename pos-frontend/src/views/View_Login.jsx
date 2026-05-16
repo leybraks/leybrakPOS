@@ -1,58 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { loginAdministrador, validarPinEmpleado, getEstadoCaja, abrirCajaBD, getSedes } from '../api/api';
+import { loginAdministrador, loginPinEmpleado, getEstadoCaja, abrirCajaBD, getSedes } from '../api/api';
+import api from '../api/api';
 import { useToast } from '../context/ToastContext';
+import { 
+  User, Lock, Eye, EyeOff, Loader2, ArrowLeft, 
+  MapPin, MonitorSmartphone, ChevronRight, 
+  Delete, Wallet, AlertCircle, LayoutDashboard
+} from 'lucide-react';
 
-// =========================================================
-// ✨ HELPER DE SEGURIDAD (Desencripta el JWT de forma segura)
-// =========================================================
+import logoLeybrak from '../assets/logoSinFondoCompacto copy.png';
 
 export default function LoginView({ onAccesoConcedido }) {
   const toast = useToast();
 
-  // =========================================================
-  // 1. MÁQUINA DE ESTADOS (Lobby Gateway)
-  // =========================================================
-  const tabletConfigurada = localStorage.getItem('tablet_token') && localStorage.getItem('sede_id');
+  const tabletConfigurada = !!localStorage.getItem('sede_id');
   const [modo, setModo] = useState(tabletConfigurada ? 'empleado' : 'inicio');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [sedesDisponibles, setSedesDisponibles] = useState([]);
   const [sedeSeleccionada, setSedeSeleccionada] = useState('');
   const [loadingAuth, setLoadingAuth] = useState(false);
 
   const [pin, setPin] = useState('');
   const [horaLocal, setHoraLocal] = useState('');
-  const [estadoLocal, setEstadoLocal] = useState('cargando...');
+  const [fechaLocal, setFechaLocal] = useState('');
+  const [estadoLocal, setEstadoLocal] = useState('cargando');
+  const [negocioNombre, setNegocioNombre] = useState('');
   const [modalApertura, setModalApertura] = useState(false);
   const [fondoCaja, setFondoCaja] = useState('');
   const [empleadoActual, setEmpleadoActual] = useState(null);
 
-  // ── Seguridad PIN: bloqueo por intentos fallidos ──────────
-  const [intentosFallidos, setIntentosFallidos] = useState(0);
-  const [bloqueadoHasta, setBloqueadoHasta] = useState(null);
-  const MAX_INTENTOS = 3;
-  const BLOQUEO_MS  = 2 * 60 * 1000; // 2 minutos
-
-  const estaBlockeado = bloqueadoHasta && Date.now() < bloqueadoHasta;
-  const segundosBloqueo = bloqueadoHasta
-    ? Math.ceil((bloqueadoHasta - Date.now()) / 1000)
-    : 0;
-
-  const negocioInfo = { marca: 'CAÑA BRAVA', sede: localStorage.getItem('sede_nombre') || 'Sede Principal' };
+  // ── Bloqueo manejado por backend — solo mostramos el countdown ──
+  const [bloqueadoSegundos, setBloqueadoSegundos] = useState(0);
+  const estaBlockeado = bloqueadoSegundos > 0;
 
   useEffect(() => {
-    if (modo !== 'empleado') return; 
+    if (bloqueadoSegundos <= 0) return;
+    const timer = setTimeout(() => setBloqueadoSegundos(s => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [bloqueadoSegundos]);
+
+  const sedeName = localStorage.getItem('sede_nombre') || 'Sede Principal';
+
+  useEffect(() => {
+    const negocioId = localStorage.getItem('negocio_id');
+    if (!negocioId) return;
+    api.get(`/negocios/${negocioId}/`)
+      .then(res => setNegocioNombre(res.data.nombre || ''))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (modo !== 'empleado') return;
+
+    // Consultar bloqueo activo al cargar
+    const sedeId = localStorage.getItem('sede_id');
+    if (sedeId) {
+      api.get(`/empleados/estado-bloqueo/?sede_id=${sedeId}`)
+        .then(res => {
+          if (res.data.bloqueado) setBloqueadoSegundos(res.data.segundos_restantes);
+        })
+        .catch(() => {});
+    }
+
     const verificarCaja = async () => {
       try {
         const res = await getEstadoCaja();
         setEstadoLocal(res.data.estado);
-      } catch (error) { console.error("Conectando..."); }
+      } catch { console.error('Conectando...'); }
     };
-    verificarCaja(); 
-    const intervaloCaja = setInterval(verificarCaja, 5000); 
+    verificarCaja();
+    const intervaloCaja = setInterval(verificarCaja, 5000);
     const timer = setInterval(() => {
-      setHoraLocal(new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true }));
+      const ahora = new Date();
+      setHoraLocal(ahora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true }));
+      setFechaLocal(ahora.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }));
     }, 1000);
     return () => { clearInterval(intervaloCaja); clearInterval(timer); };
   }, [modo]);
@@ -60,111 +84,106 @@ export default function LoginView({ onAccesoConcedido }) {
   const handleLoginSubmit = async (e, destino) => {
     e.preventDefault();
     setLoadingAuth(true);
-  
     try {
-      // loginAdministrador guarda tablet_token y tablet_refresh_token (Seguro)
-      const res = await loginAdministrador({ username: email, password: password });
+      const res = await loginAdministrador({ username: email, password });
       localStorage.setItem('negocio_id', res.data.negocio_id);
-  
-      if (destino === 'erp') {
-        // ✅ Leemos el rol que el backend nos manda en el JSON (ya no del token)
-        const rolSeguro = res.data.rol || 'Dueño';
-        
-        // 🛡️ Guardar la palabra "Dueño" en localStorage NO es un riesgo de seguridad. 
-        // El verdadero poder lo tiene la cookie HttpOnly.
-        localStorage.setItem('usuario_rol', rolSeguro);
-        
-        onAccesoConcedido(rolSeguro); 
 
+      try {
+        const resSus = await api.get('/negocio/estado-suscripcion/');
+        if (!resSus.data.puede_operar) {
+          onAccesoConcedido({ rol: res.data.rol || 'dueño', suscripcion: resSus.data });
+          return;
+        }
+      } catch {}
+
+      if (destino === 'erp') {
+        const rolSeguro = res.data.rol || 'Dueño';
+        localStorage.setItem('usuario_rol', rolSeguro);
+        onAccesoConcedido(rolSeguro);
       } else {
-        // MODO TERMINAL
         localStorage.removeItem('empleado_id');
         const sedesRes = await getSedes();
         setSedesDisponibles(sedesRes.data);
         if (sedesRes.data.length > 0) setSedeSeleccionada(sedesRes.data[0].id);
         setModo('setup_sede');
       }
-  
-    } catch (error) {
+    } catch {
       toast.error('Credenciales incorrectas. Verifica usuario y contraseña.');
     } finally {
       setLoadingAuth(false);
     }
   };
 
-  const handleGoogleLogin = () => toast.info('Google Sign-In estará disponible próximamente.');
-
   const handleSedeSetup = (e) => {
     e.preventDefault();
     const sedeObj = sedesDisponibles.find(s => s.id.toString() === sedeSeleccionada.toString());
     if (sedeObj) {
-       localStorage.setItem('sede_id', sedeObj.id);
-       localStorage.setItem('sede_nombre', sedeObj.nombre);
-       setModo('empleado'); 
+      localStorage.setItem('sede_id', sedeObj.id);
+      localStorage.setItem('sede_nombre', sedeObj.nombre);
+      localStorage.removeItem('modo_dispositivo');
+      setModo('empleado');
     }
   };
 
-  // --- Lógica PIN ---
   const presionarTecla = (num) => { if (pin.length < 4) setPin(pin + num); };
   const borrarTecla = () => { setPin(pin.slice(0, -1)); };
 
   const procesarPin = async (accion) => {
     if (pin.length !== 4) return;
-
-    // ── Bloqueo por intentos fallidos ─────────────────────
     if (estaBlockeado) {
-      toast.error(`Terminal bloqueada. Intenta en ${segundosBloqueo}s.`);
+      toast.error(`Terminal bloqueada. Espera ${bloqueadoSegundos}s.`);
       return;
     }
-
     try {
-      const respuesta = await validarPinEmpleado({ pin, accion });
+      const respuesta = await loginPinEmpleado({ pin, sede_id: localStorage.getItem('sede_id'), accion });
       const empleado = respuesta.data;
 
-      // Éxito → resetear contador de intentos
-      setIntentosFallidos(0);
-      setBloqueadoHasta(null);
-
-      localStorage.setItem('empleado_id', empleado.id);
+      // Éxito — limpiar bloqueo local
+      setBloqueadoSegundos(0);
       localStorage.setItem('empleado_nombre', empleado.nombre);
-      localStorage.setItem('usuario_rol', empleado.rol_nombre);
+      localStorage.setItem('usuario_rol', empleado.rol);
+
+      try {
+        const resSus = await api.get('/negocio/estado-suscripcion/');
+        if (!resSus.data.puede_operar) {
+          onAccesoConcedido({ rol: empleado.rol, suscripcion: resSus.data });
+          return;
+        }
+      } catch {}
 
       if (accion === 'asistencia') {
         toast.success(`Asistencia registrada — ${empleado.nombre}`);
         setPin('');
         return;
       }
-
       if (accion === 'entrar') {
-        if (['Cocina', 'Cocinero'].includes(empleado.rol_nombre)) {
-          onAccesoConcedido(empleado.rol_nombre);
-          return;
+        const rolLimpio = empleado.rol.toLowerCase();
+        if (rolLimpio === 'cocinero' || rolLimpio === 'cocina') {
+          onAccesoConcedido(empleado); return;
         }
-
         if (estadoLocal === 'cerrado') {
-          if (['Administrador', 'Cajero', 'Admin'].includes(empleado.rol_nombre)) {
-            setEmpleadoActual(empleado);
-            setModalApertura(true);
+          if (['administrador', 'cajero', 'admin'].includes(rolLimpio)) {
+            setEmpleadoActual(empleado); setModalApertura(true);
           } else {
-            toast.warning('La caja está cerrada. Contacta al administrador.');
-            setPin('');
+            toast.warning('La caja está cerrada. Contacta al administrador.'); setPin('');
           }
         } else {
-          onAccesoConcedido(empleado.rol_nombre);
+          onAccesoConcedido(empleado);
         }
       }
     } catch (error) {
-      const nuevosIntentos = intentosFallidos + 1;
-      setIntentosFallidos(nuevosIntentos);
-      setPin('');
+      const msg = error.response?.data?.error || 'PIN incorrecto.';
+      const restantes = error.response?.data?.segundos_restantes;
 
-      if (nuevosIntentos >= MAX_INTENTOS) {
-        const hasta = Date.now() + BLOQUEO_MS;
-        setBloqueadoHasta(hasta);
-        toast.error(`PIN incorrecto. Terminal bloqueada por 2 minutos por seguridad.`, 6000);
+      if (error.response?.status === 429) {
+        // Bloqueo del backend — activar countdown local para UX
+        setBloqueadoSegundos(restantes || 120);
+        toast.error(msg);
       } else {
-        toast.error(`PIN incorrecto. Intentos restantes: ${MAX_INTENTOS - nuevosIntentos}.`);
+        // PIN incorrecto — el backend ya devuelve "Intentos restantes: N"
+        toast.error(msg);
       }
+      setPin('');
     }
   };
 
@@ -176,320 +195,328 @@ export default function LoginView({ onAccesoConcedido }) {
       setEstadoLocal('abierto');
       setModalApertura(false);
       onAccesoConcedido(empleadoActual.rol_nombre);
-    } catch (error) {
+    } catch {
       toast.error('No se pudo abrir la caja. Verifica la conexión.');
     }
   };
 
-  // =========================================================
-  // RENDER: PANTALLA COMPLETA TERMINAL (Meseros)
-  // =========================================================
+  // ════════════════════════════════════════════════════════════════════════
+  // VISTA 1: TERMINAL POS (PIN)
+  // ════════════════════════════════════════════════════════════════════════
   if (modo === 'empleado') {
     return (
-      <div className="min-h-screen font-sans flex flex-col items-center justify-center relative overflow-hidden bg-[#050505] text-white select-none">
-        <div className="z-10 w-full p-6 flex flex-col items-center animate-fadeIn">
-          <div className="text-center mb-10 w-full flex flex-col items-center">
-            <div className="inline-flex items-center gap-3 bg-[#111] border border-[#222] px-5 py-2 rounded-full mb-8">
-              <span className={`w-3 h-3 rounded-full ${estadoLocal === 'abierto' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]'}`}></span>
-              <span className="text-[12px] font-black text-neutral-300 tracking-widest uppercase">
-                {estadoLocal === 'abierto' ? 'Sede Operativa' : 'Caja Cerrada'}
+      <div className="min-h-screen font-sans flex flex-col items-center justify-center bg-[#050505] text-white select-none px-4 relative overflow-hidden">
+        
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#3b82f6] opacity-[0.03] rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-[340px] flex flex-col items-center relative z-10">
+          
+          <div className="text-center mb-8 w-full">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="font-black text-2xl text-white tracking-tight">LEYBRAK<span className="text-[#3b82f6]">POS</span></span>
+            </div>
+            <h2 className="text-gray-300 font-semibold text-sm tracking-wide">{negocioNombre || 'Terminal de Caja'}</h2>
+            <p className="text-gray-500 text-[10px] font-bold tracking-widest uppercase mt-1">{sedeName}</p>
+
+            <div className={`mt-5 inline-flex items-center gap-2 px-3 py-1 rounded-md border text-[10px] font-bold uppercase tracking-widest ${
+              estadoLocal === 'abierto' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+              estadoLocal === 'cerrado' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+              'bg-[#121212] border-[#222] text-gray-400'
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${estadoLocal === 'abierto' ? 'bg-green-500 animate-pulse' : estadoLocal === 'cerrado' ? 'bg-red-500' : 'bg-gray-500'}`}/>
+              {estadoLocal === 'abierto' ? 'Caja Abierta' : estadoLocal === 'cerrado' ? 'Caja Cerrada' : 'Conectando...'}
+            </div>
+
+            <div className="mt-6 mb-2">
+              <p className="text-5xl font-light tabular-nums text-white tracking-tight">{horaLocal || '--:--'}</p>
+              <p className="text-gray-500 text-xs font-medium mt-2 capitalize">{fechaLocal}</p>
+            </div>
+          </div>
+
+          {/* PIN Dots */}
+          <div className="flex gap-4 mb-8">
+            {[0,1,2,3].map(i => (
+              <div key={i} className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                estaBlockeado ? 'bg-red-500/50' :
+                pin.length > i ? 'bg-[#3b82f6] shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-[#1a1a1a] border border-[#2a2a2a]'
+              }`}/>
+            ))}
+          </div>
+
+          {/* Alerta de bloqueo */}
+          {estaBlockeado && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-4 w-full justify-center">
+              <Lock size={14} className="text-red-400" />
+              <span className="text-red-400 text-[11px] font-bold uppercase tracking-widest">
+                Bloqueado {bloqueadoSegundos}s
               </span>
             </div>
-            <h1 className="text-6xl font-black tracking-tighter mb-2">{negocioInfo.marca}</h1>
-            <p className="text-[#ff5a1f] font-black tracking-[0.2em] text-xs uppercase">{negocioInfo.sede}</p>
-            <p className="text-neutral-600 font-mono text-xl mt-8">{horaLocal || '--:--'}</p>
-          </div>
-
-          <div className="flex gap-5 mb-12">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className={`w-5 h-5 rounded-full transition-all duration-300 ${
-                estaBlockeado
-                  ? 'bg-red-500/40 border border-red-500/60'
-                  : pin.length > i
-                    ? 'bg-white scale-125 shadow-[0_0_20px_rgba(255,255,255,0.4)]'
-                    : 'bg-[#1a1a1a] border border-[#333]'
-              }`}></div>
-            ))}
-          </div>
-          {estaBlockeado && (
-            <p className="text-red-400 text-xs font-black uppercase tracking-widest mb-4 animate-pulse">
-              🔒 Bloqueado — {segundosBloqueo}s
-            </p>
-          )}
-          {!estaBlockeado && intentosFallidos > 0 && (
-            <p className="text-orange-400 text-xs font-bold mb-4">
-              {MAX_INTENTOS - intentosFallidos} intento{MAX_INTENTOS - intentosFallidos !== 1 ? 's' : ''} restante{MAX_INTENTOS - intentosFallidos !== 1 ? 's' : ''}
-            </p>
           )}
 
-          <div className="grid grid-cols-3 gap-4 sm:gap-6 max-w-[360px] w-full">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-              <button key={num} onClick={() => presionarTecla(num.toString())} className="aspect-square bg-[#0f0f0f] border border-[#222] hover:bg-[#1a1a1a] active:scale-95 text-white text-4xl font-bold rounded-[2rem] transition-all flex items-center justify-center shadow-2xl">{num}</button>
+          {/* Teclado */}
+          <div className="grid grid-cols-3 gap-3 w-full mb-6">
+            {[1,2,3,4,5,6,7,8,9].map(num => (
+              <button
+                key={num} onClick={() => presionarTecla(num.toString())}
+                className="h-16 bg-[#121212] border border-[#1e1e1e] hover:bg-[#1a1a1a] hover:border-[#2a2a2a] active:scale-95 text-white text-xl font-medium rounded-xl transition-all"
+              >
+                {num}
+              </button>
             ))}
-            <button onClick={borrarTecla} className="aspect-square bg-[#0f0f0f] border border-[#222] hover:bg-red-500/10 active:scale-95 text-neutral-400 hover:text-white rounded-[2rem] transition-all flex items-center justify-center">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+            <button onClick={borrarTecla} className="h-16 bg-[#121212] border border-[#1e1e1e] hover:bg-red-500/10 hover:border-red-500/20 active:scale-95 text-gray-500 hover:text-red-400 rounded-xl transition-all flex items-center justify-center">
+              <Delete size={20} />
             </button>
-            <button onClick={() => presionarTecla('0')} className="aspect-square bg-[#0f0f0f] border border-[#222] hover:bg-[#1a1a1a] active:scale-95 text-white text-4xl font-bold rounded-[2rem] transition-all flex items-center justify-center">0</button>
-            <button onClick={() => setPin('')} className="aspect-square bg-[#0f0f0f] border border-[#222] hover:bg-neutral-800 active:scale-95 text-[#ff5a1f] text-xs font-black rounded-[2rem] transition-all uppercase tracking-widest flex items-center justify-center text-center px-2">Limpiar</button>
+            <button onClick={() => presionarTecla('0')} className="h-16 bg-[#121212] border border-[#1e1e1e] hover:bg-[#1a1a1a] active:scale-95 text-white text-xl font-medium rounded-xl transition-all">
+              0
+            </button>
+            <button onClick={() => setPin('')} className="h-16 bg-[#121212] border border-[#1e1e1e] hover:bg-[#1a1a1a] active:scale-95 text-gray-500 text-[10px] font-bold rounded-xl transition-all uppercase tracking-widest">
+              Limpiar
+            </button>
           </div>
 
-          <div className="w-full max-w-[360px] mt-12 flex flex-col gap-5">
-            <button
-              onClick={() => procesarPin('entrar')}
-              disabled={estaBlockeado}
-              className="w-full bg-gradient-to-r from-[#ff5a1f] to-[#e0155b] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed text-white py-6 rounded-[2rem] font-black text-lg tracking-widest active:scale-95 transition-all uppercase shadow-[0_15px_40px_rgba(255,90,31,0.25)]"
-            >
-              {estaBlockeado ? `Bloqueado ${segundosBloqueo}s` : 'Ingresar 🚀'}
-            </button>
-          </div>
+          <button
+            onClick={() => procesarPin('entrar')} disabled={estaBlockeado || pin.length < 4}
+            className="w-full py-4 rounded-xl font-bold text-sm tracking-wide transition-all active:scale-[0.98] disabled:opacity-50 bg-[#3b82f6] hover:bg-[#2563eb] text-white"
+          >
+            {estaBlockeado ? `Esperar ${bloqueadoSegundos}s...` : 'Ingresar'}
+          </button>
         </div>
 
+        {/* Modal Apertura Caja */}
         {modalApertura && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-[#0f0f0f] border border-[#222] rounded-[3.5rem] w-full max-w-sm text-center p-10">
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Apertura de Caja</h3>
-              <div className="flex items-center justify-center bg-[#1a1a1a] border border-[#222] rounded-3xl p-6 mb-10">
-                <span className="text-neutral-600 text-4xl font-light mr-4">S/</span>
-                <input type="number" value={fondoCaja} onChange={(e) => setFondoCaja(e.target.value)} className="bg-transparent w-36 text-white text-6xl font-black focus:outline-none text-center" placeholder="0.00" autoFocus />
+          <div className="fixed inset-0 bg-[#050505]/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-[#121212] border border-[#1e1e1e] rounded-2xl w-full max-w-sm p-8 shadow-2xl">
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/20">
+                  <Wallet size={24} className="text-green-500" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Apertura de Caja</h3>
+                <p className="text-gray-400 text-xs mt-1">Ingresa el fondo inicial del turno</p>
               </div>
-              <button onClick={abrirLocal} className="w-full bg-green-600 text-white py-6 rounded-2xl font-black tracking-widest uppercase">Iniciar Turno</button>
-              <button onClick={() => {setModalApertura(false); setPin('');}} className="w-full text-neutral-600 text-xs font-bold mt-8 uppercase">Cancelar</button>
+              <div className="flex items-center justify-center bg-[#0a0a0a] border border-[#1e1e1e] rounded-xl p-4 mb-6">
+                <span className="text-gray-500 text-xl mr-2">S/</span>
+                <input
+                  type="number" value={fondoCaja} onChange={e => setFondoCaja(e.target.value)}
+                  className="bg-transparent w-32 text-white text-3xl font-bold focus:outline-none text-center"
+                  placeholder="0.00" autoFocus
+                />
+              </div>
+              <button onClick={abrirLocal} className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white py-3.5 rounded-xl font-bold text-sm transition-colors mb-2">
+                Iniciar Turno
+              </button>
+              <button onClick={() => { setModalApertura(false); setPin(''); }} className="w-full text-gray-500 text-xs font-bold py-3 hover:text-gray-300">
+                Cancelar
+              </button>
             </div>
           </div>
         )}
+
+        {/* Botón legal */}
+        <a
+          href="/legal.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#121212] border border-[#1e1e1e] hover:border-[#1e1e1e] text-gray-600 hover:text-gray-400 px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+        >
+          <AlertCircle size={12} />
+          Legal
+        </a>
       </div>
     );
   }
 
-  // =========================================================
-  // RENDER: SPLIT SCREEN (Lobby / Login / Setup)
-  // =========================================================
+  // ════════════════════════════════════════════════════════════════════════
+  // VISTA 2: WEB LOGIN
+  // ════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen flex text-white font-sans overflow-hidden bg-[#050505]">
-      
-      {/* LADO IZQUIERDO (Formularios) - Con Z-Index y Sombra para separar */}
-      <div className="w-full lg:w-[45%] xl:w-[40%] flex flex-col justify-center px-8 sm:px-16 lg:px-20 relative z-40 bg-[#0c0c0c] min-h-screen shadow-[20px_0_50px_rgba(0,0,0,0.5)]">
+    <div className="min-h-screen flex bg-[#050505] font-sans overflow-hidden text-white">
+
+      {/* PANEL IZQUIERDO */}
+      <div className="w-full lg:w-[45%] flex flex-col justify-center px-8 sm:px-16 lg:px-24 relative z-10 bg-[#0a0a0a] border-r border-[#1a1a1a]">
         
-        {/* LOGO SUPERIOR */}
-        <div className="absolute top-10 left-8 sm:left-16 lg:left-20 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff5a1f] to-[#e0155b]"></div>
-          <span className="font-black text-xl tracking-tighter">BRAVA<span className="text-[#ff5a1f]">POS</span></span>
+        <div className="absolute top-10 left-8 sm:left-16 lg:left-24 flex items-center gap-2">
+          <span className="font-black text-xl tracking-tight">LEYBRAK<span className="text-[#3b82f6]">POS</span></span>
+          <span className="ml-2 px-2 py-0.5 rounded-md bg-[#121212] border border-[#222] text-[9px] text-gray-500 font-bold uppercase tracking-widest">
+            SAAS PLATFORM
+          </span>
         </div>
 
-        <div className="w-full max-w-md mx-auto mt-16 lg:mt-0 animate-fadeIn">
+        <div className="w-full max-w-[380px] mx-auto mt-16 lg:mt-0">
           
-          {/* VISTA 1: EL LOBBY */}
+          {/* INICIO */}
           {modo === 'inicio' && (
-            <>
-              <h1 className="text-4xl font-black tracking-tighter mb-2">Bienvenido</h1>
-              <p className="text-neutral-400 text-sm mb-10">Selecciona tu área de trabajo para continuar.</p>
-              
+            <div className="animate-fadeIn">
+              <h1 className="text-3xl font-bold tracking-tight mb-2">Bienvenido</h1>
+              <p className="text-gray-400 text-sm mb-8">Selecciona cómo deseas acceder a la plataforma hoy.</p>
+
               <div className="space-y-4">
-                <button onClick={() => setModo('login_erp')} className="w-full bg-transparent border border-[#333] hover:border-[#ff5a1f]/50 p-6 rounded-2xl flex items-center gap-6 transition-all group text-left">
-                  <div className="w-14 h-14 bg-[#161616] rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💻</div>
-                  <div>
-                    <h3 className="font-bold text-lg">Panel de Control</h3>
-                    <p className="text-neutral-500 text-xs mt-1">Gestionar menú, ventas y configuraciones.</p>
+                <button onClick={() => setModo('login_erp')} className="w-full bg-[#121212] border border-[#1e1e1e] hover:border-[#3b82f6]/50 hover:bg-[#161616] p-5 rounded-xl flex items-center gap-4 transition-all group text-left">
+                  <div className="w-10 h-10 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] flex items-center justify-center text-gray-400 group-hover:text-[#3b82f6] group-hover:border-[#3b82f6]/30 transition-colors">
+                    <LayoutDashboard size={20} />
                   </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-white text-sm">Panel de Control</p>
+                    <p className="text-gray-500 text-xs mt-0.5">Gestión, reportes y configuración</p>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-600 group-hover:text-[#3b82f6] group-hover:translate-x-1 transition-all" />
                 </button>
-                <button onClick={() => setModo('login_pos')} className="w-full bg-transparent border border-[#333] hover:border-[#ff5a1f]/50 p-6 rounded-2xl flex items-center gap-6 transition-all group text-left">
-                  <div className="w-14 h-14 bg-[#161616] rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
-                  <div>
-                    <h3 className="font-bold text-lg">Terminal POS</h3>
-                    <p className="text-neutral-500 text-xs mt-1">Vincular esta pantalla como punto de caja.</p>
+
+                <button onClick={() => setModo('login_pos')} className="w-full bg-[#121212] border border-[#1e1e1e] hover:border-[#3b82f6]/50 hover:bg-[#161616] p-5 rounded-xl flex items-center gap-4 transition-all group text-left">
+                  <div className="w-10 h-10 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] flex items-center justify-center text-gray-400 group-hover:text-[#3b82f6] group-hover:border-[#3b82f6]/30 transition-colors">
+                    <MonitorSmartphone size={20} />
                   </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-white text-sm">Terminal POS</p>
+                    <p className="text-gray-500 text-xs mt-0.5">Punto de venta y caja</p>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-600 group-hover:text-[#3b82f6] group-hover:translate-x-1 transition-all" />
                 </button>
               </div>
-            </>
+            </div>
           )}
 
-          {/* VISTA 2: LOGIN ESTILO "PRO" */}
+          {/* LOGIN FORM */}
           {(modo === 'login_erp' || modo === 'login_pos') && (
-            <div className="animate-slideUp">
-              <button onClick={() => setModo('inicio')} className="text-neutral-500 hover:text-white text-xs font-bold mb-8 flex items-center gap-2 transition-colors">← Regresar</button>
-              
-              <h1 className="text-4xl font-black tracking-tighter mb-2">Accede a tu Cuenta</h1>
-              <p className="text-neutral-400 text-sm mb-10">{modo === 'login_erp' ? 'Ingresa para administrar tu negocio.' : 'Ingresa para vincular este dispositivo.'}</p>
-              
-              <div className="flex gap-4 mb-8">
-                <button onClick={() => handleGoogleLogin()} className="flex-1 bg-transparent border border-[#333] hover:bg-[#161616] py-3.5 rounded-xl flex items-center justify-center gap-3 transition-colors text-sm font-bold">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                  Google
-                </button>
-                <button onClick={() => toast.info('Apple Login estará disponible próximamente.')} className="flex-1 bg-transparent border border-[#333] hover:bg-[#161616] py-3.5 rounded-xl flex items-center justify-center gap-3 transition-colors text-sm font-bold">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05 1.8-3.08 1.81-.98 0-1.42-.58-2.58-.58-1.14 0-1.63.56-2.56.59-1.05.03-2.27-.96-3.18-2.27-1.34-1.9-2.29-5.18-1.42-7.58.42-1.15 1.18-2.03 2.12-2.6.93-.57 1.98-.6 2.97-.6.94 0 1.8.46 2.51.87.69.41 1.05.65 1.58.65.57 0 1.05-.27 1.84-.73 1.05-.62 2.21-.86 3.46-.66 1.34.22 2.37.84 3.03 1.75-2.48 1.48-2.06 4.96.38 5.92-.5 1.25-1.19 2.52-2.07 3.43zM14.98 5.7c-.52.64-1.26 1.08-2.06 1.13-.12-1.37.52-2.73 1.33-3.63.53-.61 1.33-1.09 2.16-1.16.14 1.39-.46 2.65-1.43 3.66z"/></svg>
-                  Apple
-                </button>
-              </div>
+            <div className="animate-fadeIn">
+              <button onClick={() => setModo('inicio')} className="flex items-center gap-2 text-gray-500 hover:text-white text-xs font-semibold mb-8 transition-colors">
+                <ArrowLeft size={16} /> Volver
+              </button>
 
-              <div className="flex items-center gap-4 mb-8 opacity-40">
-                <div className="h-px bg-neutral-600 flex-1"></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-300">— OR —</span>
-                <div className="h-px bg-neutral-600 flex-1"></div>
-              </div>
+              <h1 className="text-3xl font-bold tracking-tight mb-2">Iniciar Sesión</h1>
+              <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales para acceder al sistema.</p>
 
-              <form onSubmit={(e) => handleLoginSubmit(e, modo === 'login_erp' ? 'erp' : 'pos')} className="space-y-5">
-                <input type="text" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#111] border border-[#222] p-4 rounded-xl text-white focus:outline-none focus:border-[#ff5a1f] transition-all text-sm" placeholder="Nombre de usuario o Correo" />
-                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-[#111] border border-[#222] p-4 rounded-xl text-white focus:outline-none focus:border-[#ff5a1f] transition-all text-sm" placeholder="Password" />
-                
-                <div className="flex justify-between items-center text-xs mt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-neutral-400 hover:text-white transition-colors">
-                    <input type="checkbox" className="accent-[#ff5a1f]" /> Recordarme
-                  </label>
-                  <button type="button" className="text-neutral-400 hover:text-white transition-colors">¿Olvidaste tu contraseña?</button>
-                </div>
-
-                <button type="submit" disabled={loadingAuth} className="w-full bg-gradient-to-r from-[#ff5a1f] to-[#e0155b] hover:opacity-90 text-white py-4 rounded-xl font-bold mt-6 transition-all shadow-[0_4px_20px_rgba(255,90,31,0.3)] disabled:opacity-50">
-                  {loadingAuth ? 'Iniciando...' : 'Login to Your Account'}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* VISTA 3: SETUP DE SEDE */}
-          {modo === 'setup_sede' && (
-            <div className="animate-slideUp text-center">
-              <div className="w-20 h-20 bg-[#161616] rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 border border-[#333]">🏢</div>
-              <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Asignar Local</h2>
-              <p className="text-neutral-400 text-sm mb-10">¿En qué sucursal operará esta terminal?</p>
-              
-              <form onSubmit={handleSedeSetup}>
-                <select value={sedeSeleccionada} onChange={e => setSedeSeleccionada(e.target.value)} required className="w-full bg-[#111] border border-[#333] p-4 rounded-xl text-white focus:outline-none focus:border-[#ff5a1f] appearance-none font-bold text-center cursor-pointer mb-8">
-                  {sedesDisponibles.map(sede => <option key={sede.id} value={sede.id}>{sede.nombre}</option>)}
-                </select>
-                <button type="submit" className="w-full bg-gradient-to-r from-[#ff5a1f] to-[#e0155b] hover:opacity-90 text-white py-4 rounded-xl font-bold transition-all shadow-[0_4px_20px_rgba(255,90,31,0.3)]">Vincular Terminal 🔒</button>
-              </form>
-            </div>
-          )}
-
-        </div>
-        
-        {/* FOOTER IZQUIERDO */}
-        <div className="absolute bottom-8 left-8 sm:left-16 lg:left-20 right-8 flex justify-between text-[10px] text-neutral-600 font-bold uppercase tracking-widest">
-          <span>Privacy Policy</span>
-          <span>Copyright 2026</span>
-        </div>
-      </div>
-
-      {/* LADO DERECHO - HERO VISUAL (DISEÑO SAAS PREMIUM) */}
-      <div className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-[#050505]">
-
-        {/* Glows de fondo sutiles */}
-        <div className="absolute w-[700px] h-[700px] bg-[#ff5a1f] opacity-[0.12] rounded-full blur-[150px]" />
-        <div className="absolute w-[500px] h-[500px] bg-[#e0155b] opacity-[0.12] rounded-full blur-[130px] translate-x-32 translate-y-20" />
-
-        {/* CONTENEDOR PRINCIPAL DEL ARTE */}
-        <div className="relative z-10 flex items-end justify-center gap-0 scale-110 xl:scale-125 origin-center transition-transform duration-500">
-
-          {/* ── LAPTOP (FONDO) ── */}
-          <div className="relative mr-[-60px] mb-8 z-10">
-            <div className="w-[420px] h-[260px] bg-[#111] rounded-t-2xl border-[3px] border-[#2a2a2a] overflow-hidden shadow-2xl">
-              <div className="bg-[#0d0d0d] w-full h-full p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#ff5a1f] opacity-80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#333]" />
-                  </div>
-                  <div className="w-32 h-2 bg-[#1a1a1a] rounded-full" />
-                  <div className="w-16 h-2 bg-[#1a1a1a] rounded-full" />
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-[#161616] border border-[#222] rounded-xl p-3 shadow-inner">
-                    <p className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest font-bold">Ventas Hoy</p>
-                    <p className="text-xl text-[#ff5a1f] font-black font-mono mt-1">S/. 4,821</p>
-                    <p className="text-[9px] text-green-500 font-mono mt-1">↑ 12% vs ayer</p>
-                  </div>
-                  <div className="bg-[#161616] border border-[#222] rounded-xl p-3 shadow-inner">
-                    <p className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest font-bold">Pedidos</p>
-                    <p className="text-xl text-[#e0155b] font-black font-mono mt-1">38</p>
-                    <p className="text-[9px] text-green-500 font-mono mt-1">5 pendientes</p>
-                  </div>
-                </div>
-                <div className="bg-[#161616] border border-[#222] rounded-xl p-3 flex items-end gap-2 h-[75px] shadow-inner">
-                  <span className="text-[9px] text-neutral-700 font-mono mr-1 self-center">Sem.</span>
-                  {[60,80,50,90,100,65,40].map((h, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-sm rounded-b-none transition-all ${i === 4 ? 'bg-[#e0155b] shadow-[0_0_10px_rgba(224,21,91,0.5)]' : 'bg-[#ff5a1f]'}`}
-                      style={{height:`${h}%`, opacity: i === 4 ? 1 : 0.4 + i * 0.07}}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="w-[420px] h-2 bg-[#1c1c1c] border-x-[3px] border-[#2a2a2a]" />
-            <div className="w-[420px] h-3.5 bg-[#181818] rounded-b-lg border-[3px] border-[#2a2a2a] border-t-0" />
-            <div className="w-32 h-2 bg-[#1a1a1a] rounded-b-lg mx-auto border-2 border-[#2a2a2a] border-t-0" />
-          </div>
-
-          {/* ── TELÉFONO (FRENTE) ── */}
-          <div className="relative z-20">
-            <div className="w-[200px] h-[400px] bg-[#111] rounded-[32px] border-[4px] border-[#2a2a2a] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.8)] relative">
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-14 h-4 bg-black rounded-full z-10" />
-              <div className="bg-[#0d0d0d] w-full h-full pt-[32px] px-3 pb-3 overflow-hidden flex flex-col">
-                <div className="flex justify-between mb-4">
-                  <span className="text-[10px] text-neutral-600 font-mono">9:41</span>
-                  <div className="flex gap-1 items-center">
-                    <div className="w-3 h-[6px] bg-neutral-700 rounded-sm" />
-                    <div className="w-[6px] h-[6px] bg-neutral-700 rounded-full" />
-                  </div>
-                </div>
-                <p className="text-[10px] text-neutral-500 font-mono uppercase tracking-widest font-bold">Hola,</p>
-                <p className="text-lg text-white font-black mb-4 font-mono tracking-tighter">BravaPOS</p>
-                
-                <div className="rounded-2xl p-4 mb-4 bg-gradient-to-br from-[#ff5a1f] to-[#e0155b] shadow-lg">
-                  <p className="text-[9px] text-white/70 font-mono font-bold uppercase tracking-widest">Caja Hoy</p>
-                  <p className="text-2xl text-white font-black font-mono mt-1">S/. 4,821</p>
-                  <div className="flex gap-1.5 mt-3">
-                    {[1,2,3].map(i => <div key={i} className="w-6 h-1 bg-white/30 rounded-full" />)}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="bg-[#161616] rounded-xl p-3 border border-[#222] shadow-inner">
-                    <p className="text-[9px] text-neutral-600 font-mono uppercase font-bold tracking-widest">Mesas</p>
-                    <p className="text-lg text-[#ff5a1f] font-black font-mono mt-1">12</p>
-                  </div>
-                  <div className="bg-[#161616] rounded-xl p-3 border border-[#222] shadow-inner">
-                    <p className="text-[9px] text-neutral-600 font-mono uppercase font-bold tracking-widest">Activas</p>
-                    <p className="text-lg text-green-500 font-black font-mono mt-1">7</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="absolute right-[-4px] top-24 w-[4px] h-12 bg-[#222] rounded-r-md" />
-            <div className="absolute left-[-4px] top-20 w-[4px] h-8 bg-[#222] rounded-l-md" />
-            <div className="absolute left-[-4px] top-[120px] w-[4px] h-8 bg-[#222] rounded-l-md" />
-
-            <div className="absolute -top-16 -right-28 bg-[#0f0f0f]/90 backdrop-blur border border-white/10 rounded-2xl p-4 shadow-2xl w-44 z-30 transition-transform cursor-pointer">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-8 h-8 rounded-full bg-[#ff5a1f] flex items-center justify-center text-[10px] text-white font-black shadow-lg">AJ</div>
+              <form onSubmit={e => handleLoginSubmit(e, modo === 'login_erp' ? 'erp' : 'pos')} className="space-y-4">
                 <div>
-                  <p className="text-white text-xs font-bold">Mesa 3</p>
-                  <p className="text-neutral-500 text-[9px] font-mono mt-0.5">hace 2 min</p>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Usuario / Correo</label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="text" required value={email} onChange={e => setEmail(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#222] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] py-3.5 pl-11 pr-4 rounded-xl text-white focus:outline-none transition-all text-sm placeholder:text-gray-600"
+                      placeholder="ejemplo@correo.com"
+                    />
+                  </div>
                 </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Contraseña</label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type={showPass ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#222] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] py-3.5 pl-11 pr-11 rounded-xl text-white focus:outline-none transition-all text-sm placeholder:text-gray-600"
+                      placeholder="••••••••"
+                    />
+                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white focus:outline-none transition-colors">
+                      {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit" disabled={loadingAuth}
+                  className="w-full py-3.5 mt-4 rounded-xl font-bold text-sm text-white transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2 bg-[#3b82f6] hover:bg-[#2563eb]"
+                >
+                  {loadingAuth ? <><Loader2 size={18} className="animate-spin" /> Verificando...</> : 'Ingresar al sistema'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* SETUP SEDE */}
+          {modo === 'setup_sede' && (
+            <div className="animate-fadeIn">
+              <h2 className="text-3xl font-bold tracking-tight mb-2">Configurar Caja</h2>
+              <p className="text-gray-400 text-sm mb-8">Selecciona la sucursal para este dispositivo.</p>
+              
+              <form onSubmit={handleSedeSetup} className="space-y-5">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Sede / Local</label>
+                  <div className="relative">
+                    <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" />
+                    <select
+                      value={sedeSeleccionada} onChange={e => setSedeSeleccionada(e.target.value)} required
+                      className="w-full bg-[#121212] border border-[#222] py-4 pl-11 pr-10 rounded-xl text-white focus:outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] appearance-none font-semibold text-sm cursor-pointer transition-all relative z-0"
+                    >
+                      {sedesDisponibles.map(sede => (
+                        <option key={sede.id} value={sede.id} className="bg-[#121212] text-white">{sede.nombre}</option>
+                      ))}
+                    </select>
+                    <ChevronRight size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 rotate-90 pointer-events-none z-10" />
+                  </div>
+                </div>
+                
+                <button type="submit" className="w-full py-3.5 rounded-xl font-bold text-white text-sm transition-all active:scale-[0.98] bg-[#3b82f6] hover:bg-[#2563eb]">
+                  Vincular Dispositivo
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* PANEL DERECHO */}
+      <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#050505] overflow-hidden">
+        
+        <div className="absolute w-[800px] h-[800px] bg-[#3b82f6] opacity-[0.02] rounded-full blur-[120px] top-1/4 -right-20 pointer-events-none" />
+        <div className="absolute w-[400px] h-[400px] bg-[#3b82f6] opacity-[0.015] rounded-full blur-[100px] bottom-10 left-10 pointer-events-none" />
+
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundSize: '32px 32px'
+        }}></div>
+
+        <div className="relative z-10 w-full max-w-lg perspective-1000">
+          <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-2xl shadow-2xl p-6 transform rotate-y-[-5deg] rotate-x-[5deg] transition-transform duration-700 hover:rotate-0">
+            
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#1e1e1e]">
+              <div>
+                <div className="h-5 w-32 bg-[#1a1a1a] rounded mb-2"></div>
+                <div className="h-3 w-20 bg-[#121212] rounded"></div>
               </div>
-              <p className="text-neutral-400 text-[10px] mb-3 font-bold">2x Lomo Saltado</p>
-              <div className="flex justify-between items-center">
-                <span className="text-[#ff5a1f] font-black text-sm">S/. 56</span>
-                <button className="text-[9px] bg-gradient-to-r from-[#ff5a1f] to-[#e0155b] px-3 py-1 rounded-md text-white font-bold shadow-md hover:opacity-90 active:scale-95 transition-all">OK</button>
+              <div className="flex gap-2">
+                <div className="h-8 w-24 bg-[#121212] border border-[#1e1e1e] rounded-lg"></div>
+                <div className="h-8 w-8 bg-[#3b82f6] rounded-lg"></div>
               </div>
             </div>
 
-            <div className="absolute bottom-1 -left-36 xl:-left-44 bg-[#0f0f0f]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl w-40 z-30 cursor-pointer">
-              <p className="text-white text-xs font-bold mb-1">Caja Abierta</p>
-              <p className="text-neutral-500 text-[9px] mb-3 font-mono">Turno mañana</p>
-              <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden shadow-inner">
-                <div className="w-[65%] h-full bg-gradient-to-r from-[#ff5a1f] to-[#e0155b] rounded-full" />
-              </div>
-              <p className="text-neutral-600 text-[8px] mt-2 font-mono uppercase tracking-widest text-right">65% de meta</p>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-[#121212] border border-[#1e1e1e] rounded-xl p-4">
+                  <div className="h-2 w-16 bg-[#1a1a1a] rounded mb-3"></div>
+                  <div className="h-6 w-24 bg-white/10 rounded mb-2"></div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-[#121212] border border-[#1e1e1e] rounded-xl p-4 h-40 flex items-end gap-2">
+              {[30, 50, 40, 70, 55, 90, 60, 80, 45, 100].map((h, i) => (
+                <div key={i} className="flex-1 bg-[#1a1a1a] rounded-t-sm hover:bg-[#3b82f6]/50 transition-colors" style={{ height: `${h}%` }}></div>
+              ))}
             </div>
           </div>
 
+          <div className="absolute -right-8 -bottom-8 bg-[#121212] border border-[#1e1e1e] rounded-xl p-4 w-48 shadow-2xl flex items-center gap-3 animate-pulse">
+            <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+            <div className="flex-1">
+              <div className="h-2 w-full bg-[#1a1a1a] rounded mb-1"></div>
+              <div className="h-2 w-2/3 bg-[#1a1a1a] rounded"></div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Botón legal */}
+      <a
+        href="/legal.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#121212] border border-[#1e1e1e] hover:border-[#3b82f6]/50 text-gray-500 hover:text-[#3b82f6] px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+      >
+        <AlertCircle size={12} />
+        Legal
+      </a>
+
     </div>
   );
 }

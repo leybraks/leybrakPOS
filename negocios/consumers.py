@@ -173,3 +173,64 @@ class SalonConsumer(AsyncWebsocketConsumer):
         from .models import Mesa
         
         return Mesa.objects.filter(id=mesa_id, sede_id=self.sede_id).exists()
+    
+# ============================================================
+# PAGOS CONSUMER (Yape / Plin en tiempo real)
+# ============================================================
+
+@database_sync_to_async
+def _tiene_acceso_negocio(user, negocio_id):
+    """
+    Verifica que el usuario tiene acceso al negocio solicitado.
+    Reutiliza la misma lógica de seguridad que los otros consumers.
+    """
+    if user.is_superuser:
+        return True
+
+    from .models import Negocio
+    return Negocio.objects.filter(propietario=user, id=negocio_id).exists()
+
+
+class PagosConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer que escucha el canal de pagos de un negocio específico.
+    El frontend (React POS) se conecta aquí cuando el cajero hace clic en "Cobrar con Yape/Plin".
+    El backend le envía los eventos de notificación push capturados por la app Android.
+    """
+
+    async def connect(self):
+        if not _usuario_valido(self.scope):
+            await self.close(code=4001)
+            return
+
+        self.negocio_id = self.scope['url_route']['kwargs']['negocio_id']
+
+        if not await _tiene_acceso_negocio(self.scope['user'], self.negocio_id):
+            await self.close(code=4003)
+            return
+
+        self.room_group_name = f"pagos_negocio_{self.negocio_id}"
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    # ----------------------------------------------------------
+    # Evento disparado por el endpoint REST cuando llega un pago
+    # Nombre del método = type del group_send (con punto → guión bajo)
+    # ----------------------------------------------------------
+    async def pago_recibido(self, event):
+        """
+        Retransmite la notificación de pago a todas las cajas conectadas de este negocio.
+        El frontend decide qué hacer según el tipo (YAPE con código vs PLIN sin código).
+        """
+        await self.send(text_data=json.dumps({
+            'type':              'pago_recibido',
+            'notificacion_id':   event['notificacion_id'],
+            'tipo':              event['tipo'],          # 'YAPE' o 'PLIN'
+            'monto':             event['monto'],
+            'codigo_seguridad':  event['codigo_seguridad'],  # None si es PLIN
+            'nombre_cliente':    event['nombre_cliente'],
+        }))

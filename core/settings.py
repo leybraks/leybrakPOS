@@ -46,9 +46,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'encrypted_model_fields',
     'corsheaders',
     'negocios',
 ]
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
 
 ASGI_APPLICATION = 'core.asgi.application'
 
@@ -257,13 +259,13 @@ APIS_NET_PE_TOKEN = os.environ.get('APIS_NET_PE_TOKEN', '')
 
 # settings.py
 # Reemplaza las últimas líneas de email por esto:
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_BACKEND     = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST        = os.environ.get('EMAIL_HOST', 'smtp.zoho.com')
+EMAIL_PORT        = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS     = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER   = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = f'BravaPOS <{os.environ.get("EMAIL_HOST_USER", "")}>'
+DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL', 'Leybrak Tech <soporte@leybrak.com>')
 
 from django.templatetags.static import static
 from django.urls import reverse_lazy
@@ -288,3 +290,10 @@ UNFOLD = {
         },
     },
 }
+
+
+MP_APP_ID         = os.getenv('MP_APP_ID', '')
+MP_CLIENT_SECRET  = os.getenv('MP_CLIENT_SECRET', '')
+MP_REDIRECT_URI   = os.getenv('MP_REDIRECT_URI', 'http://localhost:8000/api/mp/oauth/callback/')
+MP_WEBHOOK_SECRET = os.getenv('MP_WEBHOOK_SECRET', '')
+FRONTEND_URL      = os.getenv('FRONTEND_URL', 'http://localhost:5173')

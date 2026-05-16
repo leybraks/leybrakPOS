@@ -40,9 +40,7 @@ export function happyHourActivaAhora(hh) {
 
 // ── Helper: calcula las líneas de descuento de HH para el carrito ──
 export function calcularLineasHappyHour(happyHoursActivas, carrito, productosBase) {
-  console.log('HH activas para calcular:', happyHoursActivas);
-  console.log('Carrito para calcular:', carrito);
-  console.log('ProductosBase disponibles:', productosBase?.length);
+ 
   const lineas = [];
 
   for (const hh of happyHoursActivas) {

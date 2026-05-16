@@ -1,10 +1,14 @@
+from django.core.cache import cache
 import logging
-
+import secrets
+import time as time_module
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
+
+from core import settings
 
 from ..models import Sede, Producto, Categoria, Orden
 from ..serializers import ProductoSerializer, CategoriaSerializer, OrdenSerializer
@@ -100,16 +104,148 @@ def orden_publica(request, sede_id, mesa_id):
 # AUTH
 # ============================================================
 
+# publico_views.py
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def verificar_sesion(request):
     user = request.user
     ws_token = AccessToken.for_user(user)
+    
+    # Determinar rol real desde la BD, no desde localStorage
+    if user.is_superuser:
+        rol = 'SuperAdmin'
+    elif hasattr(user, 'negocio'):
+        rol = 'Dueño'
+    else:
+        rol = 'Admin'  # usuario Django sin negocio
+    
     return Response({
         'autenticado': True,
         'ws_token': str(ws_token),
         'user': {
-            'username': request.user.username,
-            'rol': 'Dueño' if hasattr(request.user, 'negocio') else 'Empleado',
+            'username': user.username,
+            'rol': rol,
+            # negocio_id para que el frontend sepa a qué negocio pertenece
+            'negocio_id': user.negocio.id if hasattr(user, 'negocio') else None,
         }
+    })
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_empleado_pin(request):
+    """
+    Valida el PIN y genera un token de sesión de empleado
+    guardado en cache (Redis), devuelto como cookie HttpOnly.
+    """
+    pin = request.data.get('pin')
+    sede_id = request.data.get('sede_id')
+    accion = request.data.get('accion', 'entrar')
+
+    if not pin or not sede_id:
+        return Response({'error': 'PIN y sede_id son requeridos'}, status=400)
+
+    # Reutilizar tu lógica existente de lockout y validación de PIN
+    lock_key = f"pin_locked_{sede_id}"
+    fail_key = f"pin_fails_{sede_id}"
+    MAX_FAILS = 5
+    LOCKOUT_S = 120
+
+    lockout_until = cache.get(lock_key)
+    if lockout_until:
+        remaining = int(lockout_until - time_module.time())
+        if remaining > 0:
+            return Response({
+                'error': f'Terminal bloqueada. Espera {remaining} segundos.',
+                'segundos_restantes': remaining
+            }, status=429)
+        cache.delete(lock_key)
+        cache.delete(fail_key)
+    from django.utils import timezone
+    from ..models import Empleado
+    from django.contrib.auth.hashers import check_password, make_password
+    
+    empleados = Empleado.objects.filter(sede_id=sede_id, activo=True).select_related('rol')
+    empleado_valido = None
+
+    for emp in empleados:
+        pin_stored = emp.pin
+        es_plano = not pin_stored.startswith(('pbkdf2_', 'argon2', 'bcrypt', '!'))
+        if es_plano:
+            if pin_stored == pin:
+                emp.pin = make_password(pin)
+                emp.save(update_fields=['pin'])
+                empleado_valido = emp
+                break
+        elif check_password(pin, pin_stored):
+            empleado_valido = emp
+            break
+
+    if not empleado_valido:
+        fails = cache.get(fail_key, 0) + 1
+        cache.set(fail_key, fails, timeout=300)
+        if fails >= MAX_FAILS:
+            cache.set(lock_key, time_module.time() + LOCKOUT_S, timeout=LOCKOUT_S + 10)
+            cache.delete(fail_key)
+            return Response({'error': f'Terminal bloqueada por {LOCKOUT_S // 60} minutos.'}, status=429)
+        return Response({'error': f'PIN incorrecto. Intentos restantes: {MAX_FAILS - fails}.'}, status=401)
+
+    # ✅ PIN válido — generar token de sesión de empleado
+    cache.delete(fail_key)
+    cache.delete(lock_key)
+
+    # Token único por sesión, guardado en Redis con TTL de 12 horas
+    session_token = secrets.token_hex(32)
+    session_key = f"empleado_session_{session_token}"
+    session_data = {
+        'empleado_id': empleado_valido.id,
+        'nombre': empleado_valido.nombre,
+        'rol': empleado_valido.rol.nombre if empleado_valido.rol else 'Empleado',
+        'sede_id': sede_id,
+        'negocio_id': str(empleado_valido.negocio_id),
+    }
+    cache.set(session_key, session_data, timeout=60 * 60 * 12)  # 12 horas
+
+    if accion == 'asistencia':
+        from django.utils import timezone
+        empleado_valido.ultimo_ingreso = timezone.now()
+        empleado_valido.save(update_fields=['ultimo_ingreso'])
+
+    response = Response({
+        'nombre': empleado_valido.nombre,
+        'rol': empleado_valido.rol.nombre if empleado_valido.rol else 'Empleado',
+        'sede_id': sede_id,
+    })
+    # Cookie HttpOnly igual que los JWT del dueño
+    response.set_cookie(
+        key='empleado_session',
+        value=session_token,
+        max_age=60 * 60 * 12,
+        httponly=True,
+        secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
+        samesite='Lax',
+        path='/',
+    )
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def verificar_sesion_empleado(request):
+    """
+    Verifica la cookie de sesión de empleado.
+    Devuelve rol y sede — el frontend lo usa al recargar.
+    """
+    session_token = request.COOKIES.get('empleado_session')
+    if not session_token:
+        return Response({'autenticado': False}, status=401)
+
+    session_key = f"empleado_session_{session_token}"
+    session_data = cache.get(session_key)
+
+    if not session_data:
+        return Response({'autenticado': False}, status=401)
+
+    return Response({
+        'autenticado': True,
+        'empleado': session_data,  # { empleado_id, nombre, rol, sede_id, negocio_id }
     })

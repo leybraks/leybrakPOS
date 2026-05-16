@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { getMesas, getOrdenes, getSedes, getNegocio } from '../../../api/api';
+import { getMesas, getOrdenes, getSedes, getNegocio ,getEstadoCaja} from '../../../api/api';
 
-export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGlobal) => {
+export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGlobal, setEstadoCaja) => {
   const [sedes, setSedes] = useState([]);
   const [mesas, setMesas] = useState([]);
   const [ordenesLlevar, setOrdenesLlevar] = useState([]);
   const [todasLasOrdenesActivas, setTodasLasOrdenesActivas] = useState([]);
   const [vistaLocal, setVistaLocal] = useState(null);
   const [modulos, setModulos] = useState({ salon: true, delivery: true, cocina: true });
+  const [cargandoCaja, setCargandoCaja] = useState(true); // ← agregar
 
   // 🔧 Ref que siempre apunta a la sede activa — el WS lo usa para ignorar
   // eventos de mesas de otras sedes cuando se está reconectando.
@@ -32,17 +33,19 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
 
         if (setConfiguracionGlobal) {
           setConfiguracionGlobal({
-            colorPrimario: data.color_primario || '#ff5a1f',
-            temaFondo: data.tema_fondo || 'dark',
-            ruc: data.ruc || '',
-            razon_social: data.razon_social || '',
-            logo: data.logo || null,
-            yape_numero: data.yape_numero || '',
-            yape_qr: data.yape_qr || null,
-            plin_numero: data.plin_numero || '',
-            plin_qr: data.plin_qr || null,
-            usa_culqi: data.usa_culqi || false,
-            culqi_public_key: data.culqi_public_key || '',
+            colorPrimario:           data.color_primario || '#ff5a1f',
+            temaFondo:               data.tema_fondo     || 'dark',
+            ruc:                     data.ruc            || '',
+            razon_social:            data.razon_social   || '',
+            logo:                    data.logo           || null,
+            yape_numero:             data.yape_numero    || '',
+            yape_qr:                 data.yape_qr        || null,
+            plin_numero:             data.plin_numero    || '',
+            plin_qr:                 data.plin_qr        || null,
+            // ✅ Automatización Yape/Plin
+            confirmacion_automatica: data.confirmacion_automatica || false,
+            device_token:            data.device_token            || null,
+            negocio_id:              data.id,
             modulos: mods,
           });
         }
@@ -131,11 +134,29 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
     cargarSalon();
     return () => { isMounted = false; };
   }, [triggerRecarga, sedeActualId]);
-
+  
+  useEffect(() => {
+    if (!sedeActualId) return;
+    const cargarEstadoCaja = async () => {
+      try {
+        const res = await getEstadoCaja({ sede_id: sedeActualId });
+        const estado = res.data?.estado || 'cerrado';
+        setEstadoCaja(estado);
+        if (res.data?.id) {
+          localStorage.setItem('sesion_caja_id', res.data.id);
+        }
+      } catch {
+        setEstadoCaja('cerrado');
+      } finally {
+        setCargandoCaja(false); // ← siempre termina la carga
+      }
+    };
+    cargarEstadoCaja();
+  }, [sedeActualId, triggerRecarga , setEstadoCaja]);
   // Exponemos el ref para que useTerminalWS pueda ignorar eventos de otras sedes
   return {
     sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar,
     todasLasOrdenesActivas, vistaLocal, setVistaLocal, modulos,
-    sedeActualIdRef,
+    sedeActualIdRef,cargandoCaja,
   };
 };

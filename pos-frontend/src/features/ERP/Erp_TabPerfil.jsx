@@ -1,38 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, Search, Upload, Smartphone, CreditCard, Lock, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../../api/api';
-export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario }) {
-  // Estado local para la animación de SUNAT
-  const [buscandoRuc, setBuscandoRuc] = useState(false);
+import { useToast } from '../../context/ToastContext';
 
-  // Función simulada (pronto real) de SUNAT
+export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario }) {
+  const [buscandoRuc, setBuscandoRuc] = useState(false);
+  const toast = useToast();
+
   const consultarSunat = async () => {
     if (!config.ruc || config.ruc.length !== 11) {
-        return alert("⚠️ El RUC debe tener exactamente 11 dígitos.");
+      return toast.error('⚠️ El RUC debe tener exactamente 11 dígitos.');
     }
     setBuscandoRuc(true);
     try {
-        const response = await api.get(`/negocios/consultar_ruc/${config.ruc}/`);
-        const data = response.data;
-
-        if (data.estado !== "ACTIVO") {
-        alert(`❌ El RUC se encuentra ${data.estado}.`);
+      const response = await api.get(`/negocios/consultar_ruc/${config.ruc}/`);
+      const data = response.data;
+      if (data.estado !== 'ACTIVO') {
+        toast.error(`❌ El RUC se encuentra ${data.estado}.`);
         setConfig({ ...config, razon_social: '' });
-        } else {
+      } else {
         setConfig({ ...config, razon_social: data.razon_social });
-        }
-    } catch (error) {
-        alert("❌ No se pudo consultar SUNAT. Verifica el RUC o intenta más tarde.");
+      }
+    } catch {
+      toast.error('❌ No se pudo consultar SUNAT. Verifica el RUC o intenta más tarde.');
     } finally {
-        setBuscandoRuc(false);
+      setBuscandoRuc(false);
     }
-    };
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
 
       {/* ========================================== */}
-      {/* 🏛️ 1. IDENTIDAD LEGAL Y COMERCIAL */}
+      {/* 🏛️ 1. IDENTIDAD LEGAL Y COMERCIAL          */}
       {/* ========================================== */}
       <div className={`lg:col-span-2 p-6 md:p-8 rounded-[2rem] border shadow-sm ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-3 mb-6">
@@ -43,7 +43,7 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-          {/* CAMPO RUC */}
+          {/* RUC */}
           <div>
             <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>RUC / NIT</label>
             <div className="flex gap-2">
@@ -69,7 +69,7 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
             </div>
           </div>
 
-          {/* CAMPO RAZÓN SOCIAL */}
+          {/* RAZÓN SOCIAL */}
           <div>
             <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
               Razón Social / Propietario <Lock size={10} />
@@ -97,7 +97,8 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
               )}
             </div>
             <div className="text-center sm:text-left">
-              <label className="px-5 py-2.5 rounded-xl text-xs font-bold border transition-all mb-2 cursor-pointer inline-flex items-center gap-2 hover:opacity-80 shadow-sm" style={{ backgroundColor: isDark ? '#222' : '#fff', borderColor: isDark ? '#444' : '#d1d5db', color: isDark ? '#fff' : '#000' }}>
+              <label className="px-5 py-2.5 rounded-xl text-xs font-bold border transition-all mb-2 cursor-pointer inline-flex items-center gap-2 hover:opacity-80 shadow-sm"
+                style={{ backgroundColor: isDark ? '#222' : '#fff', borderColor: isDark ? '#444' : '#d1d5db', color: isDark ? '#fff' : '#000' }}>
                 <Upload size={14} /> Subir nuevo logo
                 <input
                   type="file" accept="image/*" className="hidden"
@@ -114,11 +115,11 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         </div>
       </div>
 
-      {/* COLUMNA DERECHA: PAGOS */}
+      {/* COLUMNA DERECHA */}
       <div className="space-y-6">
 
         {/* ========================================== */}
-        {/* 📱 2. BILLETERAS DIGITALES */}
+        {/* 📱 2. BILLETERAS DIGITALES                 */}
         {/* ========================================== */}
         <div className={`p-6 md:p-8 rounded-[2rem] border shadow-sm flex flex-col ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center gap-3 mb-6">
@@ -135,7 +136,9 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
                 <span className="w-2 h-2 rounded-full bg-[#74089c]"></span> Yape
               </label>
               <input
-                type="tel" value={config.yape_numero || ''} onChange={(e) => setConfig({ ...config, yape_numero: e.target.value })}
+                type="tel"
+                value={config.yape_numero || ''}
+                onChange={(e) => setConfig({ ...config, yape_numero: e.target.value })}
                 className="w-full border px-4 py-2.5 rounded-xl outline-none font-bold text-sm transition-colors mb-3"
                 style={{ background: isDark ? '#0a0a0a' : '#fff', borderColor: isDark ? '#444' : '#d1d5db', color: isDark ? '#fff' : '#000', outlineColor: '#74089c' }}
                 placeholder="Número de Yape"
@@ -161,7 +164,9 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
                 <span className="w-2 h-2 rounded-full bg-[#00e3a6]"></span> Plin
               </label>
               <input
-                type="tel" value={config.plin_numero || ''} onChange={(e) => setConfig({ ...config, plin_numero: e.target.value })}
+                type="tel"
+                value={config.plin_numero || ''}
+                onChange={(e) => setConfig({ ...config, plin_numero: e.target.value })}
                 className="w-full border px-4 py-2.5 rounded-xl outline-none font-bold text-sm transition-colors mb-3"
                 style={{ background: isDark ? '#0a0a0a' : '#fff', borderColor: isDark ? '#444' : '#d1d5db', color: isDark ? '#fff' : '#000', outlineColor: '#00e3a6' }}
                 placeholder="Número de Plin"
@@ -184,60 +189,58 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         </div>
 
         {/* ========================================== */}
-        {/* 💳 3. PASARELA DE PAGO (CULQI) */}
+        {/* ⚡ 3. AUTOMATIZACIÓN YAPE / PLIN           */}
         {/* ========================================== */}
         <div className={`p-6 md:p-8 rounded-[2rem] border shadow-sm ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl border bg-blue-500/10 border-blue-500/20 text-blue-500">
-                <CreditCard size={20} />
+              <div className={`p-2.5 rounded-xl border ${config.confirmacion_automatica ? 'bg-green-500/10 border-green-500/20 text-green-500' : isDark ? 'bg-[#1a1a1a] border-[#333] text-neutral-400' : 'bg-gray-100 border-gray-200 text-gray-400'}`}>
+                <Smartphone size={20} />
               </div>
-              <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Pagos Culqi</h3>
+              <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Auto-validación</h3>
             </div>
+            {/* Toggle */}
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={config.usa_culqi || false}
-                onChange={(e) => setConfig({ ...config, usa_culqi: e.target.checked })}
+                checked={config.confirmacion_automatica || false}
+                onChange={(e) => setConfig({ ...config, confirmacion_automatica: e.target.checked })}
               />
               <div
                 className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${isDark ? 'bg-[#333]' : 'bg-gray-300'}`}
-                style={config.usa_culqi ? { backgroundColor: colorPrimario } : {}}
-              ></div>
+                style={config.confirmacion_automatica ? { backgroundColor: colorPrimario } : {}}
+              />
             </label>
           </div>
 
-          <p className={`text-xs mb-6 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
-            Activa la validación de pagos reales con tarjeta de crédito/débito y billeteras móviles.
+          <p className={`text-xs mb-4 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
+            Activa la validación automática de Yape y Plin mediante la App Leybrak instalada en el celular del negocio.
           </p>
 
-          {config.usa_culqi && (
-            <div className="space-y-4 animate-fadeIn">
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Llave Pública (Public Key)</label>
-                <input
-                  type="text"
-                  value={config.culqi_public_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_public_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="pk_test_..."
-                />
+          {config.confirmacion_automatica && (
+            <div className={`p-3 rounded-xl ${isDark ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
+              <p className={`text-xs ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                ✓ Captura notificaciones push de Yape y Plin<br />
+                ✓ Confirmación con un clic en la pantalla del cajero<br />
+                ✓ Código de seguridad de 3 dígitos anti-fraude<br />
+                ✓ 0% de comisión — el dinero va directo a tu cuenta
+              </p>
+            </div>
+          )}
+
+          {/* Device Token — solo lectura, para configurar la app Android */}
+          {config.confirmacion_automatica && config.device_token && (
+            <div className="mt-4">
+              <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
+                Token de la App Android <Lock size={10} />
+              </label>
+              <div className={`flex items-center gap-2 p-3 rounded-xl border font-mono text-xs break-all ${isDark ? 'bg-[#0a0a0a] border-[#333] text-neutral-400' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                {config.device_token}
               </div>
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
-                  Llave Privada (Private Key) <Lock size={10} />
-                </label>
-                <input
-                  type="password"
-                  value={config.culqi_private_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_private_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="sk_test_..."
-                />
-              </div>
+              <p className={`text-[10px] mt-1 ${isDark ? 'text-neutral-600' : 'text-gray-400'}`}>
+                Pega este token en la App Leybrak del celular del negocio.
+              </p>
             </div>
           )}
         </div>

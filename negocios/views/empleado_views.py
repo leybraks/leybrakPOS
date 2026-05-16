@@ -5,10 +5,11 @@ from django.core.cache import cache
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, throttle_classes
+from rest_framework.decorators import action, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from urllib3 import request
 
 from .helpers import es_valor_nulo
 from ..models import Rol, Empleado
@@ -159,3 +160,84 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             'rol_nombre': empleado_valido.rol.nombre if empleado_valido.rol else 'Sin Rol',
         }, status=status.HTTP_200_OK)
     
+
+    @action(detail=False, methods=['GET'], url_path='rendimiento')
+    def rendimiento(self, request):
+        from django.db.models import Sum, Q
+        from django.utils import timezone
+        from ..models import Orden, Pago
+        import datetime
+
+        hoy = timezone.now()
+        mes = int(request.query_params.get('mes', hoy.month))
+        anio = int(request.query_params.get('anio', hoy.year))
+        sede_id = request.query_params.get('sede_id')
+
+        # Rango del mes
+        inicio = timezone.make_aware(datetime.datetime(anio, mes, 1))
+        fin = timezone.make_aware(
+            datetime.datetime(anio + 1, 1, 1) if mes == 12
+            else datetime.datetime(anio, mes + 1, 1)
+        )
+
+        empleados_qs = self.get_queryset()
+        if sede_id:
+            empleados_qs = empleados_qs.filter(sede_id=sede_id)
+
+        ordenes_base_q = Q(
+            creado_en__gte=inicio,
+            creado_en__lt=fin,
+            estado='completado',
+            estado_pago='pagado',
+        )
+        if sede_id:
+            ordenes_base_q &= Q(sede_id=sede_id)
+
+        resultado = []
+        for emp in empleados_qs:
+            ordenes = Orden.objects.filter(ordenes_base_q, mesero=emp)
+            total_ordenes = ordenes.count()
+            total_ingresos = Pago.objects.filter(
+                orden__in=ordenes
+            ).aggregate(total=Sum('monto'))['total'] or 0
+
+            resultado.append({
+                'id': emp.id,
+                'nombre': emp.nombre,
+                'rol': emp.rol.nombre if emp.rol else 'Sin Rol',
+                'sede': emp.sede.nombre if emp.sede else '-',
+                'total_ordenes': total_ordenes,
+                'total_ingresos': float(total_ingresos),
+                'ultimo_ingreso': emp.ultimo_ingreso,
+            })
+
+        resultado.sort(key=lambda x: x['total_ingresos'], reverse=True)
+
+        return Response({
+            'mes': mes,
+            'anio': anio,
+            'rendimiento': resultado,
+        })
+
+# ============================================================
+# ESTADO DE BLOQUEO PIN (público)
+# ============================================================
+from rest_framework.decorators import api_view
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def estado_bloqueo_pin(request):
+    sede_id = request.query_params.get('sede_id')
+    if not sede_id:
+        return Response({'bloqueado': False, 'segundos_restantes': 0})
+
+    lock_key = f"pin_locked_{sede_id}"
+    lockout_until = cache.get(lock_key)
+
+    if lockout_until:
+        remaining = int(lockout_until - time_module.time())
+        if remaining > 0:
+            return Response({'bloqueado': True, 'segundos_restantes': remaining})
+        cache.delete(lock_key)
+
+    return Response({'bloqueado': False, 'segundos_restantes': 0})

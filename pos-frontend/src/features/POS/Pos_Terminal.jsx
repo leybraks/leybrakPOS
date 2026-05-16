@@ -1,6 +1,6 @@
 import React, { useState,useEffect } from 'react';
 import { crearOrden, actualizarMesa, actualizarOrden, crearPago, registrarMovimientoCaja, validarPinEmpleado } from '../../api/api';
-
+import { abrirCajaBD } from '../../api/api';
 import usePosStore from '../../store/usePosStore';
 import api from '../../api/api';
 // Modales y Drawers
@@ -32,10 +32,16 @@ export default function PosTerminal({ onIrAErp }) {
   // ── Estados Locales ──────────────────────────────────────────────────────────
   const [sedeActualId, setSedeActualId] = useState(localStorage.getItem('sede_id') || '');
   // 🔒 EXTRACCIÓN SEGURA DEL ROL DESDE EL TOKEN
-  // 🔒 EXTRACCIÓN DEL ROL (Ahora guardado directamente en el login)
   const rolUsuario = localStorage.getItem('usuario_rol') || 'Empleado'; 
   const esDueño = ['dueño', 'admin'].includes(rolUsuario.trim().toLowerCase());
-  
+  const cajaAbierta = estadoCaja === 'abierto' || estadoCaja?.estado === 'abierto';
+
+  const [modalAperturaAbierto, setModalAperturaAbierto] = useState(false);
+  const [fondoCaja, setFondoCaja] = useState('');
+  const [abriendoCaja, setAbriendoCaja] = useState(false);
+
+  const rolLimpio = (rolUsuario || '').toLowerCase().trim();
+  const puedeAbrirCaja = ['cajero', 'administrador', 'admin', 'dueño'].includes(rolLimpio);
   const [triggerRecarga, setTriggerRecarga] = useState(false);
   const [mostrarPuertaMovil, setMostrarPuertaMovil] = useState(false);
   const [modoUnir, setModoUnir] = useState(false);
@@ -50,13 +56,14 @@ export default function PosTerminal({ onIrAErp }) {
   const [modalMovimientosAbierto, setModalMovimientosAbierto] = useState(false);
   const [ordenACobrar, setOrdenACobrar] = useState(null);
   const [solicitudesBot, setSolicitudesBot] = useState([]);
+  const { setEstadoCaja } = usePosStore();
 
   // ── HOOKS DE DATOS Y WEBSOCKETS ─────────────────────────────────────────────
   const { 
     sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar, 
     todasLasOrdenesActivas, vistaLocal, setVistaLocal, modulos,
-    sedeActualIdRef  // 🔧 ref para que el WS ignore eventos de sedes anteriores
-  } = useTerminalData(sedeActualId, triggerRecarga, setConfiguracionGlobal);
+    sedeActualIdRef,cargandoCaja,  // 🔧 ref para que el WS ignore eventos de sedes anteriores
+  } = useTerminalData(sedeActualId, triggerRecarga, setConfiguracionGlobal, setEstadoCaja);
 
   useTerminalWS(sedeActualId, setMesas, setOrdenesLlevar, setSolicitudesBot, sedeActualIdRef);
 
@@ -81,7 +88,28 @@ export default function PosTerminal({ onIrAErp }) {
     localStorage.setItem('sede_id', nuevaSedeId);
     setSedeActualId(nuevaSedeId);
   };
-
+  const handleAbrirCaja = async () => {
+    if (!fondoCaja || isNaN(fondoCaja) || parseFloat(fondoCaja) < 0) {
+      alert('Ingresa un fondo de caja válido.');
+      return;
+    }
+    setAbriendoCaja(true);
+    try {
+      const res = await abrirCajaBD({
+        sede_id: sedeActualId,
+        empleado_id: localStorage.getItem('empleado_id'),
+        fondo_inicial: parseFloat(fondoCaja),
+      });
+      localStorage.setItem('sesion_caja_id', res.data.id);
+      setEstadoCaja('abierto');
+      setModalAperturaAbierto(false);
+      setFondoCaja('');
+    } catch {
+      alert('Error al abrir la caja. Intenta de nuevo.');
+    } finally {
+      setAbriendoCaja(false);
+    }
+  };
   const manejarClickMesa = async (mesa) => {
     if (modoUnir) {
       if (!mesaPrincipal) {
@@ -176,6 +204,65 @@ export default function PosTerminal({ onIrAErp }) {
       alert("Hubo un error de conexión al resolver la solicitud del bot.");
     }
   };
+  
+  if (!cajaAbierta && !cargandoCaja && vistaLocal !== null) {
+    return (
+      <div className={`h-screen flex flex-col items-center justify-center text-center p-6 ${tema === 'dark' ? 'bg-[#0a0a0a]' : 'bg-[#f0f0f0]'}`}>
+        <span className="text-7xl mb-6">🔒</span>
+        <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">
+          Caja Cerrada
+        </h1>
+        <p className="text-neutral-500 font-bold mb-8 max-w-sm">
+          {puedeAbrirCaja
+            ? 'No hay una sesión de caja activa. Inicia el turno para comenzar.'
+            : 'Esperando que el cajero o administrador abra la caja.'}
+        </p>
+
+        {puedeAbrirCaja && (
+          <button
+            onClick={() => setModalAperturaAbierto(true)}
+            className="px-8 py-4 rounded-2xl text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+            style={{ backgroundColor: colorPrimario }}
+          >
+            💰 Abrir Caja
+          </button>
+        )}
+
+        {modalAperturaAbierto && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#1a1a1a] border border-[#333] rounded-3xl w-full max-w-sm p-8 shadow-2xl">
+              <h2 className="text-xl font-black text-white mb-1">Abrir Turno</h2>
+              <p className="text-neutral-500 text-sm mb-6">Ingresa el fondo inicial de la caja</p>
+              <input
+                type="number"
+                value={fondoCaja}
+                onChange={(e) => setFondoCaja(e.target.value)}
+                placeholder="S/. 0.00"
+                className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-4 text-white text-center text-2xl font-black focus:outline-none focus:border-[#ff5a1f] mb-6"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setModalAperturaAbierto(false)}
+                  className="flex-1 py-3 rounded-xl border border-[#333] text-neutral-400 font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleAbrirCaja}
+                  disabled={abriendoCaja}
+                  className="flex-1 py-3 rounded-xl text-white font-black disabled:opacity-50"
+                  style={{ backgroundColor: colorPrimario }}
+                >
+                  {abriendoCaja ? 'Abriendo...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
   // ── RENDER DE ESTADOS ESPECIALES ────────────────────────────────────────────
   if (vistaLocal === null) {
     return (
@@ -287,7 +374,7 @@ export default function PosTerminal({ onIrAErp }) {
         total={ordenACobrar ? parseFloat(ordenACobrar.total) : 0}
         carrito={ordenACobrar ? ordenACobrar.detalles.map((d) => ({ id: d.producto, nombre: d.nombre, precio: parseFloat(d.precio_unitario), cantidad: d.cantidad || 1 })) : []}
         esVentaRapida={ordenACobrar?.es_venta_rapida || false}
-        onCobroExitoso={async (datosCobro) => { // 👈 Ahora recibe { pagos, telefono }
+        onCobroExitoso={async (datosCobro) => {
           try {
             let idOrden = ordenACobrar.id;
 
@@ -295,33 +382,36 @@ export default function PosTerminal({ onIrAErp }) {
             if (idOrden === 'venta_rapida') {
               const { data } = await crearOrden({ 
                 tipo: 'llevar', 
-                estado: 'pendiente', // Se crea pendiente porque el cobro la pasará a completada
+                estado: 'pendiente',
                 estado_pago: 'pendiente', 
                 sede: sedeActualId, 
                 detalles: ordenACobrar.detalles || [] 
               });
               idOrden = data.id;
-            } 
+            }
 
-            // 2. 🚀 DISPARAMOS AL NUEVO ENDPOINT DE COBRO + CRM
-            const sesionCajaId = localStorage.getItem('sesion_caja_id');
-            await api.post(`/ordenes/${idOrden}/cobrar_orden/`, {
-              pagos: datosCobro.pagos,
-              telefono: datosCobro.telefono, // ¡El WhatsApp para el CRM!
-              sesion_caja_id: sesionCajaId
-            });
+            // ✅ Si el pago ya fue confirmado por WebSocket, no llamar cobrar_orden
+            const yaConfirmadoPorWS = datosCobro.pagos.some(p => p.yaConfirmado);
+            
+            if (!yaConfirmadoPorWS) {
+              const sesionCajaId = localStorage.getItem('sesion_caja_id');
+              await api.post(`/ordenes/${idOrden}/cobrar_orden/`, {
+                pagos: datosCobro.pagos,
+                telefono: datosCobro.telefono,
+                sesion_caja_id: sesionCajaId
+              });
+            }
 
-            // 3. Limpiamos la pantalla
-            setOrdenACobrar(null); 
-            setTriggerRecarga((p) => !p); 
-            alert('¡Venta y CRM procesados con éxito! 💵✨');
+            setOrdenACobrar(null);
+            setTriggerRecarga((p) => !p);
+            alert('¡Venta procesada con éxito! 💵✨');
 
-          } catch (error) { 
+          } catch (error) {
             console.error(error);
-            alert('Hubo un error al procesar el pago.'); 
+            alert('Hubo un error al procesar el pago.');
           }
         }}
-      />
+        />
 
       <DrawerVentaRapida
         isOpen={drawerVentaRapidaAbierto} onClose={() => setDrawerVentaRapidaAbierto(false)}

@@ -1,9 +1,218 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getRendimientoEmpleados } from '../../api/api'; // ← agregar al import
 import { 
   Users, MapPin, Plus, Edit2, UserX, UserCheck, 
-  Trophy, Star, Shield, Banknote, Utensils, Briefcase 
+  Trophy, Star, Shield, Banknote, Utensils, Briefcase,
+  ChevronLeft, ChevronRight, TrendingUp, ShoppingBag
 } from 'lucide-react';
+function RendimientoTabla({ isDark, colorPrimario, sedeFiltroId, esDueño, sedesReales }) {
+  const hoy = new Date();
+  const [mes, setMes] = useState(hoy.getMonth() + 1);
+  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [sedeFiltro, setSedeFiltro] = useState(sedeFiltroId || '');
+  const [datos, setDatos] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
+  const MESES = [
+    'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+  ];
+
+  useEffect(() => {
+    setSedeFiltro(sedeFiltroId || '');
+  }, [sedeFiltroId]);
+
+  useEffect(() => {
+    const cargar = async () => {
+      setCargando(true);
+      try {
+        const params = { mes, anio };
+        if (sedeFiltro) params.sede_id = sedeFiltro;
+        const res = await getRendimientoEmpleados(params);
+        setDatos(res.data.rendimiento || []);
+      } catch {
+        setDatos([]);
+      } finally {
+        setCargando(false);
+      }
+    };
+    cargar();
+  }, [mes, anio, sedeFiltro]);
+
+  const irMesAnterior = () => {
+    if (mes === 1) { setMes(12); setAnio(a => a - 1); }
+    else setMes(m => m - 1);
+  };
+
+  const irMesSiguiente = () => {
+    const esHoy = mes === hoy.getMonth() + 1 && anio === hoy.getFullYear();
+    if (esHoy) return; // No ir al futuro
+    if (mes === 12) { setMes(1); setAnio(a => a + 1); }
+    else setMes(m => m + 1);
+  };
+
+  const esMesActual = mes === hoy.getMonth() + 1 && anio === hoy.getFullYear();
+
+  return (
+    <div className={`rounded-[2rem] p-6 lg:p-8 border transition-all mt-8 ${
+      isDark ? 'bg-[#161616] border-[#2a2a2a]' : 'bg-white border-gray-200 shadow-sm'
+    }`}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+        <h4 className={`text-xl font-black flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <Trophy size={24} style={{ color: colorPrimario }} />
+          Rendimiento del Equipo
+        </h4>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filtro sede (solo dueño con varias sedes) */}
+          {esDueño && sedesReales.length > 1 && (
+            <select
+              value={sedeFiltro}
+              onChange={e => setSedeFiltro(e.target.value)}
+              className={`text-xs font-bold px-3 py-2 rounded-xl border outline-none cursor-pointer ${
+                isDark ? 'bg-[#111] border-[#333] text-white' : 'bg-gray-50 border-gray-200 text-gray-800'
+              }`}
+            >
+              <option value="">Todas las sedes</option>
+              {sedesReales.map(s => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Navegador de mes */}
+          <div className={`flex items-center gap-1 rounded-xl border px-1 py-1 ${
+            isDark ? 'bg-[#111] border-[#333]' : 'bg-gray-50 border-gray-200'
+          }`}>
+            <button
+              onClick={irMesAnterior}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isDark ? 'hover:bg-[#222] text-neutral-400' : 'hover:bg-gray-200 text-gray-500'
+              }`}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className={`text-xs font-black px-3 min-w-[120px] text-center ${
+              isDark ? 'text-white' : 'text-gray-800'
+            }`}>
+              {MESES[mes - 1]} {anio}
+            </span>
+            <button
+              onClick={irMesSiguiente}
+              disabled={esMesActual}
+              className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 ${
+                isDark ? 'hover:bg-[#222] text-neutral-400' : 'hover:bg-gray-200 text-gray-500'
+              }`}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      {cargando ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+            style={{ borderColor: colorPrimario, borderTopColor: 'transparent' }} />
+        </div>
+      ) : datos.length === 0 ? (
+        <div className={`py-16 text-center rounded-2xl border-2 border-dashed ${
+          isDark ? 'border-[#222]' : 'border-gray-200'
+        }`}>
+          <TrendingUp size={40} className={`mx-auto mb-3 ${isDark ? 'text-neutral-700' : 'text-gray-300'}`} />
+          <p className={`font-bold text-sm ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
+            Sin actividad registrada en {MESES[mes - 1]} {anio}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className={`border-b ${isDark ? 'border-[#2a2a2a]' : 'border-gray-200'}`}>
+                {['#', 'Empleado', 'Rol', 'Sede', 'Órdenes', 'Ingresos Generados', 'Último Ingreso'].map(h => (
+                  <th key={h} className={`pb-4 font-black uppercase tracking-widest text-[10px] ${
+                    h === 'Ingresos Generados' || h === 'Último Ingreso' ? 'text-right' : 
+                    h === 'Órdenes' ? 'text-center' : ''
+                  } ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {datos.map((emp, i) => (
+                <tr key={emp.id} className={`border-b transition-colors ${
+                  isDark ? 'border-[#222] hover:bg-[#111]' : 'border-gray-100 hover:bg-gray-50'
+                }`}>
+                  {/* Posición */}
+                  <td className="py-4 w-8">
+                    {i === 0
+                      ? <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                      : <span className={`text-xs font-black ${isDark ? 'text-neutral-600' : 'text-gray-400'}`}>{i + 1}</span>
+                    }
+                  </td>
+
+                  {/* Nombre */}
+                  <td className={`py-4 font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {emp.nombre}
+                  </td>
+
+                  {/* Rol */}
+                  <td className="py-4">
+                    <span className={`text-[10px] px-2.5 py-1 rounded-md uppercase font-black tracking-widest border ${
+                      isDark ? 'bg-[#1a1a1a] text-neutral-400 border-[#333]' : 'bg-gray-100 text-gray-500 border-gray-200'
+                    }`}>
+                      {emp.rol}
+                    </span>
+                  </td>
+
+                  {/* Sede */}
+                  <td className={`py-4 text-xs font-bold ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
+                    {emp.sede}
+                  </td>
+
+                  {/* Órdenes */}
+                  <td className="py-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <ShoppingBag size={13} className={isDark ? 'text-neutral-500' : 'text-gray-400'} />
+                      <span className={`font-mono font-bold text-sm ${
+                        emp.total_ordenes > 0
+                          ? (isDark ? 'text-white' : 'text-gray-900')
+                          : (isDark ? 'text-neutral-600' : 'text-gray-300')
+                      }`}>
+                        {emp.total_ordenes}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* Ingresos */}
+                  <td className="py-4 text-right">
+                    <span className={`font-black text-sm tracking-wide ${
+                      emp.total_ingresos > 0 ? 'text-green-500' : (isDark ? 'text-neutral-600' : 'text-gray-300')
+                    }`}>
+                      {emp.total_ingresos > 0 ? `S/ ${emp.total_ingresos.toFixed(2)}` : '—'}
+                    </span>
+                  </td>
+
+                  {/* Último ingreso */}
+                  <td className={`py-4 text-right text-xs font-bold ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
+                    {emp.ultimo_ingreso
+                      ? new Date(emp.ultimo_ingreso).toLocaleDateString('es-PE', {
+                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                        })
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 export default function Erp_Personal({
   config,
   empleadosReales,
@@ -210,59 +419,13 @@ export default function Erp_Personal({
       </div>
 
       {/* ========== TABLA DE RENDIMIENTO ========== */}
-      <div className={`rounded-[2rem] p-6 lg:p-8 border transition-all mt-8 ${
-        isDark ? 'bg-[#161616] border-[#2a2a2a]' : 'bg-white border-gray-200 shadow-sm'
-      }`}>
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-          <h4 className={`text-xl font-black flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            <Trophy size={24} style={{ color: colorPrimario }} /> 
-            Rendimiento del Equipo
-          </h4>
-          <span className={`text-[10px] font-black px-3 py-1.5 rounded-md uppercase tracking-widest border ${
-            isDark ? 'bg-[#111] text-neutral-400 border-[#333]' : 'bg-gray-100 text-gray-500 border-gray-200'
-          }`}>
-            Mes Actual (Simulado)
-          </span>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className={`border-b ${isDark ? 'border-[#2a2a2a]' : 'border-gray-200'}`}>
-                <th className={`pb-4 font-black uppercase tracking-widest text-[10px] ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>Empleado</th>
-                <th className={`pb-4 font-black uppercase tracking-widest text-[10px] text-center ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>Rol</th>
-                <th className={`pb-4 font-black uppercase tracking-widest text-[10px] text-center ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>Órdenes</th>
-                <th className={`pb-4 font-black uppercase tracking-widest text-[10px] text-right ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>Ingresos Generados</th>
-              </tr>
-            </thead>
-            <tbody className={`text-sm font-medium ${isDark ? 'text-neutral-300' : 'text-gray-700'}`}>
-              {[
-                { nom: 'Carlos M.', rol: 'Mesero', ord: 142, total: 'S/ 3,450.00' },
-                { nom: 'Ana V.', rol: 'Cajera', ord: 320, total: 'S/ 8,200.00' },
-                { nom: 'Luis R.', rol: 'Cocinero', ord: 280, total: '-' },
-              ].map((row, i) => (
-                <tr key={i} className={`border-b transition-colors ${
-                  isDark ? 'border-[#222] hover:bg-[#111]' : 'border-gray-100 hover:bg-gray-50'
-                }`}>
-                  <td className="py-4 font-bold flex items-center gap-2">
-                    {i === 0 ? <Star size={14} className="text-yellow-500 fill-yellow-500" /> : <div className="w-3.5" />}
-                    {row.nom}
-                  </td>
-                  <td className="py-4 text-center">
-                    <span className={`text-[10px] px-2.5 py-1 rounded-md uppercase font-black tracking-widest ${
-                      isDark ? 'bg-[#1a1a1a] text-neutral-400 border border-[#333]' : 'bg-gray-100 text-gray-500 border border-gray-200'
-                    }`}>
-                      {row.rol}
-                    </span>
-                  </td>
-                  <td className="py-4 text-center font-mono font-bold text-neutral-400">{row.ord}</td>
-                  <td className="py-4 text-right font-bold text-green-500 tracking-wide">{row.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <RendimientoTabla
+        isDark={isDark}
+        colorPrimario={colorPrimario}
+        sedeFiltroId={sedeFiltroId}
+        esDueño={esDueño}
+        sedesReales={sedesReales}
+      />
 
     </div>
   );

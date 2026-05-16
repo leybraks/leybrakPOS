@@ -208,6 +208,12 @@ export const crearWebSocket = (path) => {
 
   return ws;
 };
+// Reemplaza validarPinEmpleado
+export const loginPinEmpleado = (payload) =>
+  axios.post(`${API_URL}/empleados/login-pin/`, payload, { withCredentials: true });
+
+export const verificarSesionEmpleado = () =>
+  axios.get(`${API_URL}/empleados/verificar-sesion/`, { withCredentials: true });
 
 // ============================================================
 // CAJA Y LOGIN DE EMPLEADOS
@@ -251,7 +257,8 @@ export const getRoles           = (params)    => api.get('/roles/', { params });
 export const getSedes           = (params)    => api.get('/sedes/', { params });
 export const actualizarSede     = (id, data)  => api.patch(`/sedes/${id}/`, data);
 export const crearSede          = (data)      => api.post('/sedes/', data);
-
+export const getRendimientoEmpleados = (params) =>
+  api.get('/empleados/rendimiento/', { params });
 // ============================================================
 // PRODUCTOS Y CATEGORÍAS
 // ============================================================
@@ -315,10 +322,10 @@ export const crearModificador = (data) => api.post('/modificadores-rapidos/', da
 export const actualizarModificador = (id, data) => api.put(`/modificadores-rapidos/${id}/`, data);
 export const eliminarModificador = (id) => api.delete(`/modificadores-rapidos/${id}/`);
 
-
+export const getPlanesDisponibles = () => api.get('/planes-saas/');
 export const getCombosPromocionales = () => api.get('/combos-promocionales/');
 export const crearComboPromocional = (data) => api.post('/combos-promocionales/', data);
 export const actualizarComboPromocional = (id, data) => api.put(`/combos-promocionales/${id}/`, data);
 export const eliminarComboPromocional = (id) => api.delete(`/combos-promocionales/${id}/`);
-
+export const getPagosSuscripcion = (negocioId) => api.get('/pagos-suscripcion/', { params: { negocio_id: negocioId } });
 export default api;

@@ -35,3 +35,4 @@ pos-frontend/npm-debug.log*
 staticfiles/
 /Notas/
 .claude/
+backups/

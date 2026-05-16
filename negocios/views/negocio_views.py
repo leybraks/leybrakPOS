@@ -14,8 +14,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser  # ✨ NUEVO
 
-from ..models import Negocio, Sede
-from ..serializers import NegocioSerializer, SedeSerializer
+from ..models import Negocio, PagoSuscripcion, PlanSaaS, Sede
+from ..serializers import NegocioSerializer, PagoSuscripcionSerializer, PlanSaaSSerializer, SedeSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,6 @@ class NegocioViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'RUC no encontrado en SUNAT.'}, status=404)
 
             data = response.json()
-            print(f"DATA: {data}")
             return Response({
                 'ruc':          data.get('numero_documento', ruc),
                 'razon_social': data.get('razon_social', ''),
@@ -330,7 +329,6 @@ class SedeViewSet(viewsets.ModelViewSet):
         headers = {"apikey": settings.EVO_GLOBAL_KEY}
         try:
             response = requests.delete(url, headers=headers)
-            print(f"DEBUG Evolution Delete: {response.status_code} - {response.text}")
         except Exception as e:
             print(f"Error de conexión con Evolution API: {e}")
         sede.whatsapp_instancia = None
@@ -359,3 +357,83 @@ class SedeViewSet(viewsets.ModelViewSet):
             return Response({"estado": "desconectado"})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+    @action(detail=True, methods=['get'], url_path='plan_info', permission_classes=[IsAuthenticated])
+    def plan_info(self, request, pk=None):
+        """
+        Devuelve datos del plan del negocio + uso de recursos.
+        Usado por el tab 'Plan SaaS y Límites' del frontend.
+        """
+        negocio = self.get_object()
+    
+        plan = negocio.plan
+        plan_data = None
+        if plan:
+            plan_data = {
+                'nombre':           plan.nombre,
+                'precio_mensual':   str(plan.precio_mensual),
+                'max_sedes':        plan.max_sedes,
+                'modulo_kds':       plan.modulo_kds,
+                'modulo_inventario':plan.modulo_inventario,
+                'modulo_delivery':  plan.modulo_delivery,
+                'modulo_carta_qr':  plan.modulo_carta_qr,
+                'modulo_bot_wsp':   plan.modulo_bot_wsp,
+                'modulo_ml':        plan.modulo_ml,
+            }
+    
+        sedes_usadas = negocio.sedes.filter(activo=True).count()
+    
+        return Response({
+            'plan':         plan_data,
+            'fin_prueba':   negocio.fin_prueba,
+            'activo':       negocio.activo,
+            'activo_pago':  getattr(negocio, 'activo_pago', False),  # Añadir campo cuando implementes pagos
+            'uso': {
+                'sedes_usadas': sedes_usadas,
+                'sedes_max':    plan.max_sedes if plan else 1,
+            },
+        })
+    
+class PlanSaaSViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista todos los planes disponibles, ordenados por precio ASC.
+    Solo lectura — los planes los gestiona el superadmin desde el admin de Django.
+    Ruta: GET /api/planes-saas/
+    """
+    serializer_class   = PlanSaaSSerializer
+    permission_classes = [IsAuthenticated]
+ 
+    def get_queryset(self):
+        return PlanSaaS.objects.all().order_by('precio_mensual')
+
+
+class PagoSuscripcionViewSet(viewsets.ModelViewSet):
+    """
+    GET  /api/pagos-suscripcion/              → lista del negocio autenticado
+    POST /api/pagos-suscripcion/              → registrar pago (superadmin o sistema)
+    GET  /api/pagos-suscripcion/{id}/         → detalle
+    PATCH /api/pagos-suscripcion/{id}/        → actualizar estado (ej: pendiente → pagado)
+    """
+    serializer_class   = PagoSuscripcionSerializer
+    permission_classes = [IsAuthenticated]
+ 
+    def get_queryset(self):
+        # Superadmin ve todos; el dueño solo ve los suyos
+        if self.request.user.is_superuser:
+            negocio_id = self.request.query_params.get('negocio_id')
+            if negocio_id:
+                return PagoSuscripcion.objects.filter(negocio_id=negocio_id)
+            return PagoSuscripcion.objects.all()
+ 
+        try:
+            return PagoSuscripcion.objects.filter(negocio=self.request.user.negocio)
+        except Exception:
+            return PagoSuscripcion.objects.none()
+ 
+    def perform_create(self, serializer):
+        # Solo superadmin puede crear pagos manualmente
+        if not self.request.user.is_superuser:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Solo el administrador puede registrar pagos.")
+        negocio_id = self.request.data.get('negocio')
+        serializer.save(negocio_id=negocio_id)
+ 

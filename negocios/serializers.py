@@ -2,7 +2,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 from .models import (
-    ComboPromocional, ComponenteCombo, InsumoBase, InsumoSede, ItemComboPromocional, Negocio, PlanSaaS, ReglaNegocio, Sede, Mesa, Producto, Orden, DetalleOrden, Pago,
+    ComboPromocional, ComponenteCombo, InsumoBase, InsumoSede, ItemComboPromocional, Negocio, PagoSuscripcion, PlanSaaS, ReglaNegocio, Sede, Mesa, Producto, Orden, DetalleOrden, Pago,
     ModificadorRapido, GrupoVariacion, OpcionVariacion, Rol, Empleado, SesionCaja,
     DetalleOrdenOpcion , Categoria, RecetaOpcion, Cliente, VariacionProducto, ZonaDelivery, HorarioVisibilidad
 )
@@ -10,31 +10,41 @@ from .models import (
 
 class PlanSaaSSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PlanSaaS
+        model  = PlanSaaS
         fields = [
-            'id', 'nombre', 'precio_mensual',
+            'id', 'nombre', 'precio_mensual', 'max_sedes',
             'modulo_kds', 'modulo_inventario', 'modulo_delivery',
-            'modulo_carta_qr', 'modulo_bot_wsp', 'modulo_ml', 'max_sedes',
+            'modulo_carta_qr', 'modulo_bot_wsp', 'modulo_ml',
         ]
+
+class PagoSuscripcionSerializer(serializers.ModelSerializer):
+    # Campo extra legible en el frontend: nombre del plan en lugar de ID
+    plan_nombre = serializers.CharField(source='plan.nombre', read_only=True, default=None)
+ 
+    class Meta:
+        model  = PagoSuscripcion
+        fields = [
+            'id', 'monto', 'estado', 'metodo_pago',
+            'periodo', 'fecha_pago', 'notas',
+            'referencia_externa', 'plan_nombre', 'creado_en',
+        ]
+        read_only_fields = ['id', 'creado_en', 'plan_nombre']
 
 class NegocioSerializer(serializers.ModelSerializer):
     plan_detalles = PlanSaaSSerializer(source='plan', read_only=True)
+
     class Meta:
-        model = Negocio
+        model  = Negocio
         fields = [
             'id', 'propietario', 'nombre', 'ruc', 'razon_social', 'logo',
             'yape_numero', 'yape_qr', 'plin_numero', 'plin_qr',
-            'usa_culqi', 'culqi_public_key', 'culqi_private_key',
+            'confirmacion_automatica', 'device_token',
             'plan', 'plan_detalles', 'fecha_registro', 'fin_prueba', 'activo',
             'mod_salon_activo', 'mod_cocina_activo', 'mod_inventario_activo',
             'mod_delivery_activo', 'mod_clientes_activo', 'mod_facturacion_activo',
             'mod_carta_qr_activo', 'mod_bot_wsp_activo', 'mod_ml_activo',
             'color_primario', 'tema_fondo', 'carta_config',
         ]
-        extra_kwargs = {
-            # 🛡️ La clave privada de pago NUNCA debe aparecer en respuestas GET
-            'culqi_private_key': {'write_only': True},
-        }
 
 class SedeSerializer(serializers.ModelSerializer):
     class Meta:

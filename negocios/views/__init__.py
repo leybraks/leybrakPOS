@@ -1,8 +1,5 @@
 # ============================================================
 # views/__init__.py
-#
-# Re-exporta todo para que urls.py no necesite cambiar ni una línea.
-# Django ve este package exactamente igual que el views.py original.
 # ============================================================
 
 from .helpers import (
@@ -57,8 +54,9 @@ from .cliente_views import (
     ReglaNegocioViewSet,
     calcular_distancia_km,
 )
+
 from .marketing_views import (
-    MarketingGlobalView
+    MarketingGlobalView,
 )
 
 from .publico_views import (
@@ -66,4 +64,13 @@ from .publico_views import (
     menu_publico,
     orden_publica,
     verificar_sesion,
+)
+
+from .suscripcion_views import (
+    estado_suscripcion,
+)
+
+from .pago_yape_views import (
+    recibir_notificacion_yape,
+    confirmar_pago_yape,
 )

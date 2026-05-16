@@ -52,25 +52,27 @@ jobs:
             git fetch origin V2-Estable-Cloud
             git reset --hard origin/V2-Estable-Cloud
 
-            # 🏗️ [4/7] Build y Recreación
-            # FIX 3: sin --force-recreate, Docker solo recrea lo que cambió
-            notificar "🏗️ Reconstruyendo contenedores..."
-            sudo docker compose up -d --build
+            # [4/7] Build secuencial para evitar picos de RAM (Status 137)
+            notificar "🏗️ Construyendo Backend..."
+            sudo docker compose build backend
+            notificar "🏗️ Construyendo Frontend..."
+            sudo docker compose build frontend
+            notificar "🚀 Levantando servicios..."
+            sudo docker compose up -d
 
             # ⚙️ [5/7] Migraciones
             notificar "⚙️ Aplicando cambios en la base de datos..."
             sudo docker compose exec -T backend python manage.py migrate
 
-            # 🩺 [6/7] Healthcheck con curl desde el host
-            # FIX 5: curl directo, sin depender de librerías Python del contenedor
+            # [6/7] Healthcheck — desde DENTRO del contenedor con python
             notificar "🩺 Verificando estabilidad del servicio..."
             HEALTH_SUCCESS=false
-            for i in {1..10}; do
-              if curl -sf --max-time 5 http://localhost:8000/api/health/ | grep -q "ok"; then
+            for i in {1..20}; do
+              if sudo docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" 2>/dev/null; then
                 HEALTH_SUCCESS=true
                 break
               fi
-              echo "Esperando backend... ($i/10)"
+              echo "Esperando backend... ($i/20)"
               sleep 5
             done
 

@@ -16,6 +16,8 @@ import { usePosSearch } from '../features/POS/hooks/usePosSearch';
 import { calcularLineasHappyHour, calcularLineasReglas, happyHourActivaAhora } from '../features/POS/hooks/usePosData';
 
 export default function PosView({ mesaId, onVolver, esModoTerminal = false }) {
+  // Al momento en que el empleado inicia sesión en la terminal de sala:
+  localStorage.setItem('modo_dispositivo', 'terminal');
   const toast = useToast();
   const { estadoCaja, configuracionGlobal, carrito, agregarProducto, agregarCombo, esDueño, sedes, manejarCambioSede, restarProducto, obtenerTotalItems, restarDesdeGrid, obtenerTotalDinero, vaciarCarrito, actualizarItemCompleto, sumarUnidad } = usePosStore();  const tema = configuracionGlobal?.temaFondo || 'dark';
   const colorPrimario = configuracionGlobal?.colorPrimario || '#ff5a1f';

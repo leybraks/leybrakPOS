@@ -1,3 +1,6 @@
+from datetime import timedelta
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, is_password_usable
@@ -5,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from openlocationcode import openlocationcode as olc
 from django.utils import timezone
-
+from encrypted_model_fields.fields import EncryptedCharField
 class ActivoManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(activo=True)
@@ -51,54 +54,64 @@ class Negocio(models.Model):
     plin_qr = models.ImageField(upload_to='negocios/qrs/plin/', blank=True, null=True)
 
     # ==========================================
-    # 💳 3. PASARELA DE PAGO (Culqi)
+    # ⚡ 3. AUTOMATIZACIÓN DE PAGOS (Yape/Plin)
     # ==========================================
-    usa_culqi = models.BooleanField(default=False)
-    culqi_public_key = models.CharField(max_length=255, blank=True, null=True)
-    culqi_private_key = models.CharField(max_length=255, blank=True, null=True)
+    device_token = models.CharField(
+        max_length=64, 
+        unique=True, 
+        null=True, 
+        blank=True,
+        help_text="Token único que autentica la App Android de este negocio"
+    )
+    confirmacion_automatica = models.BooleanField(
+        default=False, 
+        help_text="¿El negocio usa la App de Leybrak para auto-validar Yape/Plin?"
+    )
 
     # ==========================================
     # ⚙️ CONFIGURACIÓN DEL PLAN
     # ==========================================
     plan = models.ForeignKey('PlanSaaS', on_delete=models.PROTECT, related_name='negocios', null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
-    fin_prueba = models.DateTimeField() # Para el demo de 15 días
+    fin_prueba = models.DateTimeField()
     activo = models.BooleanField(default=True)
     
     # ==========================================
     # 🛡️ MÓDULOS DEL SISTEMA (Feature Flags)
     # ==========================================
-    mod_salon_activo = models.BooleanField(default=True) # Activa/Desactiva el mapa de mesas
-    mod_cocina_activo = models.BooleanField(default=False) # KDS
+    mod_salon_activo = models.BooleanField(default=True)
+    mod_cocina_activo = models.BooleanField(default=False)
     mod_inventario_activo = models.BooleanField(default=False)
     mod_delivery_activo = models.BooleanField(default=False)
-    mod_clientes_activo = models.BooleanField(default=False) # CRM (Base de datos de clientes)
-    mod_facturacion_activo = models.BooleanField(default=False) # Boletas/Facturas Sunat
-    mod_carta_qr_activo = models.BooleanField(default=False) # Carta digital con QR para mesas y delivery
-    mod_bot_wsp_activo = models.BooleanField(default=False) # Bot de WhatsApp
-    mod_ml_activo = models.BooleanField(default=False) # Machine Learning
+    mod_clientes_activo = models.BooleanField(default=False)
+    mod_facturacion_activo = models.BooleanField(default=False)
+    mod_carta_qr_activo = models.BooleanField(default=False)
+    mod_bot_wsp_activo = models.BooleanField(default=False)
+    mod_ml_activo = models.BooleanField(default=False)
     
     # ==========================================
     # 🎨 PERSONALIZACIÓN VISUAL
     # ==========================================
-    color_primario = models.CharField(max_length=7, default='#ff5a1f') # Naranja Brava por defecto
-    tema_fondo = models.CharField(max_length=10, default='dark') # 'dark' o 'light'
+    color_primario = models.CharField(max_length=7, default='#ff5a1f')
+    tema_fondo = models.CharField(max_length=10, default='dark')
     
     carta_config = models.JSONField(
         default=dict,
         blank=True,
         help_text="Configuración visual de la carta digital (fuentes, fondos, colores, estilos)"
     )
+
     def __str__(self):
         return self.nombre
+
     def save(self, *args, **kwargs):
-        # Si el RUC llega como un string vacío, lo forzamos a ser estrictamente NULL
         if self.ruc == "":
             self.ruc = None
-            
+        if not self.device_token:  # ← Agregar esto
+            self.device_token = secrets.token_hex(32)
         super().save(*args, **kwargs)
 
-class Sede(models.Model):
+class Sede(models.Model):   
     negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE, related_name='sedes')
     nombre = models.CharField(max_length=100)
     direccion = models.CharField(
@@ -110,9 +123,6 @@ class Sede(models.Model):
     latitud = models.FloatField(null=True, blank=True, help_text="Se autocompleta al guardar")
     longitud = models.FloatField(null=True, blank=True, help_text="Se autocompleta al guardar")
 
-    # ==========================================
-    # 📱 BOT MULTI-SEDE
-    # ==========================================
     whatsapp_instancia = models.CharField(max_length=50, null=True, blank=True, help_text="Nombre exacto en Evolution API")
     whatsapp_numero = models.CharField(max_length=20, null=True, blank=True, help_text="Número del bot")
     enlace_carta_virtual = models.URLField(max_length=500, null=True, blank=True, help_text="Link a tu menú digital, Canva, Drive o Instagram")
@@ -120,9 +130,6 @@ class Sede(models.Model):
     hora_apertura = models.TimeField(null=True, blank=True)
     hora_cierre = models.TimeField(null=True, blank=True)
 
-    # ⚠️ CAMBIO: de JSONField a un choices fijo.
-    # El JSONField libre era propenso a errores de tipeo ("Lunes" vs "lunes" vs "LUN").
-    # Con IntegerField + choices el bot siempre lee números: 0=Lun, 1=Mar... 6=Dom.
     DIAS_SEMANA = [(0,'Lunes'),(1,'Martes'),(2,'Miércoles'),(3,'Jueves'),(4,'Viernes'),(5,'Sábado'),(6,'Domingo')]
     dias_atencion = models.JSONField(
         default=list,
@@ -136,9 +143,6 @@ class Sede(models.Model):
         help_text="Límite de pedidos en preparación antes de activar el Modo Cocina Colapsada"
     )
 
-    # ==========================================
-    # 🎂 PROMOCIÓN DE CUMPLEAÑOS
-    # ==========================================
     TIPO_CUMPLE = [
         ('porcentaje', 'Porcentaje de descuento'),
         ('fijo', 'Monto fijo en soles'),
@@ -156,9 +160,6 @@ class Sede(models.Model):
         help_text="Consumo mínimo en soles para que aplique el beneficio."
     )
 
-    # ✅ CAMBIO: ManyToManyField en lugar de JSONField con IDs.
-    # Con M2M, si un producto se elimina Django limpia la relación automáticamente.
-    # Con el JSONField anterior, quedaban IDs huérfanos sin ningún aviso.
     bot_cumple_productos = models.ManyToManyField(
         'Producto',
         blank=True,
@@ -175,9 +176,6 @@ class Sede(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.negocio.nombre})"
 
-    # ✅ NUEVO: Validación cruzada entre tipo y valor/productos.
-    # Sin esto, el admin podía guardar tipo='combo' sin productos, o tipo='fijo' sin valor,
-    # y el bot explotaría en runtime sin ningún mensaje claro de por qué.
     def clean(self):
         super().clean()
         if not self.bot_cumple_activo:
@@ -193,10 +191,6 @@ class Sede(models.Model):
                     'bot_cumple_valor': "El porcentaje debe estar entre 1 y 100."
                 })
 
-        # Nota: la validación de 'combo' (que haya productos seleccionados)
-        # no se puede hacer aquí porque M2M no existe hasta después del save().
-        # Esa validación vive en el serializer o en el admin con clean() del formulario.
-
     def save(self, *args, **kwargs):
         self.full_clean()  # Dispara clean() antes de guardar
         if self.direccion and '+' in self.direccion:
@@ -207,9 +201,6 @@ class Sede(models.Model):
                     self.latitud = code_area.latitudeCenter
                     self.longitud = code_area.longitudeCenter
             except Exception as e:
-                # ✅ CAMBIO: usa logging en lugar de print().
-                # print() no aparece en producción (Gunicorn/Railway lo suprime).
-                # logging sí llega a tus logs de servidor.
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning("Error decodificando Plus Code '%s': %s", self.direccion, e)
@@ -304,17 +295,15 @@ class Empleado(models.Model):
         pass
     
     def save(self, *args, **kwargs):
-        # Si el PIN no empieza con la firma del hasher de Django, significa que es un PIN nuevo en texto plano. Lo encriptamos.
         if self.pin:
             self.pin = self.pin.strip()
-            
-        # 2. EL ESCUDO: Solo evaluamos si REALMENTE hay un texto.
-        # Si self.pin está vacío (""), esta condición se salta y no arruina la contraseña.
-        if self.pin and not is_password_usable(self.pin):
-            # Además, verificamos que sea cortito (un PIN real) para evitar doble encriptación
-            if len(self.pin) < 30:
-                self.pin = make_password(self.pin)
-                
+
+        # Detectar texto plano correctamente: verificar los prefijos reales de Django
+        HASH_PREFIXES = ('pbkdf2_sha256$', 'pbkdf2_sha1$', 'argon2', 'bcrypt', '!')
+        
+        if self.pin and not self.pin.startswith(HASH_PREFIXES):
+            self.pin = make_password(self.pin)
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -443,6 +432,35 @@ class DetalleOrden(models.Model):
     def __str__(self):
         return f"{self.cantidad}x {self.producto.nombre}"
 
+class NotificacionPago(models.Model):
+    TIPO_CHOICES = [
+        ('YAPE', 'Yape'),
+        ('PLIN', 'Plin'),
+    ]
+
+    negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE, related_name='notificaciones_entrantes')
+    tipo = models.CharField(max_length=4, choices=TIPO_CHOICES, default='YAPE')
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    codigo_seguridad = models.CharField(max_length=3, null=True, blank=True) # Para los 3 dígitos
+    nombre_cliente = models.CharField(max_length=150)
+    usado = models.BooleanField(default=False)
+    fecha_recepcion = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def es_valida(self):
+        # Expiración a los 5 minutos y control de duplicidad
+        limite_tiempo = timezone.now() - timedelta(minutes=5)
+        return not self.usado and self.fecha_recepcion >= limite_tiempo
+
+    def __str__(self):
+        return f"{self.tipo} - S/{self.monto} ({self.nombre_cliente})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['negocio', 'usado', 'fecha_recepcion']),
+        ]
+    ordering = ['-fecha_recepcion']
+
 class Pago(models.Model):
     METODOS = [
         ('efectivo', 'Efectivo'),
@@ -451,19 +469,42 @@ class Pago(models.Model):
         ('plin', 'Plin'),
     ]
     
-    orden = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='pagos')
-    metodo = models.CharField(max_length=20, choices=METODOS)
-    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    # 1. ESTADOS LIMPIOS: Solo Confirmado, Cancelado o Manual
+    ESTADOS = [
+        ('confirmado', 'Confirmado'),
+        ('cancelado', 'Cancelado'),
+        ('manual', 'Manual'),
+    ]
+
+    orden       = models.ForeignKey(Orden, on_delete=models.CASCADE, related_name='pagos')
+    metodo      = models.CharField(max_length=20, choices=METODOS)
+    monto       = models.DecimalField(max_digits=10, decimal_places=2)
     sesion_caja = models.ForeignKey(SesionCaja, on_delete=models.PROTECT, null=True, related_name='pagos')
-    fecha_pago = models.DateTimeField(auto_now_add=True)
+    fecha_pago  = models.DateTimeField(auto_now_add=True)
+    estado      = models.CharField(max_length=20, choices=ESTADOS, default='confirmado')
+
+    # ==========================================
+    # 🔗 ENLACE DE AUDITORÍA CON LA APP ANDROID
+    # ==========================================
+    # 2. Reemplazamos todo Culqi por la relación con la Notificación
+    notificacion_origen = models.OneToOneField(
+        'NotificacionPago', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Notificación push que validó automáticamente este pago"
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=['sesion_caja', 'fecha_pago']),
             models.Index(fields=['orden']),
+            # 3. Borramos también los índices que buscaban a Culqi
         ]
+
     def __str__(self):
-        return f"S/ {self.monto} en {self.get_metodo_display()} (Orden #{self.orden.id})"
-    
+        return f"S/ {self.monto} en {self.get_metodo_display()} (Orden #{self.orden.id}) - {self.get_estado_display()}"
+
 class ModificadorRapido(models.Model):
     negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=50)
@@ -953,3 +994,53 @@ class ItemComboPromocional(models.Model):
 
     def __str__(self):
         return f"{self.cantidad}x {self.producto.nombre} → Combo {self.combo.nombre}"
+
+class PagoSuscripcion(models.Model):
+ 
+    ESTADO_CHOICES = [
+        ('pagado',      'Pagado'),
+        ('pendiente',   'Pendiente'),
+        ('fallido',     'Fallido'),
+        ('reembolsado', 'Reembolsado'),
+    ]
+ 
+    METODO_CHOICES = [
+        ('yape',         'Yape'),
+        ('plin',         'Plin'),
+        ('tarjeta',      'Tarjeta'),
+        ('transferencia','Transferencia'),
+        ('efectivo',     'Efectivo'),
+        ('otro',         'Otro'),
+    ]
+ 
+    negocio     = models.ForeignKey(
+        'Negocio',
+        on_delete=models.CASCADE,
+        related_name='pagos_suscripcion'
+    )
+    plan        = models.ForeignKey(
+        'PlanSaaS',
+        on_delete=models.PROTECT,
+        related_name='pagos',
+        null=True, blank=True     # null por si el plan se elimina después
+    )
+    monto       = models.DecimalField(max_digits=10, decimal_places=2)
+    estado      = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
+    metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES, default='otro')
+ 
+    # Período al que corresponde este pago (ej: "Mayo 2026")
+    periodo     = models.CharField(max_length=30, blank=True, null=True)
+ 
+    fecha_pago  = models.DateTimeField(default=timezone.now)
+    notas       = models.TextField(blank=True, null=True)
+ 
+    # Para pagos Culqi: guardar referencia del cargo
+    referencia_externa = models.CharField(max_length=100, blank=True, null=True)
+ 
+    creado_en   = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        ordering = ['-fecha_pago']   # más reciente primero
+ 
+    def __str__(self):
+        return f"{self.negocio.nombre} — {self.get_estado_display()} — S/ {self.monto} ({self.periodo or self.fecha_pago.strftime('%b %Y')})"
