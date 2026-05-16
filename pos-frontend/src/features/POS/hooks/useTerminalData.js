@@ -33,17 +33,19 @@ export const useTerminalData = (sedeActualId, triggerRecarga, setConfiguracionGl
 
         if (setConfiguracionGlobal) {
           setConfiguracionGlobal({
-            colorPrimario: data.color_primario || '#ff5a1f',
-            temaFondo: data.tema_fondo || 'dark',
-            ruc: data.ruc || '',
-            razon_social: data.razon_social || '',
-            logo: data.logo || null,
-            yape_numero: data.yape_numero || '',
-            yape_qr: data.yape_qr || null,
-            plin_numero: data.plin_numero || '',
-            plin_qr: data.plin_qr || null,
-            usa_culqi: data.usa_culqi || false,
-            culqi_public_key: data.culqi_public_key || '',
+            colorPrimario:           data.color_primario || '#ff5a1f',
+            temaFondo:               data.tema_fondo     || 'dark',
+            ruc:                     data.ruc            || '',
+            razon_social:            data.razon_social   || '',
+            logo:                    data.logo           || null,
+            yape_numero:             data.yape_numero    || '',
+            yape_qr:                 data.yape_qr        || null,
+            plin_numero:             data.plin_numero    || '',
+            plin_qr:                 data.plin_qr        || null,
+            // ✅ Automatización Yape/Plin
+            confirmacion_automatica: data.confirmacion_automatica || false,
+            device_token:            data.device_token            || null,
+            negocio_id:              data.id,
             modulos: mods,
           });
         }

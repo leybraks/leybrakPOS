@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import usePosStore from '../../store/usePosStore';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/api';
+import { usePagosWS } from '../../features/POS/hooks/usePagosWS';
 import {
   X, Banknote, Smartphone, CreditCard, CheckCircle2,
   Users, Receipt, MessageCircle, ArrowLeft, Loader2
@@ -16,42 +16,57 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const colorPrimario = config.colorPrimario || '#8b5cf6';
   const isDark = tema === 'dark';
 
-  // Estados principales
-  const [paso, setPaso] = useState('cobro');
-  const [tab, setTab] = useState('completo');
-  const [metodo, setMetodo] = useState('efectivo');
-  const [montoIngresado, setMontoIngresado] = useState('');
-  const [dividirEntre, setDividirEntre] = useState(2);
+  // ─── Flags del negocio ───────────────────────────────────────
+  const negocioId                 = config.negocio_id;
+  const usaConfirmacionAutomatica = !!(config.confirmacion_automatica);
+  // ─── Estados principales ─────────────────────────────────────
+  const [paso, setPaso]                             = useState('cobro');
+  const [tab, setTab]                               = useState('completo');
+  const [metodo, setMetodo]                         = useState('efectivo');
+  const [montoIngresado, setMontoIngresado]         = useState('');
+  const [dividirEntre, setDividirEntre]             = useState(2);
   const [itemsSeleccionados, setItemsSeleccionados] = useState({});
-  const [pagosAcumulados, setPagosAcumulados] = useState([]);
-  const [telefonoTicket, setTelefonoTicket] = useState('');
+  const [pagosAcumulados, setPagosAcumulados]       = useState([]);
+  const [telefonoTicket, setTelefonoTicket]         = useState('');
 
-  // Estados QR Culqi (Yape/Plin)
-  const [generandoQR, setGenerandoQR] = useState(false);
-  const [qrCulqi, setQrCulqi] = useState(null);
-  const [validandoPago, setValidandoPago] = useState(false);
+  // ─── Estados Yape / Plin automático ──────────────────────────
+  const [notificaciones, setNotificaciones]           = useState([]);
+  const [notificacionElegida, setNotificacionElegida] = useState(null);
+  const esperaTimeoutRef = useRef(null);
 
-  // Estados tarjeta
-  const [procesandoTarjeta, setProcesandoTarjeta] = useState(false);
-
-  // Polling
-  const [pollingActivo, setPollingActivo] = useState(false);
-  const [segundosRestantes, setSegundosRestantes] = useState(300);
-  const pollingRef   = useRef(null);
-  const countdownRef = useRef(null);
-
-  // Preview descuento
-  const [preview, setPreview] = useState(null);
+  // ─── Preview descuento/recargo ───────────────────────────────
+  const [preview, setPreview]               = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  const detenerPolling = useCallback(() => {
-    if (pollingRef.current)   clearInterval(pollingRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    pollingRef.current   = null;
-    countdownRef.current = null;
-    setPollingActivo(false);
+  // ─── Refs para el callback del WS (evita stale closures) ─────
+  const pasoRef       = useRef(paso);
+  const metodoRef     = useRef(metodo);
+  const montoCobroRef = useRef(0);
+  useEffect(() => { pasoRef.current   = paso;   }, [paso]);
+  useEffect(() => { metodoRef.current = metodo; }, [metodo]);
+
+  // ─── Callback que maneja pagos entrantes por WebSocket ───────
+  const manejarPagoEntrante = useCallback((data) => {
+    if (pasoRef.current   !== 'qr')   return;
+    if (metodoRef.current !== 'yape' && metodoRef.current !== 'plin') return;
+
+    const montoNotificacion = parseFloat(data.monto);
+    const montoEsperado     = parseFloat(montoCobroRef.current.toFixed(2));
+    if (Math.abs(montoNotificacion - montoEsperado) >= 0.01) return;
+
+    setNotificaciones(prev => {
+      if (prev.some(n => n.notificacion_id === data.notificacion_id)) return prev;
+      return [...prev, data];
+    });
   }, []);
 
+  // ─── Hook WebSocket de pagos ──────────────────────────────────
+  usePagosWS(
+    usaConfirmacionAutomatica ? negocioId : null,
+    manejarPagoEntrante
+  );
+
+  // ─── Reset al abrir / cerrar ──────────────────────────────────
   useEffect(() => {
     if (isOpen) {
       setPaso('cobro');
@@ -62,18 +77,17 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       setItemsSeleccionados({});
       setPagosAcumulados([]);
       setTelefonoTicket('');
-      setGenerandoQR(false);
-      setQrCulqi(null);
-      setValidandoPago(false);
-      setProcesandoTarjeta(false);
       setPreview(null);
-      setPollingActivo(false);
-      setSegundosRestantes(300);
-      detenerPolling();
+      setNotificaciones([]);
+      setNotificacionElegida(null);
+      if (esperaTimeoutRef.current) clearTimeout(esperaTimeoutRef.current);
     }
-    return () => detenerPolling();
-  }, [isOpen, detenerPolling]);
+    return () => {
+      if (esperaTimeoutRef.current) clearTimeout(esperaTimeoutRef.current);
+    };
+  }, [isOpen]);
 
+  // ─── Preview de descuento/recargo ────────────────────────────
   const fetchPreview = useCallback(async (metodoActual) => {
     if (!ordenId) return;
     setLoadingPreview(true);
@@ -93,6 +107,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
   if (!isOpen) return null;
 
+  // ─── Cálculos de montos ───────────────────────────────────────
   const totalEfectivo = preview ? preview.total : total;
   const totalPagado   = pagosAcumulados.reduce((sum, p) => sum + p.monto, 0);
   const restante      = totalEfectivo - totalPagado;
@@ -110,9 +125,10 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     return 0;
   };
 
-  const montoCobro    = calcularMontoCobro();
-  const montoRecibido = parseFloat(montoIngresado) || 0;
-  const vuelto        = montoRecibido > montoCobro ? montoRecibido - montoCobro : 0;
+  const montoCobro      = calcularMontoCobro();
+  montoCobroRef.current = montoCobro;
+  const montoRecibido   = parseFloat(montoIngresado) || 0;
+  const vuelto          = montoRecibido > montoCobro ? montoRecibido - montoCobro : 0;
 
   const toggleItem = (itemId, maxCant) => {
     setItemsSeleccionados(prev => {
@@ -123,166 +139,47 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     });
   };
 
-  const registrarPago = (monto, vueltoCalculado = 0) => {
-    const nuevos = [...pagosAcumulados, { metodo, monto, vuelto: vueltoCalculado }];
-    setPagosAcumulados(nuevos);
-    const nuevoTotal = totalPagado + monto;
-    if (nuevoTotal >= totalEfectivo - 0.01) {
-      setPaso('exito');
-    } else {
+  const registrarPago = (monto, vueltoCalculado = 0, yaConfirmado = false) => {
+  const nuevos = [...pagosAcumulados, { metodo, monto, vuelto: vueltoCalculado, yaConfirmado }];
+  setPagosAcumulados(nuevos);
+  const nuevoTotal = totalPagado + monto;
+  if (nuevoTotal >= totalEfectivo - 0.01) {
+    setPaso('exito');
+  } else   {
       const restanteNuevo = totalEfectivo - nuevoTotal;
       toast.success(`Pago de S/ ${monto.toFixed(2)} registrado. Falta: S/ ${restanteNuevo.toFixed(2)}`);
       setMontoIngresado('');
       setTab('completo');
       setItemsSeleccionados({});
-      setQrCulqi(null);
+      setNotificaciones([]);
+      setNotificacionElegida(null);
       setPaso('cobro');
     }
   };
 
-  // ── CULQI QR (Yape/Plin) ──────────────────────────────────────
-  const iniciarPollingCulqi = useCallback((orderId, montoACobrar,tipoMetodo) => {
-    setPollingActivo(true);
-    setSegundosRestantes(300);
+  // ─── Confirmar notificación recibida por WS ───────────────────
+ const confirmarNotificacion = async (notificacion) => {
+  setNotificacionElegida(notificacion);
+  try {
+    await api.post('/yape/confirmar/', {
+      notificacion_id: notificacion.notificacion_id,
+      orden_id:        ordenId,
+    });
+    setNotificaciones([]);
+    // ✅ Flag que indica que el backend ya procesó el pago
+    registrarPago(parseFloat(notificacion.monto), 0, true);
+  } catch {
+    toast.error('Error al confirmar el pago. Intenta de nuevo.');
+    setNotificacionElegida(null);
+  }
+};
 
-    countdownRef.current = setInterval(() => {
-      setSegundosRestantes(prev => {
-        if (prev <= 1) {
-          detenerPolling();
-          toast.warning('El QR expiró. Genera uno nuevo.');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const res = await api.get(`/culqi/estado-orden/${orderId}/?metodo=${tipoMetodo}`);
-        if (res.data.estado === 'pagado') {
-          detenerPolling();
-          await new Promise(r => setTimeout(r, 400));
-          toast.success('✅ ¡Pago confirmado!');
-          registrarPago(montoACobrar, 0);
-        }
-      } catch {
-        // seguimos intentando
-      }
-    }, 3000);
-  }, [detenerPolling, toast]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const generarQRCulqi = async (monto, tipoMetodo) => {
-    setGenerandoQR(true);
-    setQrCulqi(null);
-    detenerPolling();
-    try {
-      const res = await api.post('/culqi/generar-qr/', {
-        orden_id:    ordenId,
-        metodo:      tipoMetodo,
-        descripcion: `Pago ${tipoMetodo} en POS`,
-      });
-      const { order_id, qr_data, monto: montoConfirmado } = res.data;
-      setQrCulqi({ orderId: order_id, qrData: qr_data, monto: montoConfirmado ?? monto });
-      iniciarPollingCulqi(order_id, montoConfirmado ?? monto, tipoMetodo);
-    } catch (error) {
-      console.error('Error generando QR Culqi:', error);
-      toast.error('Error al generar el QR. Intenta de nuevo.');
-    } finally {
-      setGenerandoQR(false);
-    }
-  };
-
-  const validarPagoCulqi = async () => {
-    if (!qrCulqi?.orderId) return;
-    setValidandoPago(true);
-    try {
-      const res = await api.get(`/culqi/estado-orden/${qrCulqi.orderId}/`);
-      if (res.data.estado === 'pagado') {
-        detenerPolling();
-        toast.success('✅ ¡Pago confirmado!');
-        registrarPago(montoCobro, 0);
-      } else {
-        toast.warning('El pago aún no se ha procesado. Espera unos segundos.');
-      }
-    } catch {
-      toast.error('Error al verificar el pago. Intenta de nuevo.');
-    } finally {
-      setValidandoPago(false);
-    }
-  };
-
-  // ── CULQI TARJETA — El backend hace todo ─────────────────────
-  const cargarScriptCulqi = () => new Promise((resolve, reject) => {
-    if (window.Culqi) return resolve();
-    const script = document.createElement('script');
-    script.src = 'https://checkout.culqi.com/js/v4';
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-
-  const abrirCheckoutTarjeta = async () => {
-    try {
-      await cargarScriptCulqi();
-      window.Culqi.publicKey = config.culqi_public_key;
-      window.Culqi.settings({
-        title:    'Pago POS',
-        currency: 'PEN',
-        amount:   Math.round(montoCobro * 100),
-      });
-
-      // Culqi llama a window.culqi() cuando el cliente completa el form
-      // Solo tokenizamos aquí — el cobro real lo hace el backend
-      window.culqi = async () => {
-        const token = window.Culqi.token?.id;
-        const error = window.Culqi.error;
-
-        if (error) {
-          toast.error(`Error de tarjeta: ${error.user_message || 'Intenta de nuevo'}`);
-          return;
-        }
-        if (!token) {
-          toast.error('No se recibió token. Intenta de nuevo.');
-          return;
-        }
-
-        window.Culqi.close();
-        setProcesandoTarjeta(true);
-
-        try {
-          // El backend crea el pago, cobra en Culqi y confirma — sin duplicados
-          const res = await api.post('/culqi/cobrar-tarjeta/', {
-            token,
-            orden_id: ordenId,
-          });
-
-          if (res.data.ok) {
-            toast.success('✅ ¡Pago con tarjeta confirmado!');
-            registrarPago(montoCobro, 0);
-          } else {
-            toast.error('El cargo fue rechazado. Verifica los datos de la tarjeta.');
-          }
-        } catch (err) {
-          const msg = err.response?.data?.error || 'El cargo fue rechazado.';
-          toast.error(msg);
-        } finally {
-          setProcesandoTarjeta(false);
-        }
-      };
-
-      window.Culqi.open();
-    } catch {
-      toast.error('No se pudo cargar la pasarela Culqi. Verifica tu conexión.');
-    }
-  };
-
-  // ── Flujo principal ──────────────────────────────────────────
+  // ─── Navegación ───────────────────────────────────────────────
   const procesarCobro = () => {
     if (metodo !== 'efectivo') {
+      setNotificaciones([]);
+      setNotificacionElegida(null);
       setPaso('qr');
-      if (config.usa_culqi && (metodo === 'yape' || metodo === 'plin')) {
-        generarQRCulqi(montoCobro, metodo);
-      }
       return;
     }
     if (!montoIngresado || montoRecibido <= 0) {
@@ -296,15 +193,21 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     registrarPago(montoCobro, vuelto);
   };
 
+  const volverACobro = () => {
+    setNotificaciones([]);
+    setNotificacionElegida(null);
+    setPaso('cobro');
+  };
+
   const finalizarCobro = () => {
     onCobroExitoso({ pagos: pagosAcumulados, telefono: telefonoTicket });
   };
 
   const metodosDisponibles = [
-    { id: 'efectivo', nombre: 'Efectivo',  icono: Banknote,   disponible: true },
-    { id: 'yape',     nombre: 'Yape',      icono: Smartphone, disponible: !!(config.yape_numero || config.yape_qr),  color: '#6d28d9' },
-    { id: 'plin',     nombre: 'Plin',      icono: Smartphone, disponible: !!(config.plin_numero || config.plin_qr),  color: '#14b8a6' },
-    { id: 'tarjeta',  nombre: 'Tarjeta',   icono: CreditCard, disponible: true, color: '#3b82f6' },
+    { id: 'efectivo', nombre: 'Efectivo', icono: Banknote,   disponible: true },
+    { id: 'yape',     nombre: 'Yape',     icono: Smartphone, disponible: !!(config.yape_numero || config.yape_qr), color: '#6d28d9' },
+    { id: 'plin',     nombre: 'Plin',     icono: Smartphone, disponible: !!(config.plin_numero || config.plin_qr), color: '#14b8a6' },
+    { id: 'tarjeta',  nombre: 'Tarjeta',  icono: CreditCard, disponible: true, color: '#3b82f6' },
   ].filter(m => m.disponible);
 
   // ══════════════════════════════════════════════
@@ -315,6 +218,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-0 md:p-4">
         <div className={`w-full max-w-lg md:rounded-3xl shadow-2xl border h-[95vh] md:h-auto md:max-h-[90vh] flex flex-col ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
 
+          {/* Header */}
           <div className={`p-6 border-b flex-shrink-0 ${isDark ? 'border-[#1a1a1a]' : 'border-gray-100'}`}>
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -328,6 +232,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </button>
             </div>
 
+            {/* Totales */}
             <div className={`rounded-2xl p-6 text-center ${isDark ? 'bg-[#111]' : 'bg-gradient-to-br from-gray-50 to-gray-100'}`}>
               {totalPagado > 0 && (
                 <div className={`mb-4 pb-4 border-b ${isDark ? 'border-[#1a1a1a]' : 'border-gray-200'}`}>
@@ -341,14 +246,14 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   </div>
                 </div>
               )}
-
               <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
                 {restante < totalEfectivo ? 'Por cobrar' : 'Total'}
               </p>
               <p className={`text-5xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {loadingPreview ? <span className="text-2xl opacity-50">Calculando...</span> : `S/ ${restante.toFixed(2)}`}
+                {loadingPreview
+                  ? <span className="text-2xl opacity-50">Calculando...</span>
+                  : `S/ ${restante.toFixed(2)}`}
               </p>
-
               {preview && (preview.descuento_total > 0 || preview.recargo_total > 0) && (
                 <div className={`mt-4 pt-4 border-t text-left space-y-1 ${isDark ? 'border-[#1a1a1a]' : 'border-gray-200'}`}>
                   <div className="flex justify-between text-xs">
@@ -369,7 +274,6 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   )}
                 </div>
               )}
-
               {pagosAcumulados.length > 0 && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-[#1a1a1a]' : 'border-gray-200'}`}>
                   <p className={`text-xs font-bold mb-2 ${isDark ? 'text-neutral-500' : 'text-gray-600'}`}>Pagos registrados:</p>
@@ -385,7 +289,10 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
             </div>
           </div>
 
+          {/* Body */}
           <div className="flex-1 overflow-y-auto p-6">
+
+            {/* Métodos */}
             <div className="mb-4">
               <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Método de pago</p>
               <div className="flex gap-2">
@@ -394,7 +301,9 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                     key={id}
                     onClick={() => setMetodo(id)}
                     className={`flex-1 p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                      metodo === id ? isDark ? 'border-white/20 bg-[#1a1a1a]' : 'border-gray-300 bg-gray-50' : `border-transparent ${isDark ? 'bg-[#111] hover:bg-[#151515]' : 'bg-gray-50 hover:bg-gray-100'}`
+                      metodo === id
+                        ? isDark ? 'border-white/20 bg-[#1a1a1a]' : 'border-gray-300 bg-gray-50'
+                        : `border-transparent ${isDark ? 'bg-[#111] hover:bg-[#151515]' : 'bg-gray-50 hover:bg-gray-100'}`
                     }`}
                     style={metodo === id && color ? { borderColor: color } : {}}
                   >
@@ -403,14 +312,15 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   </button>
                 ))}
               </div>
-              {(metodo === 'yape' || metodo === 'plin' || metodo === 'tarjeta') && config.usa_culqi && (
-                <div className={`mt-2 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-700'}`}>
+              {(metodo === 'yape' || metodo === 'plin') && usaConfirmacionAutomatica && (
+                <div className={`mt-2 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 ${isDark ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-700'}`}>
                   <CheckCircle2 size={12} />
-                  <span className="font-bold">Validación automática con Culqi</span>
+                  <span className="font-bold">Validación automática activa</span>
                 </div>
               )}
             </div>
 
+            {/* Tabs */}
             {!esVentaRapida && (
               <div className={`flex gap-2 p-1 rounded-xl mb-4 ${isDark ? 'bg-[#111]' : 'bg-gray-100'}`}>
                 {[{ id: 'completo', label: 'Todo', icon: Receipt }, { id: 'dividir', label: 'Dividir', icon: Users }, { id: 'items', label: 'Items', icon: Receipt }].map(({ id, label, icon: Icon }) => (
@@ -421,6 +331,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             )}
 
+            {/* Tab dividir */}
             {!esVentaRapida && tab === 'dividir' && (
               <div className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}>
                 <p className={`text-xs font-bold mb-3 ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>Dividir cuenta entre:</p>
@@ -439,6 +350,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             )}
 
+            {/* Tab items */}
             {!esVentaRapida && tab === 'items' && (
               <div className="max-h-48 overflow-y-auto space-y-2 mb-4">
                 {carrito.map(item => {
@@ -447,7 +359,8 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   const cantMax = item.cantidad || 1;
                   const cantSel = itemsSeleccionados[item.id] || 0;
                   return (
-                    <div key={item.id} className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${cantSel > 0 ? isDark ? 'border-white/20 bg-[#111]' : 'border-gray-300 bg-gray-50' : `border-transparent ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}`} onClick={() => toggleItem(item.id, cantMax)}>
+                    <div key={item.id} onClick={() => toggleItem(item.id, cantMax)}
+                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${cantSel > 0 ? isDark ? 'border-white/20 bg-[#111]' : 'border-gray-300 bg-gray-50' : `border-transparent ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}`}>
                       <div className="flex justify-between items-center">
                         <div className="flex-1">
                           <p className={`font-bold text-sm mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{nombre}</p>
@@ -461,6 +374,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             )}
 
+            {/* Monto a cobrar */}
             <div className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}>
               <div className="flex justify-between items-center">
                 <p className={`text-sm font-bold ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>A cobrar ahora:</p>
@@ -468,11 +382,12 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             </div>
 
+            {/* Input efectivo */}
             {metodo === 'efectivo' && (
               <>
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-neutral-500' : 'text-gray-600'}`}>Monto recibido del cliente</label>
                 <input type="number" step="0.01" value={montoIngresado} onChange={(e) => setMontoIngresado(e.target.value)} placeholder="0.00"
-                  className={`w-full p-4 rounded-xl text-3xl font-black text-center mb-3 border-2 ${isDark ? 'bg-[#111] border-[#1a1a1a] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'} focus:outline-none`} autoFocus />
+                  className={`w-full p-4 rounded-xl text-3xl font-black text-center mb-3 border-2 focus:outline-none ${isDark ? 'bg-[#111] border-[#1a1a1a] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`} autoFocus />
                 <div className="grid grid-cols-4 gap-2 mb-4">
                   {[{ label: 'Exacto', valor: montoCobro.toFixed(2) }, { label: '20', valor: '20' }, { label: '50', valor: '50' }, { label: '100', valor: '100' }].map(({ label, valor }) => (
                     <button key={label} onClick={() => setMontoIngresado(valor)} className={`py-2.5 rounded-xl font-bold text-xs ${isDark ? 'bg-[#111] text-white border border-[#1a1a1a]' : 'bg-gray-100 text-gray-900 border border-gray-200'}`}>
@@ -495,6 +410,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
             )}
           </div>
 
+          {/* Footer */}
           <div className={`p-4 md:p-6 border-t flex-shrink-0 ${isDark ? 'border-[#1a1a1a] bg-[#0a0a0a]' : 'border-gray-200 bg-white'}`}>
             <button
               onClick={procesarCobro}
@@ -503,7 +419,9 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               style={{ backgroundColor: colorPrimario }}
             >
               {metodo === 'efectivo'
-                ? (montoRecibido > 0 && montoRecibido < montoCobro ? `Registrar Parcial S/ ${montoRecibido.toFixed(2)}` : `Confirmar Cobro S/ ${montoCobro.toFixed(2)}`)
+                ? (montoRecibido > 0 && montoRecibido < montoCobro
+                    ? `Registrar Parcial S/ ${montoRecibido.toFixed(2)}`
+                    : `Confirmar Cobro S/ ${montoCobro.toFixed(2)}`)
                 : `Continuar con ${metodo.charAt(0).toUpperCase() + metodo.slice(1)}`}
             </button>
           </div>
@@ -516,7 +434,6 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   // RENDER: Pantalla QR / Confirmación digital
   // ══════════════════════════════════════════════
   if (paso === 'qr') {
-    const usaCulqi   = !!config.usa_culqi;
     const qrEstatico = config[`${metodo}_qr`];
     const numero     = config[`${metodo}_numero`];
 
@@ -524,20 +441,21 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className={`w-full max-w-md rounded-3xl shadow-2xl border ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
 
+          {/* Header */}
           <div className={`p-6 border-b ${isDark ? 'border-[#1a1a1a]' : 'border-gray-100'}`}>
             <div className="flex items-center gap-3 mb-4">
-              <button onClick={() => { detenerPolling(); setQrCulqi(null); setPaso('cobro'); }} className={`p-2 rounded-xl ${isDark ? 'hover:bg-[#1a1a1a] text-neutral-400' : 'hover:bg-gray-100 text-gray-500'}`}>
+              <button onClick={volverACobro} className={`p-2 rounded-xl ${isDark ? 'hover:bg-[#1a1a1a] text-neutral-400' : 'hover:bg-gray-100 text-gray-500'}`}>
                 <ArrowLeft size={20} />
               </button>
               <div className="flex-1">
                 <h2 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   {metodo === 'yape' ? 'Pago con Yape' : metodo === 'plin' ? 'Pago con Plin' : 'Pago con Tarjeta'}
                 </h2>
-                {usaCulqi && (metodo === 'yape' || metodo === 'plin') && (
-                  <p className={`text-xs ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>QR dinámico · Culqi</p>
+                {(metodo === 'yape' || metodo === 'plin') && usaConfirmacionAutomatica && (
+                  <p className={`text-xs ${isDark ? 'text-green-400' : 'text-green-600'}`}>Confirmación automática · WebSocket</p>
                 )}
               </div>
-              <button onClick={() => { detenerPolling(); onClose(); }} className={`p-2 rounded-xl ${isDark ? 'hover:bg-[#1a1a1a] text-neutral-400' : 'hover:bg-gray-100 text-gray-500'}`}>
+              <button onClick={() => { volverACobro(); onClose(); }} className={`p-2 rounded-xl ${isDark ? 'hover:bg-[#1a1a1a] text-neutral-400' : 'hover:bg-gray-100 text-gray-500'}`}>
                 <X size={20} />
               </button>
             </div>
@@ -549,57 +467,8 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
           <div className="p-8">
 
-            {/* ══ YAPE / PLIN con Culqi ══ */}
-            {(metodo === 'yape' || metodo === 'plin') && usaCulqi && (
-              <div className="text-center">
-                {generandoQR && (
-                  <div className="flex flex-col items-center gap-4 py-8">
-                    <Loader2 size={48} className="animate-spin" style={{ color: colorPrimario }} />
-                    <p className={`text-sm font-bold ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>Generando QR...</p>
-                  </div>
-                )}
-                {!generandoQR && qrCulqi && (
-                  <>
-                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4 ${isDark ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-700'}`}>
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-xs font-bold">QR ACTIVO</span>
-                      {pollingActivo && <span className={`text-xs ml-1 ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>· Verificando...</span>}
-                    </div>
-                    <div className={`text-xs font-black mb-4 ${segundosRestantes < 60 ? 'text-red-500' : isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
-                      Expira en {Math.floor(segundosRestantes / 60)}:{String(segundosRestantes % 60).padStart(2, '0')}
-                    </div>
-                    <div className="inline-block p-4 bg-white rounded-2xl shadow-lg mb-4">
-                      {qrCulqi.qrData?.startsWith('http') ? (
-                        <img src={qrCulqi.qrData} alt={`QR ${metodo}`} className="w-52 h-52 rounded-xl" />
-                      ) : (
-                        <QRCodeSVG value={qrCulqi.qrData || 'sin-datos'} size={200} bgColor="#ffffff" fgColor="#000000" level="M" />
-                      )}
-                    </div>
-                    <div className={`p-3 rounded-xl mb-4 ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
-                      <p className={`text-xs ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-                        ✓ El cliente escanea con {metodo === 'yape' ? 'Yape' : 'Plin'}<br />
-                        ✓ El pago se confirma automáticamente
-                      </p>
-                    </div>
-                    <button onClick={validarPagoCulqi} disabled={validandoPago} className={`w-full py-3 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 mb-3 ${isDark ? 'bg-[#1a1a1a] text-neutral-300' : 'bg-gray-100 text-gray-700'}`}>
-                      {validandoPago ? <><Loader2 size={16} className="animate-spin" /> Verificando...</> : 'Verificar manualmente'}
-                    </button>
-                    <button onClick={() => { detenerPolling(); setQrCulqi(null); setPaso('cobro'); }} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-500' : 'bg-gray-50 text-gray-500'}`}>
-                      Cancelar
-                    </button>
-                  </>
-                )}
-                {!generandoQR && !qrCulqi && (
-                  <div className="py-8">
-                    <p className={`text-sm mb-4 ${isDark ? 'text-red-400' : 'text-red-600'}`}>No se pudo generar el QR</p>
-                    <button onClick={() => generarQRCulqi(montoCobro, metodo)} className="w-full py-3 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>Reintentar</button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ══ YAPE / PLIN sin Culqi ══ */}
-            {(metodo === 'yape' || metodo === 'plin') && !usaCulqi && (qrEstatico || numero) && (
+            {/* ══ YAPE / PLIN ══ */}
+            {(metodo === 'yape' || metodo === 'plin') && (
               <div className="text-center">
                 {qrEstatico && (
                   <>
@@ -611,60 +480,92 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                 )}
                 {numero && (
                   <div className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-[#111]' : 'bg-gray-100'}`}>
-                    <p className={`text-xs mb-1 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Número de {metodo.charAt(0).toUpperCase() + metodo.slice(1)}</p>
+                    <p className={`text-xs mb-1 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Número de {metodo === 'yape' ? 'Yape' : 'Plin'}</p>
                     <p className={`text-2xl font-black font-mono ${isDark ? 'text-white' : 'text-gray-900'}`}>{numero}</p>
                   </div>
                 )}
-                <div className={`p-3 rounded-xl mb-6 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
-                  <p className={`text-xs ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>⚠️ Verifica manualmente que el pago haya ingresado antes de confirmar</p>
-                </div>
-                <button onClick={() => registrarPago(montoCobro, 0)} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
-                  Confirmar Pago Recibido
-                </button>
-              </div>
-            )}
 
-            {/* ══ TARJETA con Culqi ══ */}
-            {metodo === 'tarjeta' && usaCulqi && (
-              <div className="text-center py-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                  <CreditCard size={40} />
-                </div>
-                <h3 className={`text-lg font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>Pasarela Culqi</h3>
-                <p className={`text-sm mb-6 max-w-xs mx-auto ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>
-                  Se abrirá la pasarela segura de Culqi para ingresar los datos de la tarjeta.
-                </p>
-                {procesandoTarjeta ? (
-                  <div className="flex flex-col items-center gap-4 py-4">
-                    <Loader2 size={40} className="animate-spin" style={{ color: colorPrimario }} />
-                    <p className={`text-sm font-bold ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>Procesando pago...</p>
-                  </div>
-                ) : (
+                {/* ── Modo AUTOMÁTICO ── */}
+                {usaConfirmacionAutomatica ? (
                   <>
-                    <div className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-blue-500/5 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
-                      <p className={`text-xs ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-                        ✓ Visa, Mastercard, Amex, Diners<br />
-                        ✓ Confirmación automática
+                    {notificaciones.length === 0 && (
+                      <div className={`p-4 rounded-xl mb-4 flex items-center gap-3 ${isDark ? 'bg-[#111] border border-[#222]' : 'bg-gray-50 border border-gray-200'}`}>
+                        <Loader2 size={18} className="animate-spin shrink-0" style={{ color: colorPrimario }} />
+                        <p className={`text-sm text-left ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>
+                          Esperando notificación de pago en tiempo real...
+                        </p>
+                      </div>
+                    )}
+                    {notificaciones.length > 0 && (
+                      <div className="mb-4 space-y-3">
+                        <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
+                          {notificaciones.length === 1 ? 'Pago detectado — confirma con un clic' : `${notificaciones.length} pagos detectados — elige el correcto`}
+                        </p>
+                        {notificaciones.map((n) => {
+                          const esYape  = n.tipo === 'YAPE';
+                          const elegida = notificacionElegida?.notificacion_id === n.notificacion_id;
+                          return (
+                            <button
+                              key={n.notificacion_id}
+                              onClick={() => confirmarNotificacion(n)}
+                              disabled={!!notificacionElegida}
+                              className={`w-full py-4 px-5 rounded-xl font-bold text-white flex items-center justify-between transition-all ${elegida ? 'opacity-60 cursor-wait' : 'hover:opacity-90 active:scale-[0.98]'}`}
+                              style={{ backgroundColor: esYape ? '#6d28d9' : '#14b8a6' }}
+                            >
+                              <div className="text-left">
+                                <p className="text-sm opacity-80">{n.nombre_cliente}</p>
+                                {esYape && n.codigo_seguridad && (
+                                  <p className="text-3xl font-black tracking-widest mt-0.5">{n.codigo_seguridad}</p>
+                                )}
+                                {!esYape && <p className="text-sm mt-0.5 opacity-90">Pago desde Plin</p>}
+                              </div>
+                              <div className="text-right shrink-0 ml-4">
+                                <p className="text-xs opacity-70">S/</p>
+                                <p className="text-2xl font-black">{parseFloat(n.monto).toFixed(2)}</p>
+                                {elegida && <Loader2 size={16} className="animate-spin mt-1 ml-auto" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => registrarPago(montoCobro, 0)}
+                      className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-500 hover:text-neutral-300' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}
+                    >
+                      Confirmar manualmente
+                    </button>
+                  </>
+                ) : (
+                  /* ── Modo MANUAL ── */
+                  <>
+                    <div className={`p-3 rounded-xl mb-6 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
+                      <p className={`text-xs ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+                        ⚠️ Verifica manualmente que el pago haya ingresado antes de confirmar
                       </p>
                     </div>
-                    <button onClick={abrirCheckoutTarjeta} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
-                      Abrir Pasarela Culqi
+                    <button onClick={() => registrarPago(montoCobro, 0)} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
+                      Confirmar Pago Recibido
                     </button>
                   </>
                 )}
               </div>
             )}
 
-            {/* ══ TARJETA sin Culqi ══ */}
-            {metodo === 'tarjeta' && !usaCulqi && (
+            {/* ══ TARJETA — solo manual ══ */}
+            {metodo === 'tarjeta' && (
               <div className="text-center py-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gray-500/10 text-gray-500 flex items-center justify-center">
+                <div className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
                   <CreditCard size={40} />
                 </div>
                 <h3 className={`text-lg font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>Terminal POS Físico</h3>
-                <p className={`text-sm mb-6 max-w-xs mx-auto ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>Procesa el cobro en tu terminal físico y confirma manualmente.</p>
+                <p className={`text-sm mb-6 max-w-xs mx-auto ${isDark ? 'text-neutral-400' : 'text-gray-600'}`}>
+                  Procesa el cobro en tu terminal físico y confirma manualmente.
+                </p>
                 <div className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
-                  <p className={`text-xs ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>⚠️ Asegúrate que la transacción fue aprobada antes de confirmar</p>
+                  <p className={`text-xs ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+                    ⚠️ Asegúrate que la transacción fue aprobada antes de confirmar
+                  </p>
                 </div>
                 <button onClick={() => registrarPago(montoCobro, 0)} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
                   Confirmar Pago Aprobado
@@ -711,6 +612,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               )}
             </div>
 
+            {/* Ticket WhatsApp */}
             <div className={`p-6 rounded-2xl mb-6 ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}>
               <div className="flex items-center gap-3 mb-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-green-500/10 text-green-500' : 'bg-green-50 text-green-600'}`}>

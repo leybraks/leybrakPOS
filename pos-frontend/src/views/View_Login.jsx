@@ -4,18 +4,16 @@ import api from '../api/api';
 import { useToast } from '../context/ToastContext';
 import { 
   User, Lock, Eye, EyeOff, Loader2, ArrowLeft, 
-  MapPin, MonitorSmartphone, Settings, ChevronRight, 
+  MapPin, MonitorSmartphone, ChevronRight, 
   Delete, Wallet, AlertCircle, LayoutDashboard
 } from 'lucide-react';
 
-// Tu logo local
 import logoLeybrak from '../assets/logoSinFondoCompacto copy.png';
 
 export default function LoginView({ onAccesoConcedido }) {
   const toast = useToast();
 
-  // ── ESTADOS Y LÓGICA INTACTOS ──────────────────────────────────────────
-  const tabletConfigurada = localStorage.getItem('tablet_token') && localStorage.getItem('sede_id');
+  const tabletConfigurada = !!localStorage.getItem('sede_id');
   const [modo, setModo] = useState(tabletConfigurada ? 'empleado' : 'inicio');
 
   const [email, setEmail] = useState('');
@@ -34,13 +32,16 @@ export default function LoginView({ onAccesoConcedido }) {
   const [fondoCaja, setFondoCaja] = useState('');
   const [empleadoActual, setEmpleadoActual] = useState(null);
 
-  const [intentosFallidos, setIntentosFallidos] = useState(0);
-  const [bloqueadoHasta, setBloqueadoHasta] = useState(null);
-  const MAX_INTENTOS = 3;
-  const BLOQUEO_MS = 2 * 60 * 1000;
+  // ── Bloqueo manejado por backend — solo mostramos el countdown ──
+  const [bloqueadoSegundos, setBloqueadoSegundos] = useState(0);
+  const estaBlockeado = bloqueadoSegundos > 0;
 
-  const estaBlockeado = bloqueadoHasta && Date.now() < bloqueadoHasta;
-  const segundosBloqueo = bloqueadoHasta ? Math.ceil((bloqueadoHasta - Date.now()) / 1000) : 0;
+  useEffect(() => {
+    if (bloqueadoSegundos <= 0) return;
+    const timer = setTimeout(() => setBloqueadoSegundos(s => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [bloqueadoSegundos]);
+
   const sedeName = localStorage.getItem('sede_nombre') || 'Sede Principal';
 
   useEffect(() => {
@@ -53,6 +54,17 @@ export default function LoginView({ onAccesoConcedido }) {
 
   useEffect(() => {
     if (modo !== 'empleado') return;
+
+    // Consultar bloqueo activo al cargar
+    const sedeId = localStorage.getItem('sede_id');
+    if (sedeId) {
+      api.get(`/empleados/estado-bloqueo/?sede_id=${sedeId}`)
+        .then(res => {
+          if (res.data.bloqueado) setBloqueadoSegundos(res.data.segundos_restantes);
+        })
+        .catch(() => {});
+    }
+
     const verificarCaja = async () => {
       try {
         const res = await getEstadoCaja();
@@ -118,12 +130,16 @@ export default function LoginView({ onAccesoConcedido }) {
 
   const procesarPin = async (accion) => {
     if (pin.length !== 4) return;
-    if (estaBlockeado) { toast.error(`Terminal bloqueada. Intenta en ${segundosBloqueo}s.`); return; }
+    if (estaBlockeado) {
+      toast.error(`Terminal bloqueada. Espera ${bloqueadoSegundos}s.`);
+      return;
+    }
     try {
       const respuesta = await loginPinEmpleado({ pin, sede_id: localStorage.getItem('sede_id'), accion });
       const empleado = respuesta.data;
-      setIntentosFallidos(0);
-      setBloqueadoHasta(null);
+
+      // Éxito — limpiar bloqueo local
+      setBloqueadoSegundos(0);
       localStorage.setItem('empleado_nombre', empleado.nombre);
       localStorage.setItem('usuario_rol', empleado.rol);
 
@@ -158,18 +174,14 @@ export default function LoginView({ onAccesoConcedido }) {
     } catch (error) {
       const msg = error.response?.data?.error || 'PIN incorrecto.';
       const restantes = error.response?.data?.segundos_restantes;
+
       if (error.response?.status === 429) {
+        // Bloqueo del backend — activar countdown local para UX
+        setBloqueadoSegundos(restantes || 120);
         toast.error(msg);
-        if (restantes) setBloqueadoHasta(Date.now() + restantes * 1000);
       } else {
-        const nuevos = intentosFallidos + 1;
-        setIntentosFallidos(nuevos);
-        if (nuevos >= MAX_INTENTOS) {
-          setBloqueadoHasta(Date.now() + BLOQUEO_MS);
-          toast.error('Demasiados intentos. Terminal bloqueada 2 minutos.');
-        } else {
-          toast.error(`PIN incorrecto. Intento ${nuevos}/${MAX_INTENTOS}.`);
-        }
+        // PIN incorrecto — el backend ya devuelve "Intentos restantes: N"
+        toast.error(msg);
       }
       setPin('');
     }
@@ -189,21 +201,18 @@ export default function LoginView({ onAccesoConcedido }) {
   };
 
   // ════════════════════════════════════════════════════════════════════════
-  // VISTA 1: TERMINAL POS (PIN) - Alineado al Dashboard Dark Mode
+  // VISTA 1: TERMINAL POS (PIN)
   // ════════════════════════════════════════════════════════════════════════
   if (modo === 'empleado') {
     return (
       <div className="min-h-screen font-sans flex flex-col items-center justify-center bg-[#050505] text-white select-none px-4 relative overflow-hidden">
         
-        {/* Glow azul muy sutil en el fondo */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#3b82f6] opacity-[0.03] rounded-full blur-[120px] pointer-events-none" />
 
         <div className="w-full max-w-[340px] flex flex-col items-center relative z-10">
           
-          {/* Header Terminal */}
           <div className="text-center mb-8 w-full">
             <div className="flex items-center justify-center gap-2 mb-4">
-              {/* Si tienes el logo, úsalo aquí. Recreo el texto de tu captura */}
               <span className="font-black text-2xl text-white tracking-tight">LEYBRAK<span className="text-[#3b82f6]">POS</span></span>
             </div>
             <h2 className="text-gray-300 font-semibold text-sm tracking-wide">{negocioNombre || 'Terminal de Caja'}</h2>
@@ -234,15 +243,17 @@ export default function LoginView({ onAccesoConcedido }) {
             ))}
           </div>
 
-          {/* Alertas */}
+          {/* Alerta de bloqueo */}
           {estaBlockeado && (
             <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-4 w-full justify-center">
               <Lock size={14} className="text-red-400" />
-              <span className="text-red-400 text-[11px] font-bold uppercase tracking-widest">Bloqueado {segundosBloqueo}s</span>
+              <span className="text-red-400 text-[11px] font-bold uppercase tracking-widest">
+                Bloqueado {bloqueadoSegundos}s
+              </span>
             </div>
           )}
 
-          {/* Teclado - Estilo Dashboard */}
+          {/* Teclado */}
           <div className="grid grid-cols-3 gap-3 w-full mb-6">
             {[1,2,3,4,5,6,7,8,9].map(num => (
               <button
@@ -267,7 +278,7 @@ export default function LoginView({ onAccesoConcedido }) {
             onClick={() => procesarPin('entrar')} disabled={estaBlockeado || pin.length < 4}
             className="w-full py-4 rounded-xl font-bold text-sm tracking-wide transition-all active:scale-[0.98] disabled:opacity-50 bg-[#3b82f6] hover:bg-[#2563eb] text-white"
           >
-            {estaBlockeado ? 'Esperar...' : 'Ingresar'}
+            {estaBlockeado ? `Esperar ${bloqueadoSegundos}s...` : 'Ingresar'}
           </button>
         </div>
 
@@ -299,7 +310,8 @@ export default function LoginView({ onAccesoConcedido }) {
             </div>
           </div>
         )}
-        {/* Enlace Legal - Siempre visible */}
+
+        {/* Botón legal */}
         <a
           href="/legal.html"
           target="_blank"
@@ -314,17 +326,15 @@ export default function LoginView({ onAccesoConcedido }) {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // VISTA 2: WEB LOGIN - Estilo Dashboard Leybrak (Dark SaaS)
+  // VISTA 2: WEB LOGIN
   // ════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen flex bg-[#050505] font-sans overflow-hidden text-white">
 
-      {/* PANEL IZQUIERDO (Formulario Dark) */}
+      {/* PANEL IZQUIERDO */}
       <div className="w-full lg:w-[45%] flex flex-col justify-center px-8 sm:px-16 lg:px-24 relative z-10 bg-[#0a0a0a] border-r border-[#1a1a1a]">
         
-        {/* Logo Superior */}
         <div className="absolute top-10 left-8 sm:left-16 lg:left-24 flex items-center gap-2">
-          {/* Usando texto para igualar la captura perfectamente */}
           <span className="font-black text-xl tracking-tight">LEYBRAK<span className="text-[#3b82f6]">POS</span></span>
           <span className="ml-2 px-2 py-0.5 rounded-md bg-[#121212] border border-[#222] text-[9px] text-gray-500 font-bold uppercase tracking-widest">
             SAAS PLATFORM
@@ -333,7 +343,7 @@ export default function LoginView({ onAccesoConcedido }) {
 
         <div className="w-full max-w-[380px] mx-auto mt-16 lg:mt-0">
           
-          {/* ── ESTADO: INICIO (Lobby) ── */}
+          {/* INICIO */}
           {modo === 'inicio' && (
             <div className="animate-fadeIn">
               <h1 className="text-3xl font-bold tracking-tight mb-2">Bienvenido</h1>
@@ -365,7 +375,7 @@ export default function LoginView({ onAccesoConcedido }) {
             </div>
           )}
 
-          {/* ── ESTADO: LOGIN FORM ── */}
+          {/* LOGIN FORM */}
           {(modo === 'login_erp' || modo === 'login_pos') && (
             <div className="animate-fadeIn">
               <button onClick={() => setModo('inicio')} className="flex items-center gap-2 text-gray-500 hover:text-white text-xs font-semibold mb-8 transition-colors">
@@ -376,7 +386,6 @@ export default function LoginView({ onAccesoConcedido }) {
               <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales para acceder al sistema.</p>
 
               <form onSubmit={e => handleLoginSubmit(e, modo === 'login_erp' ? 'erp' : 'pos')} className="space-y-4">
-                
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Usuario / Correo</label>
                   <div className="relative">
@@ -404,7 +413,6 @@ export default function LoginView({ onAccesoConcedido }) {
                   </div>
                 </div>
 
-                {/* Botón azul estilo Dashboard */}
                 <button
                   type="submit" disabled={loadingAuth}
                   className="w-full py-3.5 mt-4 rounded-xl font-bold text-sm text-white transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2 bg-[#3b82f6] hover:bg-[#2563eb]"
@@ -415,7 +423,7 @@ export default function LoginView({ onAccesoConcedido }) {
             </div>
           )}
 
-          {/* ── ESTADO: SETUP SEDE ── */}
+          {/* SETUP SEDE */}
           {modo === 'setup_sede' && (
             <div className="animate-fadeIn">
               <h2 className="text-3xl font-bold tracking-tight mb-2">Configurar Caja</h2>
@@ -447,24 +455,20 @@ export default function LoginView({ onAccesoConcedido }) {
         </div>
       </div>
 
-      {/* PANEL DERECHO (Abstracto Dark Mode - Refuerza la identidad del software) */}
+      {/* PANEL DERECHO */}
       <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#050505] overflow-hidden">
         
-        {/* Glows ambientales muy sutiles */}
         <div className="absolute w-[800px] h-[800px] bg-[#3b82f6] opacity-[0.02] rounded-full blur-[120px] top-1/4 -right-20 pointer-events-none" />
         <div className="absolute w-[400px] h-[400px] bg-[#3b82f6] opacity-[0.015] rounded-full blur-[100px] bottom-10 left-10 pointer-events-none" />
 
-        {/* Patrón de puntos tipo grid SaaS */}
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
           backgroundSize: '32px 32px'
         }}></div>
 
-        {/* Elemento central visual (Dashboard Mockup Minimalista) */}
         <div className="relative z-10 w-full max-w-lg perspective-1000">
           <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-2xl shadow-2xl p-6 transform rotate-y-[-5deg] rotate-x-[5deg] transition-transform duration-700 hover:rotate-0">
             
-            {/* Header del mock */}
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#1e1e1e]">
               <div>
                 <div className="h-5 w-32 bg-[#1a1a1a] rounded mb-2"></div>
@@ -476,7 +480,6 @@ export default function LoginView({ onAccesoConcedido }) {
               </div>
             </div>
 
-            {/* Tarjetas de estadísticas mockeadas */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="bg-[#121212] border border-[#1e1e1e] rounded-xl p-4">
@@ -486,16 +489,13 @@ export default function LoginView({ onAccesoConcedido }) {
               ))}
             </div>
 
-            {/* Gráfico mockeado */}
             <div className="bg-[#121212] border border-[#1e1e1e] rounded-xl p-4 h-40 flex items-end gap-2">
-               {[30, 50, 40, 70, 55, 90, 60, 80, 45, 100].map((h, i) => (
+              {[30, 50, 40, 70, 55, 90, 60, 80, 45, 100].map((h, i) => (
                 <div key={i} className="flex-1 bg-[#1a1a1a] rounded-t-sm hover:bg-[#3b82f6]/50 transition-colors" style={{ height: `${h}%` }}></div>
               ))}
             </div>
-
           </div>
 
-          {/* Floating UI Element */}
           <div className="absolute -right-8 -bottom-8 bg-[#121212] border border-[#1e1e1e] rounded-xl p-4 w-48 shadow-2xl flex items-center gap-3 animate-pulse">
             <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
             <div className="flex-1">
@@ -506,6 +506,7 @@ export default function LoginView({ onAccesoConcedido }) {
         </div>
       </div>
 
+      {/* Botón legal */}
       <a
         href="/legal.html"
         target="_blank"

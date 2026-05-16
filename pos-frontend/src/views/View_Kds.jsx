@@ -120,7 +120,6 @@ export default function KdsView({ onVolver }) {
         }
 
         if (data.type === 'solicitud_cambio_nueva') {
-          console.log('🤖 Solicitud del Bot recibida en KDS:', data);
           setSolicitudesBot(prev => {
             if (prev.some(s => s.solicitud_id === data.solicitud_id)) return prev;
             return [data, ...prev];

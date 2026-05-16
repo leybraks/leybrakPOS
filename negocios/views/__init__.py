@@ -70,9 +70,7 @@ from .suscripcion_views import (
     estado_suscripcion,
 )
 
-from .culqi_views import (
-    generar_qr_culqi,
-    estado_orden_culqi,
-    cobrar_tarjeta_culqi,
-    webhook_culqi,
+from .pago_yape_views import (
+    recibir_notificacion_yape,
+    confirmar_pago_yape,
 )

@@ -51,8 +51,10 @@ export const useErpDashboard = () => {
     // Billeteras
     yape_numero: '', yape_qrPreview: null, yape_qrFile: null, yape_qr: null,
     plin_numero: '', plin_qrPreview: null, plin_qrFile: null, plin_qr: null,
-    // Culqi
-    usa_culqi: false, culqi_public_key: '', culqi_private_key: '',
+    // Automatización Yape/Plin
+    confirmacion_automatica: false,
+    device_token: null,
+    negocio_id: null,
     // Módulos — camelCase (para manejarGuardarConfig y hayCambiosPendientes)
     modSalon: true, modCocina: false, modDelivery: false, modInventario: false,
     modClientes: false, modFacturacion: false, modCartaQr: false, modBotWsp: false, modMl: false,
@@ -214,10 +216,10 @@ export const useErpDashboard = () => {
           yape_qr: datosBD.yape_qr || null,
           plin_numero: datosBD.plin_numero || '',
           plin_qr: datosBD.plin_qr || null,
-          // Culqi
-          usa_culqi: datosBD.usa_culqi || false,
-          culqi_public_key: datosBD.culqi_public_key || '',
-          culqi_private_key: datosBD.culqi_private_key || '',
+          // ✅ Automatización Yape/Plin
+          confirmacion_automatica: datosBD.confirmacion_automatica || false,
+          device_token:            datosBD.device_token            || null,
+          negocio_id:              datosBD.id,
           // Módulos camelCase (para manejarGuardarConfig — NO CAMBIAR)
           modSalon:       datosBD.mod_salon_activo       ?? true,
           modCocina:      datosBD.mod_cocina_activo      ?? false,
@@ -243,7 +245,7 @@ export const useErpDashboard = () => {
           color_primario: datosBD.color_primario || '#ff5a1f',
           temaFondo:      datosBD.tema_fondo     || 'dark',
           tema_fondo:     datosBD.tema_fondo     || 'dark',
-          // Plan — ambas versiones
+          // Plan
           permisosPlan:  datosBD.plan_detalles || {},
           plan_detalles: datosBD.plan_detalles || null,
         };
@@ -252,25 +254,26 @@ export const useErpDashboard = () => {
         setConfig(configData);
         setConfigOriginal(JSON.parse(JSON.stringify(configData)));
         setConfiguracionGlobal({
-          colorPrimario: configData.colorPrimario,
-          temaFondo:     configData.temaFondo,
-          yape_numero:   configData.yape_numero,
-          yape_qr:       configData.yape_qr,
-          plin_numero:   configData.plin_numero,
-          plin_qr:       configData.plin_qr,
-          usa_culqi:     configData.usa_culqi,
-          culqi_public_key: configData.culqi_public_key,
+          colorPrimario:           configData.colorPrimario,
+          temaFondo:               configData.temaFondo,
+          yape_numero:             configData.yape_numero,
+          yape_qr:                 configData.yape_qr,
+          plin_numero:             configData.plin_numero,
+          plin_qr:                 configData.plin_qr,
+          // ✅ Automatización
+          confirmacion_automatica: configData.confirmacion_automatica,
+          device_token:            configData.device_token,
+          negocio_id:              configData.negocio_id,
           modulos: {
-            // ✅ Activo solo si el dueño lo activó Y el plan lo incluye
-            salon:          configData.modSalon,                                          // base, siempre
-            cocina:         configData.modCocina      && (plan.modulo_kds        ?? false),
-            delivery:       configData.modDelivery    && (plan.modulo_delivery   ?? false),
-            inventario:     configData.modInventario  && (plan.modulo_inventario ?? false),
-            clientes:       configData.modClientes,                                       // base, siempre
-            facturacion:    configData.modFacturacion,                                    // base, siempre
-            cartaQr:        configData.modCartaQr     && (plan.modulo_carta_qr   ?? false),
-            botWsp:         configData.modBotWsp      && (plan.modulo_bot_wsp    ?? false),
-            machineLearning:configData.modMl          && (plan.modulo_ml         ?? false),
+            salon:           configData.modSalon,
+            cocina:          configData.modCocina      && (plan.modulo_kds        ?? false),
+            delivery:        configData.modDelivery    && (plan.modulo_delivery   ?? false),
+            inventario:      configData.modInventario  && (plan.modulo_inventario ?? false),
+            clientes:        configData.modClientes,
+            facturacion:     configData.modFacturacion,
+            cartaQr:         configData.modCartaQr     && (plan.modulo_carta_qr   ?? false),
+            botWsp:          configData.modBotWsp      && (plan.modulo_bot_wsp    ?? false),
+            machineLearning: configData.modMl          && (plan.modulo_ml         ?? false),
           }
         });
       } catch (error) { console.error("Error config:", error); }
@@ -336,12 +339,10 @@ export const useErpDashboard = () => {
     setMenuAbierto(false);
   };
 
-  // ✅ FIX: restaura desde configOriginal (foto al entrar), no desde prev (estado actual modificado)
   const descartarCambios = () => {
     if (configOriginal) {
       setConfig({
         ...configOriginal,
-        // Sincroniza snake_case desde los valores originales camelCase
         mod_salon_activo:       configOriginal.modSalon,
         mod_cocina_activo:      configOriginal.modCocina,
         mod_inventario_activo:  configOriginal.modInventario,
@@ -388,14 +389,18 @@ export const useErpDashboard = () => {
 
       const formData = new FormData();
 
-      formData.append('ruc', config.ruc || '');
+      // Identidad
+      formData.append('ruc',          config.ruc          || '');
       formData.append('razon_social', config.razon_social || '');
+
+      // Billeteras
       formData.append('yape_numero', config.yape_numero || '');
       formData.append('plin_numero', config.plin_numero || '');
-      formData.append('culqi_public_key', config.culqi_public_key || '');
-      formData.append('culqi_private_key', config.culqi_private_key || '');
-      formData.append('usa_culqi', config.usa_culqi ? 'True' : 'False');
 
+      // ✅ Automatización Yape/Plin (reemplaza Culqi)
+      formData.append('confirmacion_automatica', config.confirmacion_automatica ? 'True' : 'False');
+
+      // Archivos
       if (config.logoFile)    formData.append('logo',    config.logoFile);
       if (config.yape_qrFile) formData.append('yape_qr', config.yape_qrFile);
       if (config.plin_qrFile) formData.append('plin_qr', config.plin_qrFile);
@@ -420,26 +425,27 @@ export const useErpDashboard = () => {
 
       const plan = config.plan_detalles || {};
 
+      // ✅ Store global actualizado con automatización
       setConfiguracionGlobal({
-        colorPrimario: config.colorPrimario,
-        temaFondo:     config.temaFondo,
-        yape_numero:   config.yape_numero,
-        yape_qr:       config.yape_qrPreview || config.yape_qr,
-        plin_numero:   config.plin_numero,
-        plin_qr:       config.plin_qrPreview || config.plin_qr,
-        usa_culqi:     config.usa_culqi,
-        culqi_public_key: config.culqi_public_key,
+        colorPrimario:           config.colorPrimario,
+        temaFondo:               config.temaFondo,
+        yape_numero:             config.yape_numero,
+        yape_qr:                 config.yape_qrPreview || config.yape_qr,
+        plin_numero:             config.plin_numero,
+        plin_qr:                 config.plin_qrPreview || config.plin_qr,
+        confirmacion_automatica: config.confirmacion_automatica,
+        device_token:            config.device_token,
+        negocio_id:              parseInt(negocioId),
         modulos: {
-          // ✅ Activo solo si el dueño lo activó Y el plan lo incluye
-          salon:          config.modSalon,
-          cocina:         config.modCocina      && (plan.modulo_kds        ?? false),
-          delivery:       config.modDelivery    && (plan.modulo_delivery   ?? false),
-          inventario:     config.modInventario  && (plan.modulo_inventario ?? false),
-          clientes:       config.modClientes,
-          facturacion:    config.modFacturacion,
-          cartaQr:        config.modCartaQr     && (plan.modulo_carta_qr   ?? false),
-          botWsp:         config.modBotWsp      && (plan.modulo_bot_wsp    ?? false),
-          machineLearning:config.modMl          && (plan.modulo_ml         ?? false),
+          salon:           config.modSalon,
+          cocina:          config.modCocina      && (plan.modulo_kds        ?? false),
+          delivery:        config.modDelivery    && (plan.modulo_delivery   ?? false),
+          inventario:      config.modInventario  && (plan.modulo_inventario ?? false),
+          clientes:        config.modClientes,
+          facturacion:     config.modFacturacion,
+          cartaQr:         config.modCartaQr     && (plan.modulo_carta_qr   ?? false),
+          botWsp:          config.modBotWsp      && (plan.modulo_bot_wsp    ?? false),
+          machineLearning: config.modMl          && (plan.modulo_ml         ?? false),
         }
       });
 
@@ -451,8 +457,7 @@ export const useErpDashboard = () => {
       } = config;
       setConfigOriginal(JSON.parse(JSON.stringify(configSegura)));
 
-      // ✅ FIX: sincroniza snake_case con los camelCase recién guardados
-      // para que Tab_Modulos refleje el estado correcto sin recargar
+      // Sincroniza snake_case con los camelCase recién guardados
       setConfig(prev => ({
         ...prev,
         mod_salon_activo:       prev.modSalon,
@@ -468,7 +473,7 @@ export const useErpDashboard = () => {
         tema_fondo:             prev.temaFondo,
       }));
 
-      alert("✅ ¡Configuración e imágenes guardadas!");
+      alert("✅ ¡Configuración guardada!");
     } catch (error) { 
       console.error(error);
       alert("❌ Error al guardar. Verifica la consola."); 

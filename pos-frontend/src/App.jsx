@@ -9,7 +9,11 @@ import KdsView from './views/View_Kds';
 import ErpDashboard from './views/View_Erp';
 import PublicMenu from './features/public/PublicMenu';
 import api from '../src/api/api';
+import usePosStore from './store/usePosStore';
 
+if (typeof window !== 'undefined') {
+  window.__getStoreConfig = () => usePosStore.getState().configuracionGlobal;
+}
 const ROL_A_VISTA = {
   'superadmin':    'erp',
   'dueño':         'erp',
@@ -42,40 +46,39 @@ const VistaInternaPOS = () => {
   };
 
   useEffect(() => {
-    const verificar = async () => {
+  const verificar = async () => {
+    try {
+      // 1. ¿Hay sesión de empleado activa? (cookie empleado_session)
       try {
-        // 1. ¿Hay sesión de empleado activa? (cookie empleado_session)
-        try {
-          const res = await verificarSesionEmpleado();
-          if (res.data.autenticado) {
-            const { rol, sede_id, nombre, empleado_id, negocio_id } = res.data.empleado;
-            const vistaDestino = getRolVista(rol);
+        const res = await verificarSesionEmpleado();
+        if (res.data.autenticado) {
+          const { rol, sede_id, nombre, empleado_id, negocio_id } = res.data.empleado;
+          const vistaDestino = getRolVista(rol);
+          if (!vistaDestino) { setVista('sin_permiso'); return; }
 
-            if (!vistaDestino) { setVista('sin_permiso'); return; }
+          localStorage.setItem('sede_id',         sede_id);
+          localStorage.setItem('empleado_id',     empleado_id);
+          localStorage.setItem('empleado_nombre', nombre);
+          localStorage.setItem('negocio_id',      negocio_id);
+          localStorage.setItem('usuario_rol',     rol);
 
-            localStorage.setItem('sede_id',         sede_id);
-            localStorage.setItem('empleado_id',     empleado_id);
-            localStorage.setItem('empleado_nombre', nombre);
-            localStorage.setItem('negocio_id',      negocio_id);
-            localStorage.setItem('usuario_rol',     rol);
+          const sus = await verificarSuscripcion();
+          if (sus && !sus.puede_operar) { setVista('bloqueado'); return; }
 
-            const sus = await verificarSuscripcion();
-            if (sus && !sus.puede_operar) { setVista('bloqueado'); return; }
-
-            setSesion({ rol, nombre, sede_id });
-            setVista(vistaDestino);
-            return;
-          }
-        } catch (_) {
-          // No hay sesión de empleado — intentar con dueño
+          setSesion({ rol, nombre, sede_id });
+          setVista(vistaDestino);
+          return;
         }
+      } catch (_) {
+        // No hay sesión de empleado
+      }
 
-        // 2. ¿Hay sesión de dueño activa? (cookie JWT)
+      // 2. ¿Hay sesión de dueño activa? (cookie JWT) — tiene prioridad sobre tablet
+      try {
         const res = await api.get('/verificar-sesion/');
         if (res.data.autenticado) {
           const { rol, negocio_id } = res.data.user;
           const vistaDestino = getRolVista(rol);
-
           if (!vistaDestino) { setVista('sin_permiso'); return; }
 
           if (negocio_id) localStorage.setItem('negocio_id', negocio_id);
@@ -87,8 +90,19 @@ const VistaInternaPOS = () => {
           setVista(vistaDestino);
           return;
         }
+      } catch (_) {
+        // No hay sesión de dueño
+      }
 
+      // 3. Recién aquí: si hay sede_id guardada es tablet → forzar PIN
+      if (localStorage.getItem('sede_id')) {
         setVista('login');
+        return;
+      }
+
+      // 4. Sin nada → login
+      setVista('login');
+
       } catch {
         setVista('login');
       } finally {

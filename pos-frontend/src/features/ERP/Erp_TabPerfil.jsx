@@ -189,89 +189,58 @@ export default function Tab_Perfil({ config, setConfig, isDark, colorPrimario })
         </div>
 
         {/* ========================================== */}
-        {/* 💳 3. CULQI — Yape / Plin / Tarjeta        */}
+        {/* ⚡ 3. AUTOMATIZACIÓN YAPE / PLIN           */}
         {/* ========================================== */}
         <div className={`p-6 md:p-8 rounded-[2rem] border shadow-sm ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl border ${config.usa_culqi ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' : isDark ? 'bg-[#1a1a1a] border-[#333] text-neutral-400' : 'bg-gray-100 border-gray-200 text-gray-400'}`}>
-                <CreditCard size={20} />
+              <div className={`p-2.5 rounded-xl border ${config.confirmacion_automatica ? 'bg-green-500/10 border-green-500/20 text-green-500' : isDark ? 'bg-[#1a1a1a] border-[#333] text-neutral-400' : 'bg-gray-100 border-gray-200 text-gray-400'}`}>
+                <Smartphone size={20} />
               </div>
-              <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Pagos Culqi</h3>
+              <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Auto-validación</h3>
             </div>
             {/* Toggle */}
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={config.usa_culqi || false}
-                onChange={(e) => setConfig({ ...config, usa_culqi: e.target.checked })}
+                checked={config.confirmacion_automatica || false}
+                onChange={(e) => setConfig({ ...config, confirmacion_automatica: e.target.checked })}
               />
               <div
                 className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${isDark ? 'bg-[#333]' : 'bg-gray-300'}`}
-                style={config.usa_culqi ? { backgroundColor: colorPrimario } : {}}
+                style={config.confirmacion_automatica ? { backgroundColor: colorPrimario } : {}}
               />
             </label>
           </div>
 
-          <p className={`text-xs mb-6 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
-            Activa cobros con QR dinámico para Yape y Plin, y pagos con tarjeta de crédito/débito.
+          <p className={`text-xs mb-4 ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
+            Activa la validación automática de Yape y Plin mediante la App Leybrak instalada en el celular del negocio.
           </p>
 
-          {config.usa_culqi && (
-            <div className="space-y-4 animate-fadeIn">
-              {/* Public Key */}
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
-                  Llave Pública (Public Key)
-                </label>
-                <input
-                  type="text"
-                  value={config.culqi_public_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_public_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="pk_test_..."
-                />
-              </div>
+          {config.confirmacion_automatica && (
+            <div className={`p-3 rounded-xl ${isDark ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
+              <p className={`text-xs ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                ✓ Captura notificaciones push de Yape y Plin<br />
+                ✓ Confirmación con un clic en la pantalla del cajero<br />
+                ✓ Código de seguridad de 3 dígitos anti-fraude<br />
+                ✓ 0% de comisión — el dinero va directo a tu cuenta
+              </p>
+            </div>
+          )}
 
-              {/* Private Key */}
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
-                  Llave Privada (Private Key) <Lock size={10} />
-                </label>
-                <input
-                  type="password"
-                  value={config.culqi_private_key || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_private_key: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="sk_test_..."
-                />
+          {/* Device Token — solo lectura, para configurar la app Android */}
+          {config.confirmacion_automatica && config.device_token && (
+            <div className="mt-4">
+              <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
+                Token de la App Android <Lock size={10} />
+              </label>
+              <div className={`flex items-center gap-2 p-3 rounded-xl border font-mono text-xs break-all ${isDark ? 'bg-[#0a0a0a] border-[#333] text-neutral-400' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                {config.device_token}
               </div>
-
-              {/* Webhook Secret */}
-              <div>
-                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>
-                  Webhook Secret <Lock size={10} />
-                </label>
-                <input
-                  type="password"
-                  value={config.culqi_webhook_secret || ''}
-                  onChange={(e) => setConfig({ ...config, culqi_webhook_secret: e.target.value })}
-                  className="w-full border px-4 py-3 rounded-xl outline-none font-mono text-xs transition-colors"
-                  style={{ background: isDark ? '#0a0a0a' : '#f9fafb', borderColor: isDark ? '#444' : '#e5e7eb', color: isDark ? '#fff' : '#000' }}
-                  placeholder="wh_test_..."
-                />
-              </div>
-
-              <div className={`p-3 rounded-xl ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
-                <p className={`text-xs ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-                  ✓ QR dinámico para Yape y Plin<br />
-                  ✓ Tarjetas Visa, Mastercard, Amex, Diners<br />
-                  ✓ Confirmación automática vía webhook
-                </p>
-              </div>
+              <p className={`text-[10px] mt-1 ${isDark ? 'text-neutral-600' : 'text-gray-400'}`}>
+                Pega este token en la App Leybrak del celular del negocio.
+              </p>
             </div>
           )}
         </div>

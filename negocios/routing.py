@@ -3,5 +3,6 @@ from . import consumers
 
 websocket_urlpatterns = [
     re_path(r'ws/cocina/(?P<sede_id>\w+)/$', consumers.CocinaConsumer.as_asgi()),
-    re_path(r'ws/salon/(?P<sede_id>\w+)/$', consumers.SalonConsumer.as_asgi()), 
+    re_path(r'ws/salon/(?P<sede_id>\w+)/$', consumers.SalonConsumer.as_asgi()),
+    re_path(r'ws/pagos/(?P<negocio_id>\w+)/$', consumers.PagosConsumer.as_asgi()),  # ← Nueva
 ]

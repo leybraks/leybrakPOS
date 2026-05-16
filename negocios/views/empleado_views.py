@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, throttle_classes
+from rest_framework.decorators import action, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -218,3 +218,26 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             'anio': anio,
             'rendimiento': resultado,
         })
+
+# ============================================================
+# ESTADO DE BLOQUEO PIN (público)
+# ============================================================
+from rest_framework.decorators import api_view
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def estado_bloqueo_pin(request):
+    sede_id = request.query_params.get('sede_id')
+    if not sede_id:
+        return Response({'bloqueado': False, 'segundos_restantes': 0})
+
+    lock_key = f"pin_locked_{sede_id}"
+    lockout_until = cache.get(lock_key)
+
+    if lockout_until:
+        remaining = int(lockout_until - time_module.time())
+        if remaining > 0:
+            return Response({'bloqueado': True, 'segundos_restantes': remaining})
+        cache.delete(lock_key)
+
+    return Response({'bloqueado': False, 'segundos_restantes': 0})

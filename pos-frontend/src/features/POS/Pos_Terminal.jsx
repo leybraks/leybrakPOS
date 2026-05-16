@@ -374,7 +374,7 @@ export default function PosTerminal({ onIrAErp }) {
         total={ordenACobrar ? parseFloat(ordenACobrar.total) : 0}
         carrito={ordenACobrar ? ordenACobrar.detalles.map((d) => ({ id: d.producto, nombre: d.nombre, precio: parseFloat(d.precio_unitario), cantidad: d.cantidad || 1 })) : []}
         esVentaRapida={ordenACobrar?.es_venta_rapida || false}
-        onCobroExitoso={async (datosCobro) => { // 👈 Ahora recibe { pagos, telefono }
+        onCobroExitoso={async (datosCobro) => {
           try {
             let idOrden = ordenACobrar.id;
 
@@ -382,33 +382,36 @@ export default function PosTerminal({ onIrAErp }) {
             if (idOrden === 'venta_rapida') {
               const { data } = await crearOrden({ 
                 tipo: 'llevar', 
-                estado: 'pendiente', // Se crea pendiente porque el cobro la pasará a completada
+                estado: 'pendiente',
                 estado_pago: 'pendiente', 
                 sede: sedeActualId, 
                 detalles: ordenACobrar.detalles || [] 
               });
               idOrden = data.id;
-            } 
+            }
 
-            // 2. 🚀 DISPARAMOS AL NUEVO ENDPOINT DE COBRO + CRM
-            const sesionCajaId = localStorage.getItem('sesion_caja_id');
-            await api.post(`/ordenes/${idOrden}/cobrar_orden/`, {
-              pagos: datosCobro.pagos,
-              telefono: datosCobro.telefono, // ¡El WhatsApp para el CRM!
-              sesion_caja_id: sesionCajaId
-            });
+            // ✅ Si el pago ya fue confirmado por WebSocket, no llamar cobrar_orden
+            const yaConfirmadoPorWS = datosCobro.pagos.some(p => p.yaConfirmado);
+            
+            if (!yaConfirmadoPorWS) {
+              const sesionCajaId = localStorage.getItem('sesion_caja_id');
+              await api.post(`/ordenes/${idOrden}/cobrar_orden/`, {
+                pagos: datosCobro.pagos,
+                telefono: datosCobro.telefono,
+                sesion_caja_id: sesionCajaId
+              });
+            }
 
-            // 3. Limpiamos la pantalla
-            setOrdenACobrar(null); 
-            setTriggerRecarga((p) => !p); 
-            alert('¡Venta y CRM procesados con éxito! 💵✨');
+            setOrdenACobrar(null);
+            setTriggerRecarga((p) => !p);
+            alert('¡Venta procesada con éxito! 💵✨');
 
-          } catch (error) { 
+          } catch (error) {
             console.error(error);
-            alert('Hubo un error al procesar el pago.'); 
+            alert('Hubo un error al procesar el pago.');
           }
         }}
-      />
+        />
 
       <DrawerVentaRapida
         isOpen={drawerVentaRapidaAbierto} onClose={() => setDrawerVentaRapidaAbierto(false)}
