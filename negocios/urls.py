@@ -14,7 +14,7 @@ from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 from negocios.views.suscripcion_views import estado_suscripcion
 from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape
-from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
+from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
 router = DefaultRouter()
@@ -77,7 +77,8 @@ urlpatterns = [
     path('reglas-negocio-v2/',                         ReglaNegocioView.as_view(),           name='reglas_negocio'),
     path('reglas-negocio-v2/<int:pk>/',                ReglaNegocioDetalleView.as_view(),    name='regla_negocio_detalle'),
     path('negocio/estado-suscripcion/',                estado_suscripcion,                   name='estado-suscripcion'),
-
+    path('movil/login/',   login_movil,   name='movil-login'),
+    path('movil/refresh/', refresh_movil, name='movil-refresh'),
     # ==========================================
     # 📱 YAPE / PLIN — Validación automática
     # ==========================================
