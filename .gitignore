@@ -35,6 +35,7 @@ pos-frontend/npm-debug.log*
 staticfiles/
 /Notas/
 .claude/
+backups/
 # ========================
 # 4. IGNORAR COSAS DE REACT NATIVE (App Móvil)
 # ========================
