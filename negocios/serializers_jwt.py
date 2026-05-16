@@ -175,3 +175,76 @@ class LogoutView:
 
     # Exponer como clase con .as_view()
     as_view = _View.as_view
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_movil(request):
+    """
+    Login exclusivo para la app móvil.
+    Devuelve JWT en el body (no en cookies) para guardarlo
+    en EncryptedStorage del dispositivo.
+    """
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    if not username or not password:
+        return Response(
+            {'error': 'Usuario y contraseña requeridos.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = authenticate(username=username, password=password)
+    if not user:
+        return Response(
+            {'error': 'Credenciales inválidas.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if not user.is_active:
+        return Response(
+            {'error': 'Cuenta desactivada.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    refresh = RefreshToken.for_user(user)
+    negocio = getattr(user, 'negocio', None)
+
+    return Response({
+        'access':     str(refresh.access_token),
+        'refresh':    str(refresh),
+        'negocio_id': negocio.id if negocio else None,
+        'rol':        'dueño',
+        'nombre':     user.get_full_name() or user.username,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  
+def refresh_movil(request):
+    """
+    Refresco de token para la app móvil.
+    Lee el refresh del body (no de cookies).
+    """
+    refresh_token = request.data.get('refresh')
+    if not refresh_token:
+        return Response(
+            {'error': 'Refresh token requerido.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        refresh = RefreshToken(refresh_token)
+        return Response({
+            'access': str(refresh.access_token),
+        }, status=status.HTTP_200_OK)
+    except Exception:
+        return Response(
+            {'error': 'Token inválido o expirado.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )

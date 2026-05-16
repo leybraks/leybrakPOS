@@ -36,3 +36,14 @@ staticfiles/
 /Notas/
 .claude/
 backups/
+# ========================
+# 4. IGNORAR COSAS DE REACT NATIVE (App Móvil)
+# ========================
+LeybrakApp/node_modules/
+LeybrakApp/android/.gradle/
+LeybrakApp/android/app/build/
+LeybrakApp/android/build/
+LeybrakApp/ios/build/
+LeybrakApp/.bundle/
+LeybrakApp/*.keystore
+!LeybrakApp/android/app/debug.keystore
