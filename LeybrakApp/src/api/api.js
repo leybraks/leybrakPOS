@@ -1,0 +1,155 @@
+import axios from 'axios';
+import EncryptedStorage from 'react-native-encrypted-storage';
+
+const BASE_URL = __DEV__
+  ? 'https://pos.leybrak.com/api'
+  : 'https://pos.leybrak.com/api';
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 10000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// ─── Token helpers ────────────────────────────────────────────
+export const guardarTokens = async (access, refresh) => {
+  await EncryptedStorage.setItem('access_token', access);
+  await EncryptedStorage.setItem('refresh_token', refresh);
+};
+
+export const limpiarTokens = async () => {
+  await EncryptedStorage.removeItem('access_token');
+  await EncryptedStorage.removeItem('refresh_token');
+  await EncryptedStorage.removeItem('negocio_id');
+  await EncryptedStorage.removeItem('empleado_id');
+  await EncryptedStorage.removeItem('sede_id');
+  await EncryptedStorage.removeItem('usuario_rol');
+};
+
+export const getAccessToken = async () =>
+  await EncryptedStorage.getItem('access_token');
+
+// ─── Interceptor REQUEST ──────────────────────────────────────
+api.interceptors.request.use(
+  async (config) => {
+    const token = await getAccessToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    const empleadoId = await EncryptedStorage.getItem('empleado_id');
+    if (empleadoId) config.headers['X-Empleado-ID'] = empleadoId;
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ─── Interceptor RESPONSE — refresh automático ───────────────
+let estaRefrescando = false;
+let colaDeEspera = [];
+
+const procesarCola = (error) => {
+  colaDeEspera.forEach(({ resolve, reject }) =>
+    error ? reject(error) : resolve()
+  );
+  colaDeEspera = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
+
+      if (estaRefrescando) {
+        return new Promise((resolve, reject) =>
+          colaDeEspera.push({ resolve, reject })
+        ).then(() => api(original));
+      }
+
+      estaRefrescando = true;
+      try {
+        const refresh = await EncryptedStorage.getItem('refresh_token');
+        if (!refresh) throw new Error('Sin refresh token');
+
+        // ✅ Usa el endpoint móvil, no el de cookies
+        const res = await axios.post(`${BASE_URL}/movil/refresh/`, { refresh });
+        await EncryptedStorage.setItem('access_token', res.data.access);
+        original.headers.Authorization = `Bearer ${res.data.access}`;
+        procesarCola(null);
+        return api(original);
+      } catch (err) {
+        procesarCola(err);
+        await limpiarTokens();
+        // navegación al login — la conectamos cuando tengamos el navigator
+      } finally {
+        estaRefrescando = false;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ─── Auth ─────────────────────────────────────────────────────
+export const loginMovil = (credentials) =>
+  axios.post(`${BASE_URL}/movil/login/`, credentials);
+
+export const loginPinEmpleado = (payload) =>
+  api.post('/empleados/login-pin/', payload);
+
+export const verificarSesionEmpleado = () =>
+  api.get('/empleados/verificar-sesion/');
+
+// ─── Negocio ──────────────────────────────────────────────────
+export const getNegocio        = (id)       => api.get(`/negocios/${id}/`);
+export const actualizarNegocio = (id, data) => api.patch(`/negocios/${id}/`, data, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+});
+
+// ─── Menú ─────────────────────────────────────────────────────
+export const getProductos  = (params) => api.get('/productos/', { params });
+export const getCategorias = (params) => api.get('/categorias/', { params });
+export const crearProducto      = (data)     => api.post('/productos/', data);
+export const actualizarProducto = (id, data) => api.put(`/productos/${id}/`, data);
+export const parchearProducto   = (id, data) => api.patch(`/productos/${id}/`, data);
+export const crearCategoria     = (data)     => api.post('/categorias/', data);
+export const parchearCategoria  = (id, data) => api.patch(`/categorias/${id}/`, data);
+
+// ─── Mesas y órdenes ─────────────────────────────────────────
+export const getMesas              = (params)        => api.get('/mesas/', { params });
+export const getOrdenes            = (params)        => api.get('/ordenes/', { params });
+export const crearOrden            = (data)          => api.post('/ordenes/', data);
+export const actualizarOrden       = (id, data)      => api.patch(`/ordenes/${id}/`, data);
+export const agregarProductosAOrden = (id, payload)  => api.post(`/ordenes/${id}/agregar_productos/`, payload);
+export const anularItemDeOrden     = (id, payload)   => api.post(`/ordenes/${id}/anular_item/`, payload);
+
+// ─── Caja ─────────────────────────────────────────────────────
+export const getEstadoCaja = (params)  => api.get('/sesiones_caja/estado_actual/', { params });
+export const abrirCajaBD   = (payload) => api.post('/sesiones_caja/abrir_caja/', payload);
+export const cerrarCaja    = (data)    => api.post('/sesiones_caja/cerrar_caja/', data);
+
+// ─── Empleados y roles ────────────────────────────────────────
+export const getEmpleados       = (params)   => api.get('/empleados/', { params });
+export const crearEmpleado      = (data)     => api.post('/empleados/', data);
+export const actualizarEmpleado = (id, data) => api.patch(`/empleados/${id}/`, data);
+export const getRoles           = (params)   => api.get('/roles/', { params });
+
+// ─── Sedes ────────────────────────────────────────────────────
+export const getSedes       = (params)   => api.get('/sedes/', { params });
+export const crearSede      = (data)     => api.post('/sedes/', data);
+export const actualizarSede = (id, data) => api.patch(`/sedes/${id}/`, data);
+
+// ─── Dashboard ────────────────────────────────────────────────
+export const obtenerMetricasDashboard = (params) =>
+  api.get('/dashboard/metricas/', { params });
+
+// ─── Yape / Plin ─────────────────────────────────────────────
+export const confirmarPagoYape = (data) => api.post('/yape/confirmar/', data);
+
+// ─── Modificadores ───────────────────────────────────────────
+export const getModificadores      = (params)   => api.get('/modificadores-rapidos/', { params });
+export const crearModificador      = (data)     => api.post('/modificadores-rapidos/', data);
+export const actualizarModificador = (id, data) => api.put(`/modificadores-rapidos/${id}/`, data);
+export const eliminarModificador   = (id)       => api.delete(`/modificadores-rapidos/${id}/`);
+
+export default api;
