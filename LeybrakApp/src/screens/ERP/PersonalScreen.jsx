@@ -42,7 +42,7 @@ const iconoPorRol = (rol) => {
 };
 
 // ─── Tabla de Rendimiento ─────────────────────────────────────
-function RendimientoTabla({ t, sedeFiltroId, esDueno, sedes }) {
+function RendimientoTabla({ t, colorPrimario, sedeFiltroId, esDueno, sedes }) {
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -50,7 +50,7 @@ function RendimientoTabla({ t, sedeFiltroId, esDueno, sedes }) {
   const [cargando, setCargando] = useState(true);
 
   const MESES = [
-    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
     'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
   ];
 
@@ -72,84 +72,126 @@ function RendimientoTabla({ t, sedeFiltroId, esDueno, sedes }) {
   }, [mes, anio, sedeFiltroId]);
 
   const irMesAnterior = () => {
-    if (mes === 1) { setMes(12); setAnio(a => a - 1); }
+    if (mes === 1) { setMes(12); setAnio(a => a - 1); } 
     else setMes(m => m - 1);
   };
 
   const irMesSiguiente = () => {
-    if (mes === hoy.getMonth() + 1 && anio === hoy.getFullYear()) return;
-    if (mes === 12) { setMes(1); setAnio(a => a + 1); }
+    const esHoy = mes === hoy.getMonth() + 1 && anio === hoy.getFullYear();
+    if (esHoy) return;
+    if (mes === 12) { setMes(1); setAnio(a => a + 1); } 
     else setMes(m => m + 1);
   };
 
   const esMesActual = mes === hoy.getMonth() + 1 && anio === hoy.getFullYear();
 
+  const formatearFecha = (fechaISO) => {
+    if (!fechaISO) return '—';
+    const d = new Date(fechaISO);
+    return `${d.getDate().toString().padStart(2, '0')} ${MESES[d.getMonth()]} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  };
+
   return (
-    <View style={[s.cardSaaS, { backgroundColor: t.bgCard, borderColor: t.border, marginTop: 24 }]}>
+    <View style={[styles.card, { backgroundColor: t.bgCard, borderColor: t.border }]}>
       
-      {/* Header Rendimiento */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <Icon name="trophy" size={20} color={t.color} style={{ marginRight: 10 }} />
-          <Text style={[s.cardTitulo, { color: t.textPrim }]}>Rendimiento</Text>
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        <View style={styles.titleRow}>
+          {/* Cambiado a trophy para FontAwesome */}
+          <Icon name="trophy" size={20} color={colorPrimario || t.color} />
+          <Text style={[styles.title, { color: t.textPrim }]}>Rendimiento del Equipo</Text>
         </View>
 
-        {/* Navegador de mes */}
-        <View style={[s.mesNav, { backgroundColor: t.bgInput, borderColor: t.border }]}>
-          <TouchableOpacity onPress={irMesAnterior} style={s.mesBtn}>
+        <View style={[styles.mesNav, { backgroundColor: t.bgCard2, borderColor: t.border }]}>
+          <TouchableOpacity onPress={irMesAnterior} style={styles.mesBtn}>
             <Icon name="chevron-left" size={12} color={t.textSec} />
           </TouchableOpacity>
-          <Text style={[s.mesText, { color: t.textPrim }]}>{MESES[mes - 1]} {anio}</Text>
-          <TouchableOpacity onPress={irMesSiguiente} style={[s.mesBtn, esMesActual && { opacity: 0.3 }]} disabled={esMesActual}>
+          <Text style={[styles.mesText, { color: t.textPrim }]}>
+            {MESES[mes - 1]} {anio}
+          </Text>
+          <TouchableOpacity 
+            onPress={irMesSiguiente} 
+            style={[styles.mesBtn, esMesActual && { opacity: 0.3 }]} 
+            disabled={esMesActual}
+          >
             <Icon name="chevron-right" size={12} color={t.textSec} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Tabla (Scroll Horizontal) */}
+      {/* Contenido */}
       {cargando ? (
-        <ActivityIndicator size="small" color={t.color} style={{ marginVertical: 32 }} />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={colorPrimario || t.color} />
+        </View>
       ) : datos.length === 0 ? (
-        <View style={[s.emptyTable, { borderColor: t.border }]}>
-          <Icon name="line-chart" size={32} color={t.textMuted} style={{ marginBottom: 12 }} />
-          <Text style={{ color: t.textSec, fontSize: 12, fontWeight: '600' }}>Sin actividad registrada en {MESES[mes - 1]} {anio}</Text>
+        <View style={[styles.emptyState, { borderColor: t.border }]}>
+          {/* Cambiado a line-chart para FontAwesome */}
+          <Icon name="line-chart" size={32} color={t.textMuted} style={{ marginBottom: 8 }} />
+          <Text style={[styles.emptyText, { color: t.textMuted }]}>
+            Sin actividad registrada en {MESES[mes - 1]} {anio}
+          </Text>
         </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View>
-            {/* Cabecera */}
-            <View style={[s.tableRow, s.tableHeader, { borderBottomColor: t.border }]}>
-              <Text style={[s.th, { width: 40, color: t.textSec }]}>#</Text>
-              <Text style={[s.th, { width: 140, color: t.textSec }]}>EMPLEADO</Text>
-              <Text style={[s.th, { width: 100, color: t.textSec }]}>ROL</Text>
-              <Text style={[s.th, { width: 100, color: t.textSec }]}>SEDE</Text>
-              <Text style={[s.th, { width: 80, color: t.textSec, textAlign: 'center' }]}>ÓRDENES</Text>
-              <Text style={[s.th, { width: 100, color: t.textSec, textAlign: 'right' }]}>INGRESOS</Text>
-            </View>
+        <View style={styles.listContainer}>
+          {datos.map((emp, i) => (
+            <View 
+              key={emp.id} 
+              style={[
+                styles.row, 
+                { borderBottomColor: t.border },
+                i === datos.length - 1 && { borderBottomWidth: 0 }
+              ]}
+            >
+              {/* Posición */}
+              <View style={styles.rankContainer}>
+                {i === 0 ? (
+                  <Icon name="star" size={16} color="#eab308" />
+                ) : (
+                  <Text style={[styles.rankText, { color: t.textMuted }]}>{i + 1}</Text>
+                )}
+              </View>
 
-            {/* Filas */}
-            {datos.map((emp, i) => (
-              <View key={emp.id} style={[s.tableRow, { borderBottomColor: t.border }]}>
-                <View style={{ width: 40 }}>
-                  {i === 0 ? <Icon name="star" size={14} color="#eab308" /> : <Text style={[s.td, { color: t.textSec, fontWeight: '900' }]}>{i + 1}</Text>}
-                </View>
-                <Text style={[s.td, { width: 140, color: t.textPrim, fontWeight: '800' }]} numberOfLines={1}>{emp.nombre}</Text>
-                <View style={{ width: 100, alignItems: 'flex-start' }}>
-                  <View style={[s.badgeSaaS, { backgroundColor: t.bgCard2, borderColor: t.border }]}>
-                    <Text style={[s.badgeSaaSText, { color: t.textSec }]}>{emp.rol}</Text>
-                  </View>
-                </View>
-                <Text style={[s.td, { width: 100, color: t.textSec }]} numberOfLines={1}>{emp.sede}</Text>
-                <Text style={[s.td, { width: 80, color: emp.total_ordenes > 0 ? t.textPrim : t.textMuted, textAlign: 'center', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
-                  {emp.total_ordenes}
+              {/* Info Empleado */}
+              <View style={styles.infoContainer}>
+                <Text style={[styles.nombre, { color: t.textPrim }]} numberOfLines={1}>
+                  {emp.nombre}
                 </Text>
-                <Text style={[s.td, { width: 100, color: emp.total_ingresos > 0 ? '#10b981' : t.textMuted, textAlign: 'right', fontWeight: '900' }]}>
-                  {emp.total_ingresos > 0 ? `S/ ${parseFloat(emp.total_ingresos).toFixed(2)}` : '—'}
+                
+                <View style={styles.badgesRow}>
+                  <View style={[styles.badge, { backgroundColor: t.bgCard2, borderColor: t.border2 }]}>
+                    <Text style={[styles.badgeText, { color: t.textSec }]}>{emp.rol}</Text>
+                  </View>
+                  <Text style={[styles.sedeText, { color: t.textMuted }]}>{emp.sede}</Text>
+                </View>
+
+                <Text style={[styles.fechaText, { color: t.textMuted }]}>
+                  Últ. ingreso: {formatearFecha(emp.ultimo_ingreso)}
                 </Text>
               </View>
-            ))}
-          </View>
-        </ScrollView>
+
+              {/* Métricas */}
+              <View style={styles.metricasContainer}>
+                <Text style={[
+                  styles.ingresosText, 
+                  emp.total_ingresos > 0 ? { color: '#10b981' } : { color: t.textMuted }
+                ]}>
+                  {emp.total_ingresos > 0 ? `S/ ${parseFloat(emp.total_ingresos).toFixed(2)}` : '—'}
+                </Text>
+                
+                <View style={styles.ordenesRow}>
+                  <Icon name="shopping-bag" size={12} color={t.textMuted} />
+                  <Text style={[
+                    styles.ordenesText, 
+                    { color: emp.total_ordenes > 0 ? t.textPrim : t.textMuted }
+                  ]}>
+                    {emp.total_ordenes}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -565,6 +607,141 @@ const s = StyleSheet.create({
   tableHeader:    { borderBottomWidth: 2, paddingBottom: 10 },
   th:             { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   td:             { fontSize: 13, fontWeight: '600' },
+});
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 32, // Equivalente a rounded-[2rem]
+    padding: 24,      // Equivalente a p-6
+    borderWidth: 1,
+    marginTop: 24,
+  },
+  headerContainer: {
+    flexDirection: 'column',
+    gap: 16,
+    marginBottom: 24,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '900', // font-black
+  },
+  mesNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    alignSelf: 'flex-start',
+  },
+  mesBtn: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  mesText: {
+    fontSize: 12,
+    fontWeight: '900',
+    minWidth: 80,
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  loaderContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  listContainer: {
+    flexDirection: 'column',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  rankContainer: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  infoContainer: {
+    flex: 1,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  nombre: {
+    fontSize: 15,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sedeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  fechaText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  metricasContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  ingresosText: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  ordenesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  ordenesText: {
+    fontFamily: 'monospace', // Equivalente a font-mono
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 // ─── Estilos Modal ────────────────────────────────────────────

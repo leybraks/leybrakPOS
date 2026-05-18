@@ -13,7 +13,6 @@ const COLORES = [
   '#ff5a1f', '#3b82f6', '#10b981',
   '#eab308', '#8b5cf6', '#ec4899',
 ];
-
 // ─── Módulos del sistema ──────────────────────────────────────
 const MODULOS_META = [
   { id: 'modSalon',       key_plan: null,                icon: 'cutlery',   color: '#f59e0b', title: 'Gestión de Salón',   desc: 'Mapa interactivo de mesas y cuentas.',        badge: null,         badgeColor: null       },

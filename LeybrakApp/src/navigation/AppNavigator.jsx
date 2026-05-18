@@ -14,7 +14,7 @@ import DashboardScreen from '../screens/ERP/DashboardScreen';
 import ConfiguracionScreen from '../screens/ERP/ConfiguracionScreen';
 import useAppStore from '../store/useAppStore';
 import PersonalScreen from '../screens/ERP/PersonalScreen';
-
+import MenuScreen from '../screens/ERP/Menu/MenuScreen';
 const { width } = Dimensions.get('window');
 
 // ✅ Constante global fija para StyleSheet (no puede ser dinámica)
@@ -208,7 +208,7 @@ function ERPLayout({ onIrAlPos, onLogout }) {
       <View style={{ flex: 1 }}>
         {vistaActiva === 'dashboard'     && <DashboardScreen />}
         {vistaActiva === 'configuracion' && <ConfiguracionScreen />}
-        {vistaActiva === 'menu'          && <PlaceholderScreen titulo="Menú"         icono="cutlery"    color={color} />}
+        {vistaActiva === 'menu' && <MenuScreen />}
         {vistaActiva === 'personal' && <PersonalScreen />}
         {vistaActiva === 'inventario'    && <PlaceholderScreen titulo="Inventario"   icono="cube"       color={color} />}
         {vistaActiva === 'sedes'         && <PlaceholderScreen titulo="Sedes"        icono="map-marker" color={color} />}
