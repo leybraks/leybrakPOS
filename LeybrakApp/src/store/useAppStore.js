@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 
 const useAppStore = create((set) => ({
+  // Estado de caja — nivel raíz (separado de configuracion)
+  estadoCaja: null,
+  setEstadoCaja: (estado) => set({ estadoCaja: estado }),
+
   configuracionGlobal: {
     colorPrimario: '#3b82f6',
     temaFondo: 'dark',

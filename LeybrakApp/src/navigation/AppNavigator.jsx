@@ -10,20 +10,20 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { BlurView } from '@react-native-community/blur';
 
-import DashboardScreen from '../screens/ERP/DashboardScreen';
+import DashboardScreen     from '../screens/ERP/DashboardScreen';
 import ConfiguracionScreen from '../screens/ERP/ConfiguracionScreen';
-import useAppStore from '../store/useAppStore';
-import PersonalScreen from '../screens/ERP/PersonalScreen';
-import MenuScreen from '../screens/ERP/Menu/MenuScreen';
+import PersonalScreen      from '../screens/ERP/PersonalScreen';
+import MenuScreen          from '../screens/ERP/Menu/MenuScreen';
+import SalonScreen         from '../screens/POS/SalonScreen';
+import useAppStore         from '../store/useAppStore';
+
 const { width } = Dimensions.get('window');
 
-// ✅ Constante global fija para StyleSheet (no puede ser dinámica)
 const COLOR_DEFAULT = '#3b82f6';
+const SAFE_BOTTOM   = Platform.OS === 'ios' ? 34 : 24;
+const SAFE_TOP      = Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 24) + 10;
 
-const SAFE_BOTTOM = Platform.OS === 'ios' ? 34 : 24;
-const SAFE_TOP    = Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 24) + 10;
-
-// ─── Placeholders ─────────────────────────────────────────────
+// ─── Placeholder ──────────────────────────────────────────────
 const PlaceholderScreen = ({ titulo, icono }) => (
   <View style={{ flex: 1, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center' }}>
     <View style={{ width: 64, height: 64, backgroundColor: '#121212', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#1e1e1e' }}>
@@ -89,10 +89,8 @@ function Drawer({ visible, vistaActiva, color, drawerItems, onNavegar, onIrAlPos
   const grupos = [...new Set(drawerItems.map(i => i.grupo))];
 
   return (
-    <Modal transparent visible={true} onRequestClose={onClose} animationType="none">
+    <Modal transparent visible onRequestClose={onClose} animationType="none">
       <View style={d.overlay}>
-
-        {/* Fondo con blur */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
           <BlurView
             style={StyleSheet.absoluteFill}
@@ -103,9 +101,7 @@ function Drawer({ visible, vistaActiva, color, drawerItems, onNavegar, onIrAlPos
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
         </Animated.View>
 
-        {/* Panel */}
         <Animated.View style={[d.drawer, { transform: [{ translateX: slideAnim }] }]}>
-
           <View style={d.drawerHeader}>
             <View>
               <Text style={d.drawerBrand}>LEYBRAK<Text style={{ color }}>POS</Text></Text>
@@ -163,7 +159,6 @@ function Drawer({ visible, vistaActiva, color, drawerItems, onNavegar, onIrAlPos
               <Text style={d.logoutBtnText}>Cerrar Sesión</Text>
             </TouchableOpacity>
           </View>
-
         </Animated.View>
       </View>
     </Modal>
@@ -175,82 +170,80 @@ function ERPLayout({ onIrAlPos, onLogout }) {
   const [vistaActiva, setVistaActiva] = useState('dashboard');
   const [drawerVisible, setDrawerVisible] = useState(false);
 
-  // ✅ PRIMERO el store
   const { configuracionGlobal } = useAppStore();
-  const color    = configuracionGlobal.colorPrimario || COLOR_DEFAULT;
-  const isDark   = configuracionGlobal.temaFondo !== 'light';
-  const modulos  = configuracionGlobal.modulos || {};
-  const bgColor  = isDark ? '#050505' : '#f0f0f0';
+  const color   = configuracionGlobal.colorPrimario || COLOR_DEFAULT;
+  const isDark  = configuracionGlobal.temaFondo !== 'light';
+  const modulos = configuracionGlobal.modulos || {};
+  const bgColor = isDark ? '#050505' : '#f0f0f0';
 
-  // Filtrar drawer según módulos activos
   const drawerItemsFiltrados = ALL_DRAWER_ITEMS.filter(item => {
     if (item.moduloKey === null) return true;
     return modulos[item.moduloKey] === true;
-    });
+  });
 
-    useEffect(() => {
+  useEffect(() => {
     const itemActivo = ALL_DRAWER_ITEMS.find(i => i.id === vistaActiva);
     if (itemActivo && itemActivo.moduloKey && !modulos[itemActivo.moduloKey]) {
-        setVistaActiva('dashboard');
+      setVistaActiva('dashboard');
     }
-    }, [modulos]);
+  }, [modulos]);
 
-  const ScreenComponent = SCREENS_META[vistaActiva]?.component || SCREENS_META.dashboard.component;
-  const estaEnDrawer    = !TAB_ITEMS.includes(vistaActiva);
+  const estaEnDrawer = !TAB_ITEMS.includes(vistaActiva);
 
   return (
     <View style={{ flex: 1, backgroundColor: bgColor }}>
-      <StatusBar 
-        barStyle={isDark ? 'light-content' : 'dark-content'} 
-        backgroundColor={bgColor} 
-      />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bgColor} />
 
       <View style={{ flex: 1 }}>
         {vistaActiva === 'dashboard'     && <DashboardScreen />}
         {vistaActiva === 'configuracion' && <ConfiguracionScreen />}
-        {vistaActiva === 'menu' && <MenuScreen />}
-        {vistaActiva === 'personal' && <PersonalScreen />}
-        {vistaActiva === 'inventario'    && <PlaceholderScreen titulo="Inventario"   icono="cube"       color={color} />}
-        {vistaActiva === 'sedes'         && <PlaceholderScreen titulo="Sedes"        icono="map-marker" color={color} />}
-        {vistaActiva === 'crm'           && <PlaceholderScreen titulo="CRM"          icono="heart"      color={color} />}
-        {vistaActiva === 'bot_wsp'       && <PlaceholderScreen titulo="Bot WhatsApp" icono="comments"   color={color} />}
-        {vistaActiva === 'carta_qr'      && <PlaceholderScreen titulo="Carta QR"     icono="qrcode"     color={color} />}
-        {vistaActiva === 'facturacion'   && <PlaceholderScreen titulo="Facturación"  icono="file-text"  color={color} />}
+        {vistaActiva === 'menu'          && <MenuScreen />}
+        {vistaActiva === 'personal'      && <PersonalScreen />}
+        {vistaActiva === 'inventario'    && <PlaceholderScreen titulo="Inventario"   icono="cube"       />}
+        {vistaActiva === 'sedes'         && <PlaceholderScreen titulo="Sedes"        icono="map-marker" />}
+        {vistaActiva === 'crm'           && <PlaceholderScreen titulo="CRM"          icono="heart"      />}
+        {vistaActiva === 'bot_wsp'       && <PlaceholderScreen titulo="Bot WhatsApp" icono="comments"   />}
+        {vistaActiva === 'carta_qr'      && <PlaceholderScreen titulo="Carta QR"     icono="qrcode"     />}
+        {vistaActiva === 'facturacion'   && <PlaceholderScreen titulo="Facturación"  icono="file-text"  />}
       </View>
 
       {/* Tab Bar */}
-      <View style={t.tabBarWrapper}>
-        <View style={t.tabBar}>
+      <View style={tb.tabBarWrapper}>
+        <View style={tb.tabBar}>
 
           {TAB_ITEMS.slice(0, 2).map(id => {
             const sc     = SCREENS_META[id];
             const activo = vistaActiva === id;
             return (
-              <TouchableOpacity key={id} style={t.tabItem} onPress={() => setVistaActiva(id)} activeOpacity={0.7}>
+              <TouchableOpacity key={id} style={tb.tabItem} onPress={() => setVistaActiva(id)} activeOpacity={0.7}>
                 <Icon name={sc.icono} size={20} color={activo ? color : '#4b5563'} />
-                <Text style={[t.tabLabel, activo && { color }]}>{sc.nombre}</Text>
+                <Text style={[tb.tabLabel, activo && { color }]}>{sc.nombre}</Text>
               </TouchableOpacity>
             );
           })}
 
           {/* FAB POS */}
-          <View style={t.fabContainer}>
-            <TouchableOpacity style={[t.fabButton, { backgroundColor: color, shadowColor: color }]} onPress={onIrAlPos} activeOpacity={0.8}>
+          <View style={tb.fabContainer}>
+            <TouchableOpacity
+              style={[tb.fabButton, { backgroundColor: color, shadowColor: color }]}
+              onPress={onIrAlPos}
+              activeOpacity={0.8}
+            >
               <Icon name="desktop" size={22} color="#fff" />
             </TouchableOpacity>
-            <Text style={[t.tabLabel, { color, marginTop: 6 }]}>POS</Text>
+            <Text style={[tb.tabLabel, { color, marginTop: 6 }]}>POS</Text>
           </View>
 
           {/* Personal */}
-          <TouchableOpacity style={t.tabItem} onPress={() => setVistaActiva(TAB_ITEMS[2])} activeOpacity={0.7}>
+          <TouchableOpacity style={tb.tabItem} onPress={() => setVistaActiva(TAB_ITEMS[2])} activeOpacity={0.7}>
             <Icon name={SCREENS_META[TAB_ITEMS[2]].icono} size={20} color={vistaActiva === TAB_ITEMS[2] ? color : '#4b5563'} />
-            <Text style={[t.tabLabel, vistaActiva === TAB_ITEMS[2] && { color }]}>{SCREENS_META[TAB_ITEMS[2]].nombre}</Text>
+            <Text style={[tb.tabLabel, vistaActiva === TAB_ITEMS[2] && { color }]}>{SCREENS_META[TAB_ITEMS[2]].nombre}</Text>
           </TouchableOpacity>
 
           {/* Más */}
-          <TouchableOpacity style={t.tabItem} onPress={() => setDrawerVisible(true)} activeOpacity={0.7}>
+          <TouchableOpacity style={tb.tabItem} onPress={() => setDrawerVisible(true)} activeOpacity={0.7}>
             <Icon name="bars" size={20} color={estaEnDrawer ? color : '#4b5563'} />
-            <Text style={[t.tabLabel, estaEnDrawer && { color }]}>Más</Text>
+            <Text style={[tb.tabLabel, estaEnDrawer && { color }]}>Más</Text>
           </TouchableOpacity>
 
         </View>
@@ -260,12 +253,76 @@ function ERPLayout({ onIrAlPos, onLogout }) {
         visible={drawerVisible}
         vistaActiva={vistaActiva}
         color={color}
-        drawerItems={drawerItemsFiltrados}  // ← filtrado
+        drawerItems={drawerItemsFiltrados}
         onNavegar={setVistaActiva}
         onIrAlPos={onIrAlPos}
         onLogout={onLogout}
         onClose={() => setDrawerVisible(false)}
-      />    
+      />
+    </View>
+  );
+}
+
+// ─── POS Layout ───────────────────────────────────────────────
+function POSLayout({ onVolver }) {
+  const [mesaActiva, setMesaActiva] = useState(null);
+
+  const { configuracionGlobal } = useAppStore();
+  const color = configuracionGlobal.colorPrimario || COLOR_DEFAULT;
+
+  // Sin mesa seleccionada → mapa de mesas
+  if (!mesaActiva) {
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Botón volver al ERP */}
+        <SalonScreen
+          onSeleccionarMesa={(mesa) => setMesaActiva(mesa)}
+          onVolver={onVolver}
+        />
+      </View>
+    );
+  }
+
+  // Mesa seleccionada → placeholder hasta que PosScreen esté listo
+  return (
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+
+      {/* Header temporal */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
+        paddingTop: SAFE_TOP, paddingBottom: 16,
+        backgroundColor: '#0a0a0a', borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
+      }}>
+        <TouchableOpacity
+          onPress={() => setMesaActiva(null)}
+          style={{ width: 36, height: 36, backgroundColor: '#161616', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1, borderColor: '#222' }}
+          activeOpacity={0.8}
+        >
+          <Icon name="arrow-left" size={14} color="#9ca3af" />
+        </TouchableOpacity>
+        <View>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>
+            {typeof mesaActiva === 'object' && mesaActiva.id === 'llevar'
+              ? `Para llevar — ${mesaActiva.cliente}`
+              : `Mesa ${mesaActiva}`
+            }
+          </Text>
+          <Text style={{ color: '#6b7280', fontSize: 11, marginTop: 1 }}>Terminal POS</Text>
+        </View>
+      </View>
+
+      {/* Placeholder */}
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <View style={{ width: 72, height: 72, backgroundColor: `${color}15`, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="desktop" size={32} color={color} />
+        </View>
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>PosScreen</Text>
+        <Text style={{ color: '#6b7280', fontSize: 13 }}>En construcción</Text>
+        <View style={{ backgroundColor: `${color}10`, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: `${color}30` }}>
+          <Text style={{ color, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>PRÓXIMAMENTE</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -274,21 +331,24 @@ function ERPLayout({ onIrAlPos, onLogout }) {
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator({ sesion, onLogout }) {
-  const handleIrAlPos = () => alert('Terminal POS — En construcción');
+  const [enPos, setEnPos] = useState(false);
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="ERP">
-          {() => <ERPLayout onIrAlPos={handleIrAlPos} onLogout={onLogout} />}
+        <Stack.Screen name="Main">
+          {() => enPos
+            ? <POSLayout onVolver={() => setEnPos(false)} />
+            : <ERPLayout onIrAlPos={() => setEnPos(true)} onLogout={onLogout} />
+          }
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
-// ─── Estilos Tab Bar ─────────────────────────────────────────
-const t = StyleSheet.create({
+// ─── Estilos Tab Bar ──────────────────────────────────────────
+const tb = StyleSheet.create({
   tabBarWrapper: {
     backgroundColor: '#0a0a0a',
     borderTopWidth: 1,
@@ -336,9 +396,9 @@ const t = StyleSheet.create({
   },
 });
 
-// ─── Estilos Drawer ──────────────────────────────────────────
+// ─── Estilos Drawer ───────────────────────────────────────────
 const d = StyleSheet.create({
-  overlay:          { flex: 1, flexDirection: 'row' },
+  overlay:   { flex: 1, flexDirection: 'row' },
   drawer: {
     position: 'absolute', right: 0, top: 0, bottom: 0,
     width: width * 0.75, maxWidth: 320,

@@ -14,6 +14,7 @@ import {
 import useAppStore from '../../../store/useAppStore';
 import ModalCategorias from './ModalCategorias';
 import ModalPlato      from './ModalPlato';
+import ModalCombos from './ModalCombos';
 // ─── Hook de tema ─────────────────────────────────────────────
 const useTema = () => {
   const { configuracionGlobal } = useAppStore();
@@ -124,7 +125,7 @@ export default function MenuScreen() {
   const [cargando, setCargando]       = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
   const [rolUsuario, setRolUsuario]   = useState('');
-
+  const [modalCombosVisible, setModalCombosVisible] = useState(false);
   const esDueno = ['dueño', 'admin', 'administrador'].includes(rolUsuario.toLowerCase());
 
   const cargar = useCallback(async () => {
@@ -248,7 +249,7 @@ export default function MenuScreen() {
             {[
               { label: 'Nuevo Plato', icono: 'plus',   primary: true,  onPress: () => { setPlatoEditar(null); setModalPlatoVisible(true); } },
               { label: 'Categorías',  icono: 'folder', primary: false, onPress: () => setModalCatVisible(true) },
-              { label: 'Combos',      icono: 'layers',  primary: false },
+              { label: 'Combos', icono: 'th-large', primary: false, onPress: () => setModalCombosVisible(true) },
             ].map(btn => (
               <TouchableOpacity
                 key={btn.label}
@@ -334,6 +335,13 @@ export default function MenuScreen() {
         t={t}
         onGuardar={handleGuardarPlato}
         onCerrar={() => { setModalPlatoVisible(false); setPlatoEditar(null); }}
+      />
+      <ModalCombos
+        visible={modalCombosVisible}
+        productos={productos}
+        categorias={categorias}
+        t={t}
+        onCerrar={() => setModalCombosVisible(false)}
       />
     </View>
   );

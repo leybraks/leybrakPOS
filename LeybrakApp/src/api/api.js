@@ -38,6 +38,25 @@ api.interceptors.request.use(
     const empleadoId = await EncryptedStorage.getItem('empleado_id');
     if (empleadoId) config.headers['X-Empleado-ID'] = empleadoId;
 
+    // ✅ Auto-inyectar sede_id en GETs (igual que la web)
+    const sedeId = await EncryptedStorage.getItem('sede_id');
+    const tieneSedeEnUrl    = config.url?.includes('sede_id=') || config.url?.includes('sede=');
+    const tieneSedeEnParams = config.params?.sede_id || config.params?.sede;
+    const tieneNegocioEnParams = config.params?.negocio_id;
+    const esRutaGlobal      = config.url?.includes('negocios');
+
+    if (
+      sedeId &&
+      config.method === 'get' &&
+      !tieneSedeEnUrl &&
+      !tieneSedeEnParams &&
+      !esRutaGlobal &&
+      !tieneNegocioEnParams
+    ) {
+      const sep = config.url?.includes('?') ? '&' : '?';
+      config.url = `${config.url}${sep}sede_id=${sedeId}`;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -151,5 +170,5 @@ export const getModificadores      = (params)   => api.get('/modificadores-rapid
 export const crearModificador      = (data)     => api.post('/modificadores-rapidos/', data);
 export const actualizarModificador = (id, data) => api.put(`/modificadores-rapidos/${id}/`, data);
 export const eliminarModificador   = (id)       => api.delete(`/modificadores-rapidos/${id}/`);
-
+export const getOrdenesLlevar = (params) => api.get('/ordenes/', { params: { ...params, tipo: 'llevar', estado: 'preparando' } });
 export default api;
