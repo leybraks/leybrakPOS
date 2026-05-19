@@ -144,9 +144,42 @@ export const anularItemDeOrden     = (id, payload)   => api.post(`/ordenes/${id}
 
 // ─── Caja ─────────────────────────────────────────────────────
 export const getEstadoCaja = (params)  => api.get('/sesiones_caja/estado_actual/', { params });
-export const abrirCajaBD   = (payload) => api.post('/sesiones_caja/abrir_caja/', payload);
-export const cerrarCaja    = (data)    => api.post('/sesiones_caja/cerrar_caja/', data);
+export const abrirCajaBD = async (payload) => {
+  const sedeId = await EncryptedStorage.getItem('sede_id');
+  const finalPayload = { ...payload, sede_id: payload.sede_id || sedeId };
+  console.log('ABRIR CAJA PAYLOAD:', JSON.stringify(finalPayload));
+  try {
+    const res = await api.post('/sesiones_caja/abrir_caja/', finalPayload);
+    console.log('ABRIR CAJA OK:', JSON.stringify(res.data));
+    return res;
+  } catch (e) {
+    console.log('ABRIR CAJA ERROR:', e?.response?.status, JSON.stringify(e?.response?.data));
+    console.log('ABRIR CAJA MESSAGE:', e?.message);
+    throw e;
+  }
+};
+export const cerrarCaja = async (data) => {
+  const sedeId = await EncryptedStorage.getItem('sede_id');
+  try {
+    const res = await api.post('/sesiones_caja/cerrar_caja/', { ...data, sede_id: data.sede_id || sedeId });
+    console.log('CERRAR CAJA OK:', JSON.stringify(res.data));
+    return res;
+  } catch (e) {
+    console.log('CERRAR CAJA ERROR:', e?.response?.status, JSON.stringify(e?.response?.data));
+    console.log('CERRAR CAJA MESSAGE:', e?.message);
+    throw e;
+  }
+};
+export const validarPinEmpleado = async (payload) => {
+  const sedeId = await EncryptedStorage.getItem('sede_id');
+  return api.post('/empleados/validar_pin/', { ...payload, sede_id: payload.sede_id || sedeId });
+};
+export const actualizarMesa = (id, data) => api.patch(`/mesas/${id}/`, data);
 
+export const registrarMovimientoCaja = async (data) => {
+  const sedeId = await EncryptedStorage.getItem('sede_id');
+  return api.post('/movimientos-caja/', { ...data, sede_id: data.sede_id || sedeId });
+};
 // ─── Empleados y roles ────────────────────────────────────────
 export const getEmpleados       = (params)   => api.get('/empleados/', { params });
 export const crearEmpleado      = (data)     => api.post('/empleados/', data);
