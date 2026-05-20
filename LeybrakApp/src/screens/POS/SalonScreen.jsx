@@ -228,7 +228,7 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
         getOrdenesLlevar(params),
         getOrdenes({ negocio_id: negocioId, sede_id: savedSede, estado: 'preparando' }),
       ]);
-
+      console.warn('🟡 ORDENES LLEVAR:', JSON.stringify(resOrdenes.data?.map(o => ({ id: o.id, tipo: o.tipo, estado: o.estado }))));
       const mesasConEstado = resMesas.data.map(mesa => {
         const ordenActiva = resOrdenesActivas.data?.find(o => String(o.mesa) === String(mesa.id));
         return {
