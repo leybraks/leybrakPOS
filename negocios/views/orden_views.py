@@ -98,7 +98,17 @@ class OrdenViewSet(viewsets.ModelViewSet):
             else:
                 queryset = queryset.order_by('-creado_en')
 
+        # ✅ Filtros adicionales por query params
+        tipo = self.request.query_params.get('tipo')
+        if not es_valor_nulo(tipo):
+            queryset = queryset.filter(tipo=tipo)
+
+        estado = self.request.query_params.get('estado')
+        if not es_valor_nulo(estado):
+            queryset = queryset.filter(estado=estado)
+
         return queryset
+
 
     def perform_create(self, serializer):
         empleado = get_empleado_desde_header(self.request)
