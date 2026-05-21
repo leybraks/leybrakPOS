@@ -7,7 +7,8 @@ import {
 import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import useAppStore from '../../store/useAppStore';
-
+import ModalCierreCaja from '../../components/modals/ModalCierreCaja';
+import ModalMovimientoCaja from '../../components/modals/ModalMovimientoCaja';
 // ─── IMPORTACIONES DE API Y POS ───
 import api, {
   getMesas, getSedes, getOrdenesLlevar, getOrdenes,
@@ -431,12 +432,20 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
     <View style={[s.container, { backgroundColor: t.bg }]}>
       <StatusBar barStyle={t.isDark ? 'light-content' : 'dark-content'} backgroundColor={t.bg} />
 
-      {/* Header Estilo Web */}
-      <View style={[s.header, { backgroundColor: t.bg, borderBottomColor: t.border }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.headerTitulo, { color: t.textPrim }]}>
+      {/* Header Estilo Web / Mobile */}
+      <View style={[s.header, { backgroundColor: t.bg, borderBottomColor: t.border, alignItems: 'center' }]}>
+        
+        {/* 1. Contenedor del Título (Con más espacio ahora) */}
+        <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
+          <Text 
+            style={[s.headerTitulo, { color: t.textPrim }]}
+            numberOfLines={2} 
+            ellipsizeMode="tail"
+          >
             {vistaLocal === 'salon' ? 'SALÓN ' : 'PARA '}
-            <Text style={{ color: t.color }}>{vistaLocal === 'salon' ? (sedeActualInfo?.nombre || 'PRINCIPAL') : 'LLEVAR'}</Text>
+            <Text style={{ color: t.color }}>
+              {vistaLocal === 'salon' ? (sedeActualInfo?.nombre || 'PRINCIPAL') : 'LLEVAR'}
+            </Text>
           </Text>
           <View style={s.envivoWrapper}>
             <Text style={s.envivoText}>EN VIVO</Text>
@@ -444,34 +453,64 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
           </View>
         </View>
 
-        <View style={s.headerActions}>
-          {esDueno && onVolver && (
-            <TouchableOpacity style={[s.actionBtn, { backgroundColor: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' }]} onPress={onVolver}>
-              <Icon name="cog" size={18} color="#3b82f6" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={[s.actionBtn, { backgroundColor: `${t.color}1A`, borderColor: `${t.color}4D` }]} onPress={() => setDrawerVentaRapidaAbierto(true)}>
-            <Icon name="bolt" size={18} color={t.color} />
-          </TouchableOpacity>
-          {vistaLocal === 'salon' && (
-            <TouchableOpacity 
-              style={[s.actionBtn, { backgroundColor: t.bgCard, borderColor: t.border }, modoUnir && { backgroundColor: t.color, borderColor: t.color }]} 
-              onPress={() => { setModoUnir(!modoUnir); setMesaPrincipal(null); }}
-            >
-              <Icon name="link" size={16} color={modoUnir ? '#fff' : t.textSec} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity 
-            style={[s.actionBtn, { backgroundColor: t.bgCard, borderColor: t.border }]} 
-            onPress={() => setVistaLocal(vistaLocal === 'salon' ? 'llevar' : 'salon')}
-          >
-            <Icon name={vistaLocal === 'salon' ? 'shopping-bag' : 'table'} size={16} color={t.textSec} />
-            {vistaLocal === 'salon' && ordenesLlevar.length > 0 && (
-              <View style={[s.badgeNotif, { backgroundColor: t.color }]}>
-                <Text style={s.badgeNotifText}>{ordenesLlevar.length}</Text>
-              </View>
+        {/* 2. Contenedor de Botones (Columna que agrupa las 2 filas) */}
+        <View style={{ flexDirection: 'column', gap: 6 }}>
+          
+          {/* FILA 1: Config, Venta Rápida, Unir Mesas */}
+          <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'flex-end' }}>
+            {esDueno && onVolver && (
+              <TouchableOpacity style={[s.actionBtn, { backgroundColor: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' }]} onPress={onVolver}>
+                <Icon name="cog" size={18} color="#3b82f6" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            
+            <TouchableOpacity style={[s.actionBtn, { backgroundColor: `${t.color}1A`, borderColor: `${t.color}4D` }]} onPress={() => setDrawerVentaRapidaAbierto(true)}>
+              <Icon name="bolt" size={18} color={t.color} />
+            </TouchableOpacity>
+            
+            {vistaLocal === 'salon' && (
+              <TouchableOpacity 
+                style={[s.actionBtn, { backgroundColor: t.bgCard, borderColor: t.border }, modoUnir && { backgroundColor: t.color, borderColor: t.color }]} 
+                onPress={() => { setModoUnir(!modoUnir); setMesaPrincipal(null); }}
+              >
+                <Icon name="link" size={16} color={modoUnir ? '#fff' : t.textSec} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* FILA 2: Cambiar Vista, Caja Chica, Cerrar Caja */}
+          <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'flex-end' }}>
+            <TouchableOpacity 
+              style={[s.actionBtn, { backgroundColor: t.bgCard, borderColor: t.border }]} 
+              onPress={() => setVistaLocal(vistaLocal === 'salon' ? 'llevar' : 'salon')}
+            >
+              <Icon name={vistaLocal === 'salon' ? 'shopping-bag' : 'table'} size={16} color={t.textSec} />
+              {vistaLocal === 'salon' && ordenesLlevar.length > 0 && (
+                <View style={[s.badgeNotif, { backgroundColor: t.color }]}>
+                  <Text style={s.badgeNotifText}>{ordenesLlevar.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            {['cajero', 'administrador', 'admin', 'dueño'].includes(rolUsuario.toLowerCase()) && (
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}
+                onPress={() => setModalMovimientosAbierto(true)}
+              >
+                <Icon name="money" size={18} color="#10b981" />
+              </TouchableOpacity>
+            )}
+
+            {['cajero', 'administrador', 'admin', 'dueño'].includes(rolUsuario.toLowerCase()) && (
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}
+                onPress={handleCierreCajaSeguro}
+              >
+                <Icon name="lock" size={18} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+
         </View>
       </View>
 
@@ -555,6 +594,22 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
       </ScrollView>
 
       <ModalCliente visible={modalClienteVisible} t={t} color={t.color} onConfirmar={({ nombre, telefono }) => { setModalClienteVisible(false); onSeleccionarMesa({ id: 'llevar', cliente: nombre, telefono }); }} onCerrar={() => setModalClienteVisible(false)} />
+      <ModalCierreCaja
+        visible={modalCierreAbierto}
+        onClose={() => setModalCierreAbierto(false)}
+        onCierreExitoso={(resumen) => {
+          setModalCierreAbierto(false);
+          const dif = resumen?.diferencia || 0;
+          const msg = dif === 0 ? '✅ ¡Cuadre perfecto!'
+            : dif > 0 ? `⚠️ Sobrante de S/ ${dif.toFixed(2)}`
+            : `🚨 Faltante de S/ ${Math.abs(dif).toFixed(2)}`;
+          Alert.alert('Cierre completado', msg);
+        }}
+      />
+      <ModalMovimientoCaja
+        visible={modalMovimientosAbierto}
+        onClose={() => setModalMovimientosAbierto(false)}
+      />
     </View>
   );
 }
