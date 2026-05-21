@@ -572,7 +572,7 @@ class MovimientoCaja(models.Model):
 
     sede = models.ForeignKey(Sede, on_delete=models.CASCADE, related_name='movimientos_caja')
     sesion_caja = models.ForeignKey(SesionCaja, on_delete=models.CASCADE, related_name='movimientos')
-    empleado = models.ForeignKey(Empleado, on_delete=models.PROTECT, related_name='movimientos_registrados')
+    empleado = models.ForeignKey(Empleado, on_delete=models.PROTECT, related_name="movimientos_registrados", null=True, blank=True)
 
     tipo = models.CharField(max_length=10, choices=TIPOS_MOVIMIENTO)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
