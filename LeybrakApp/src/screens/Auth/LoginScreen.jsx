@@ -142,12 +142,16 @@ export default function LoginScreen({ onLoginExitoso }) {
     setCargando(true);
     try {
       const res = await loginMovil({ username: usuario.trim(), password });
-      const { access, refresh, negocio_id, rol, nombre } = res.data;
+      const { access, refresh, negocio_id, rol, nombre, empleado_id } = res.data;
 
       await guardarTokens(access, refresh);
       await EncryptedStorage.setItem('negocio_id',     String(negocio_id));
       await EncryptedStorage.setItem('usuario_rol',    rol);
       await EncryptedStorage.setItem('usuario_nombre', nombre);
+      // ✅ Guardar empleado_id del dueño
+      if (empleado_id) {
+        await EncryptedStorage.setItem('empleado_id', String(empleado_id));
+      }
 
       onLoginExitoso({ negocio_id, rol, nombre, tipo: 'dueno' });
     } catch (error) {

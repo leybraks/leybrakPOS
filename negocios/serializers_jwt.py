@@ -185,11 +185,6 @@ from django.contrib.auth import authenticate
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_movil(request):
-    """
-    Login exclusivo para la app móvil.
-    Devuelve JWT en el body (no en cookies) para guardarlo
-    en EncryptedStorage del dispositivo.
-    """
     username = request.data.get('username')
     password = request.data.get('password')
 
@@ -215,12 +210,34 @@ def login_movil(request):
     refresh = RefreshToken.for_user(user)
     negocio = getattr(user, 'negocio', None)
 
+    # ✅ Buscar o crear empleado "Dueño" para este negocio
+    empleado_id = None
+    if negocio:
+        from .models import Empleado, Rol, Sede
+        try:
+            rol_dueno = Rol.objects.get(nombre='Dueño')
+            sede_principal = Sede.objects.filter(negocio=negocio).first()
+            empleado_dueno, creado = Empleado.objects.get_or_create(
+                negocio=negocio,
+                rol=rol_dueno,
+                defaults={
+                    'nombre': user.get_full_name() or user.username,
+                    'pin': '0000',
+                    'activo': True,
+                    'sede': sede_principal,
+                }
+            )
+            empleado_id = empleado_dueno.id
+        except Exception as e:
+            pass  # Si falla, empleado_id queda None
+
     return Response({
-        'access':     str(refresh.access_token),
-        'refresh':    str(refresh),
-        'negocio_id': negocio.id if negocio else None,
-        'rol':        'dueño',
-        'nombre':     user.get_full_name() or user.username,
+        'access':      str(refresh.access_token),
+        'refresh':     str(refresh),
+        'negocio_id':  negocio.id if negocio else None,
+        'rol':         'dueño',
+        'nombre':      user.get_full_name() or user.username,
+        'empleado_id': empleado_id,  # ✅ Nuevo campo
     }, status=status.HTTP_200_OK)
 
 
