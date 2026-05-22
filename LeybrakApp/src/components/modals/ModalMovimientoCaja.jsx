@@ -75,8 +75,6 @@ export default function ModalMovimientoCaja({ visible, onClose }) {
       );
       handleCerrar();
     } catch (e) {
-        console.warn('ERROR MOVIMIENTO:', JSON.stringify(e?.response?.data));
-        console.warn('STATUS:', e?.response?.status);
         Alert.alert('Error', e?.response?.data?.error || 'No se pudo registrar el movimiento.');
     } finally {
       setProcesando(false);
@@ -154,6 +152,7 @@ export default function ModalMovimientoCaja({ visible, onClose }) {
               onChangeText={setConcepto}
               placeholder={esEgreso ? 'Ej. Compra de insumos' : 'Ej. Ingreso de sencillo'}
               placeholderTextColor={t.textMut}
+              maxLength={200}
             />
 
             {/* Botón confirmar */}

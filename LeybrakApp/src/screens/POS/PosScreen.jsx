@@ -1,456 +1,860 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Modal, TextInput, Platform, StatusBar, Alert,
+  TextInput, ActivityIndicator, Alert, Modal, FlatList,
+  StatusBar, Platform, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
-
-// Store y API
-import useAppStore from '../../store/useAppStore'; // Equivalente a usePosStore
+import useAppStore from '../../store/useAppStore';
+import ModalCobro from '../../components/modals/ModalCobro';
+import ModalModificadores from '../../components/modals/ModalModificadores';
 import api, {
-  abrirCajaBD, actualizarMesa, actualizarOrden, crearOrden,
-  crearPago, registrarMovimientoCaja, validarPinEmpleado
+  getProductos, getCategorias, getOrdenes, getModificadores,
+  crearOrden, actualizarOrden, agregarProductosAOrden, anularItemDeOrden,
 } from '../../api/api';
 
-// ─── IMPORTACIONES ASUMIDAS (Arquitectura Limpia) ─────────────
-// Al igual que en la web, deberías separar estos componentes en sus propios archivos
-import ModalCobro from '../../components/modals/ModalCobro';
-import ModalCierreCaja from '../../components/modals/ModalCierreCaja';
-import DrawerVentaRapida from './Pos_DrawerVentaRapida';
-import ModalMovimientoCaja from '../../components/modals/ModalMovimientoCaja';
-import ModalAlertaBot from '../../components/modals/ModalAlertaBot';
-
-import TerminalHeader from './components/TerminalHeader';
-import TerminalMesasGrid from './components/TerminalMesasGrid';
-import TerminalLlevarView from './components/TerminalLlevarView';
-import TerminalSidebar from './components/TerminalSidebar';
-
-import { useTerminalData } from './hooks/useTerminalData';
-import { useTerminalWS } from './hooks/useTerminalWS';
-
-// ─── HOOK DE TEMA (Helper RN) ─────────────────────────────────
+// ─── Hook de tema ─────────────────────────────────────────────
 const useTema = () => {
   const { configuracionGlobal } = useAppStore();
   const isDark = configuracionGlobal?.temaFondo !== 'light';
-  const color = configuracionGlobal?.colorPrimario || '#ff5a1f';
+  const color  = configuracionGlobal?.colorPrimario || '#ff5a1f';
   return {
     isDark, color,
-    bg: isDark ? '#0a0a0a' : '#f0f0f0',
-    bgCard: isDark ? '#141414' : '#ffffff',
-    bgInput: isDark ? '#111111' : '#f9fafb',
-    border: isDark ? '#222222' : '#e5e7eb',
-    border2: isDark ? '#333333' : '#d1d5db',
-    textPrim: isDark ? '#ffffff' : '#111111',
-    textSec: isDark ? '#9ca3af' : '#6b7280',
+    bg:        isDark ? '#0a0a0a' : '#f4f4f5',
+    bgCard:    isDark ? '#141414' : '#ffffff',
+    bgCard2:   isDark ? '#1a1a1a' : '#f3f4f6',
+    bgInput:   isDark ? '#111111' : '#f9fafb',
+    border:    isDark ? '#222222' : '#e5e7eb',
+    border2:   isDark ? '#333333' : '#d1d5db',
+    textPrim:  isDark ? '#ffffff' : '#111111',
+    textSec:   isDark ? '#9ca3af' : '#6b7280',
     textMuted: isDark ? '#4b5563' : '#9ca3af',
   };
 };
 
-export default function PosTerminalScreen({ onIrAErp }) {
+// ─── PosScreen principal ──────────────────────────────────────
+export default function PosScreen({ mesaId, onVolver }) {
   const t = useTema();
-  const { estadoCaja, setEstadoCaja, configuracionGlobal, setConfiguracionGlobal } = useAppStore();
+  const [modalCobroVisible, setModalCobroVisible] = useState(false);
+  const esParaLlevar = typeof mesaId === 'object' && mesaId?.id === 'llevar';
+  const nombreLlevar = typeof mesaId === 'object' ? mesaId.cliente : '';
+  const mesaIdReal   = esParaLlevar ? null : (typeof mesaId === 'object' ? mesaId.id : mesaId);
 
-  // ─── ESTADOS LOCALES Y SEGURIDAD ──────────────────────────────
-  const [sedeActualId, setSedeActualId] = useState('');
-  const [rolUsuario, setRolUsuario] = useState('Empleado');
-  const [empleadoId, setEmpleadoId] = useState('');
+  const [productos, setProductos]       = useState([]);
+  const [categorias, setCategorias]     = useState([]);
+  const [ordenActiva, setOrdenActiva]   = useState(null);
+  const [carrito, setCarrito]           = useState([]);
+  const [cargando, setCargando]         = useState(true);
+  const [procesando, setProcesando]     = useState(false);
+  const [busqueda, setBusqueda]         = useState('');
+  const [busquedaActiva, setBusquedaActiva] = useState(false);
+  const [categoriaActiva, setCategoriaActiva] = useState('todas');
+  const [carritoAbierto, setCarritoAbierto]   = useState(false);
+  const [mostrarExito, setMostrarExito]       = useState(false);
+  const [sedeId, setSedeId]             = useState('');
+  const [negocioId, setNegocioId]       = useState('');
+  const [empleadoNombre, setEmpleadoNombre] = useState('');
+  const [productoParaVariar, setProductoParaVariar] = useState(null);
+  const [modalVariacionesVisible, setModalVariacionesVisible] = useState(false);
 
-  const esDueño = ['dueño', 'admin'].includes(rolUsuario.trim().toLowerCase());
-  const cajaAbierta = estadoCaja === 'abierto' || estadoCaja?.estado === 'abierto';
-  const puedeAbrirCaja = ['cajero', 'administrador', 'admin', 'dueño'].includes(rolUsuario.toLowerCase().trim());
-
-  // Estados de UI y Modales
-  const [modalAperturaAbierto, setModalAperturaAbierto] = useState(false);
-  const [fondoCaja, setFondoCaja] = useState('');
-  const [abriendoCaja, setAbriendoCaja] = useState(false);
-
-  const [triggerRecarga, setTriggerRecarga] = useState(false);
-  const [mostrarPuertaMovil, setMostrarPuertaMovil] = useState(false);
-  const [modoUnir, setModoUnir] = useState(false);
-  const [mesaPrincipal, setMesaPrincipal] = useState(null);
-  const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
-
-  const [modalClienteAbierto, setModalClienteAbierto] = useState(false);
-  const [nombreCliente, setNombreCliente] = useState('');
-  const [telefonoCliente, setTelefonoCliente] = useState('');
-  
-  const [modalCierreAbierto, setModalCierreAbierto] = useState(false);
-  const [drawerVentaRapidaAbierto, setDrawerVentaRapidaAbierto] = useState(false);
-  const [modalMovimientosAbierto, setModalMovimientosAbierto] = useState(false);
-  const [ordenACobrar, setOrdenACobrar] = useState(null);
-  const [solicitudesBot, setSolicitudesBot] = useState([]);
-
-  // Cargar datos de sesión iniciales
+  // ─── Sesión ───────────────────────────────────────────────
   useEffect(() => {
-    const initSession = async () => {
-      const sede = await EncryptedStorage.getItem('sede_id');
-      const rol = await EncryptedStorage.getItem('usuario_rol');
-      const empId = await EncryptedStorage.getItem('empleado_id');
-      if (sede) setSedeActualId(sede);
-      if (rol) setRolUsuario(rol);
-      if (empId) setEmpleadoId(empId);
+    const init = async () => {
+      const sid    = await EncryptedStorage.getItem('sede_id');
+      const nid    = await EncryptedStorage.getItem('negocio_id');
+      const enombre = await EncryptedStorage.getItem('empleado_nombre');
+      if (sid) setSedeId(sid);
+      if (nid) setNegocioId(nid);
+      if (enombre) setEmpleadoNombre(enombre);
     };
-    initSession();
+    init();
   }, []);
 
-  // ─── HOOKS DE DATOS Y WEBSOCKETS ──────────────────────────────
-  const {
-    sedes, mesas, setMesas, ordenesLlevar, setOrdenesLlevar,
-    todasLasOrdenesActivas, vistaLocal, setVistaLocal, modulos,
-    sedeActualIdRef, cargandoCaja
-  } = useTerminalData(sedeActualId, triggerRecarga, setConfiguracionGlobal, setEstadoCaja);
+  // ─── Cargar datos ─────────────────────────────────────────
+  const [modificadores, setModificadores] = useState([]);
 
-  useTerminalWS(sedeActualId, setMesas, setOrdenesLlevar, setSolicitudesBot, sedeActualIdRef);
+  const cargarDatos = useCallback(async () => {
+    if (!sedeId || !negocioId) return;
+    setCargando(true);
+    try {
+      const [resProd, resCat, resOrdenes, resMods] = await Promise.all([
+        getProductos({ negocio_id: negocioId, sede_id: sedeId, disponible: true }),
+        getCategorias({ negocio_id: negocioId }),
+        !esParaLlevar && mesaIdReal
+          ? getOrdenes({ negocio_id: negocioId, sede_id: sedeId, mesa: mesaIdReal, estado: 'preparando' })
+          : Promise.resolve({ data: [] }),
+        getModificadores({ negocio_id: negocioId }),
+      ]);
 
-  // Auto-seleccionar primera sede si no hay una guardada
-  useEffect(() => {
-    if (sedes?.length > 0 && !sedeActualId) {
-      const primeraSedeId = String(sedes[0].id);
-      EncryptedStorage.setItem('sede_id', primeraSedeId);
-      setSedeActualId(primeraSedeId);
+      setProductos(resProd.data || []);
+      setCategorias(resCat.data || []);
+      setModificadores(resMods.data || []);
+
+      const ordenes = resOrdenes.data || [];
+      if (ordenes.length > 0) setOrdenActiva(ordenes[0]);
+
+    } catch (e) {
+      console.error('Error cargando POS:', e);
+    } finally {
+      setCargando(false);
     }
-  }, [sedes, sedeActualId]);
+  }, [sedeId, negocioId, mesaIdReal, esParaLlevar]);
 
-  // ─── HELPERS Y MANEJADORES ────────────────────────────────────
-  const manejarCambioSede = async (nuevaSedeId) => {
-    if (!nuevaSedeId) return;
-    await EncryptedStorage.setItem('sede_id', nuevaSedeId);
-    setSedeActualId(nuevaSedeId);
-  };
+  useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-  const handleAbrirCaja = async () => {
-    if (!fondoCaja || isNaN(fondoCaja) || parseFloat(fondoCaja) < 0) {
-      Alert.alert('Error', 'Ingresa un fondo de caja válido.');
+  // ─── Carrito helpers ──────────────────────────────────────
+  const totalCarrito      = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const totalOrdenActiva  = ordenActiva
+    ? ordenActiva.detalles.reduce((s, d) => s + parseFloat(d.precio_unitario || 0) * (d.cantidad || 1), 0)
+    : 0;
+  const totalMesa  = totalCarrito + totalOrdenActiva;
+  const cantItems  = carrito.reduce((s, i) => s + i.cantidad, 0)
+    + (ordenActiva?.detalles.reduce((s, d) => s + d.cantidad, 0) || 0);
+
+  const agregarAlCarrito = (producto) => {
+    // Solo forzar modal si la selección es OBLIGATORIA
+    if (producto.requiere_seleccion) {
+      setProductoParaVariar(producto);
+      setModalVariacionesVisible(true);
       return;
     }
-    setAbriendoCaja(true);
+
+    // Producto estándar (con o sin variaciones opcionales) → agrega directo
+    const cartId = `base_${producto.id}`;
+    setCarrito(prev => {
+      const existe = prev.find(i => i.cart_id === cartId);
+      if (existe) return prev.map(i => i.cart_id === cartId ? { ...i, cantidad: i.cantidad + 1 } : i);
+      return [...prev, {
+        cart_id:   cartId,
+        id:        producto.id,
+        nombre:    producto.nombre,
+        precio:    parseFloat(producto.precio_base || producto.precio_minimo || 0),
+        cantidad:  1,
+        imagen:    producto.imagen,
+        opciones_seleccionadas: [],
+        notas_cocina: '',
+      }];
+    });
+  };
+
+  const agregarConVariaciones = (productoConOpciones) => {
+    const cartId = `var_${productoConOpciones.id}_${Date.now()}`;
+    setCarrito(prev => [...prev, {
+      cart_id:   cartId,
+      id:        productoConOpciones.id,
+      nombre:    productoConOpciones.nombre,
+      precio:    parseFloat(productoConOpciones.precio_base || 0),
+      cantidad:  1,
+      imagen:    productoConOpciones.imagen,
+      opciones_seleccionadas: productoConOpciones.opciones_seleccionadas || [],
+      notas_cocina: productoConOpciones.notas_cocina || '',
+    }]);
+  };
+
+  const restarDelCarrito = (cartId) => {
+    setCarrito(prev => {
+      const item = prev.find(i => i.cart_id === cartId);
+      if (!item) return prev;
+      if (item.cantidad <= 1) return prev.filter(i => i.cart_id !== cartId);
+      return prev.map(i => i.cart_id === cartId ? { ...i, cantidad: i.cantidad - 1 } : i);
+    });
+  };
+
+  const sumarUnidad = (cartId) => {
+    setCarrito(prev => prev.map(i => i.cart_id === cartId ? { ...i, cantidad: i.cantidad + 1 } : i));
+  };
+
+  const cantidadSimple = (productoId) => {
+    return carrito.filter(i => i.id === productoId).reduce((s, i) => s + i.cantidad, 0);
+  };
+
+  // ─── Filtros ──────────────────────────────────────────────
+  const productosFiltrados = productos.filter(p => {
+    const matchBusqueda  = !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    const matchCategoria = categoriaActiva === 'todas' || String(p.categoria) === String(categoriaActiva);
+    return matchBusqueda && matchCategoria && p.disponible;
+  });
+
+  // ─── Enviar a cocina ──────────────────────────────────────
+  const enviarACocina = async () => {
+    if (carrito.length === 0) return;
+    setProcesando(true);
     try {
-      const res = await abrirCajaBD({
-        sede_id: sedeActualId,
-        empleado_id: empleadoId,
-        fondo_inicial: parseFloat(fondoCaja),
-      });
-      await EncryptedStorage.setItem('sesion_caja_id', String(res.data.id));
-      setEstadoCaja('abierto');
-      setModalAperturaAbierto(false);
-      setFondoCaja('');
-    } catch {
-      Alert.alert('Error', 'No se pudo abrir la caja. Intenta de nuevo.');
-    } finally {
-      setAbriendoCaja(false);
-    }
-  };
+      const detalles = carrito.map(item => ({
+        producto:              item.id,
+        cantidad:              item.cantidad,
+        precio_unitario:       item.precio,
+        notas_cocina:          item.notas_cocina || '',
+        notas_y_modificadores: '',
+        opciones_seleccionadas: item.opciones_seleccionadas || [],
+      }));
 
-  const manejarClickMesa = async (mesa) => {
-    if (modoUnir) {
-      if (!mesaPrincipal) {
-        setMesaPrincipal(mesa.id);
-      } else if (mesa.id !== mesaPrincipal) {
-        try {
-          await actualizarMesa(mesa.id, { mesa_principal: mesaPrincipal });
-          setModoUnir(false); setMesaPrincipal(null);
-          setTriggerRecarga((p) => !p);
-        } catch { Alert.alert('Error', 'No se pudo unir las mesas.'); }
+      if (ordenActiva) {
+        const res = await agregarProductosAOrden(ordenActiva.id, { detalles });
+        setOrdenActiva(res.data.orden || res.data);
+      } else {
+        const payload = {
+          sede:           sedeId,
+          mesa:           esParaLlevar ? null : mesaIdReal,
+          tipo:           esParaLlevar ? 'llevar' : 'salon',
+          estado:         'preparando',
+          total:          totalCarrito,
+          cliente_nombre: esParaLlevar ? nombreLlevar : '',
+          detalles,
+        };
+        const res = await crearOrden(payload);
+        setOrdenActiva(res.data.orden || res.data);
       }
-    } else {
-      setMesaSeleccionada(mesa.id);
+
+      setCarrito([]);
+      setCarritoAbierto(false);
+      setMostrarExito(true);
+      setTimeout(() => { setMostrarExito(false); onVolver(); }, 2000);
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo enviar a cocina.');
+    } finally {
+      setProcesando(false);
     }
   };
 
-  const manejarSepararMesa = async (mesaPadre) => {
+  // ─── Anular item ──────────────────────────────────────────
+  const anularItem = (detalle) => {
     Alert.alert(
-      'Separar Mesas',
-      `¿Estás seguro de que quieres desarmar el grupo de la Mesa ${mesaPadre.numero}?`,
+      'Anular plato',
+      `¿Anular "${detalle.producto_nombre}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Desarmar', style: 'destructive', onPress: async () => {
+        {
+          text: 'Anular', style: 'destructive',
+          onPress: async () => {
             try {
-              const mesasHijas = mesas.filter((m) => m.unida_a === mesaPadre.id);
-              await Promise.all(mesasHijas.map((hija) => actualizarMesa(hija.id, { mesa_principal: null })));
-              setTriggerRecarga((p) => !p);
-            } catch { Alert.alert('Error', 'Hubo un problema al separar las mesas.'); }
-          }
-        }
+              const res = await anularItemDeOrden(ordenActiva.id, {
+                detalle_id:      detalle.id,
+                motivo:          'Anulado desde app',
+                empleado_nombre: empleadoNombre || 'Staff',
+              });
+              setOrdenActiva(res.data.orden || res.data);
+            } catch { Alert.alert('Error', 'No se pudo anular.'); }
+          },
+        },
       ]
     );
   };
 
-  const iniciarOrdenDelivery = () => {
-    if (!nombreCliente.trim()) { Alert.alert('Error', 'Ingresa el nombre del cliente.'); return; }
-    setModalClienteAbierto(false);
-    setMesaSeleccionada({ id: 'llevar', cliente: nombreCliente, telefono: telefonoCliente });
-    setNombreCliente(''); setTelefonoCliente('');
-  };
-
-  const entregarOrdenLlevar = async (id) => {
-    try { await actualizarOrden(id, { estado: 'pagado' }); setTriggerRecarga(p => !p); }
-    catch { Alert.alert('Error', 'No se pudo entregar el pedido.'); }
-  };
-
-  const manejarCancelacion = (id) => {
-    // En RN usamos prompt mediante un Modal custom o Alert.prompt (solo iOS). 
-    // Para compatibilidad cruzada asumimos un Alert o Modal de cancelación.
-    Alert.alert('Cancelar Pedido', '¿Estás seguro de cancelar este pedido?', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Sí, Cancelar', style: 'destructive', onPress: async () => {
-          try { await actualizarOrden(id, { estado: 'cancelado', cancelado: true }); setTriggerRecarga(p => !p); }
-          catch { Alert.alert('Error', 'Error al cancelar'); }
-      }}
-    ]);
-  };
-
-  const manejarCierreCajaSeguro = async () => {
-    const hayOcupadas = mesas.some((m) => m.estado === 'ocupada' || m.orden_activa);
-    const hayLlevar = ordenesLlevar.some((o) => o.estado_pago !== 'pagado');
-    if (hayOcupadas || hayLlevar) { Alert.alert('⚠️ Atención', 'Hay mesas ocupadas o pedidos pendientes.'); return; }
-    
-    // Asumimos un Modal de validación de PIN para RN
-    Alert.prompt('Cierre de Caja', 'Ingrese PIN autorizado:', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Confirmar', onPress: async (pin) => {
-          try {
-            const { data } = await validarPinEmpleado({ pin, accion: 'entrar' });
-            if (['Cajero', 'Administrador', 'Admin'].includes(data.rol_nombre)) setModalCierreAbierto(true);
-            else Alert.alert('🚫', 'Sin permisos para cerrar caja.');
-          } catch { Alert.alert('❌', 'PIN incorrecto o empleado inactivo.'); }
-      }}
-    ], 'secure-text');
-  };
-
-  const manejarResolucionBot = async (solicitud_id, orden_id, decision) => {
+  // ─── Cobrar ───────────────────────────────────────────────
+  const cobrar = async () => {
+    if (!ordenActiva) return;
     try {
-      await api.post(`/ordenes/${orden_id}/resolver_solicitud_bot/`, { solicitud_id, decision });
-      setSolicitudesBot(prev => prev.filter(s => s.solicitud_id !== solicitud_id));
-      if (decision === 'aprobar') setTriggerRecarga(p => !p);
+      const sesionCajaId = await EncryptedStorage.getItem('sesion_caja_id');
+      await api.post(`/ordenes/${ordenActiva.id}/cobrar_orden/`, {
+        pagos: [{ monto: totalMesa, metodo: 'efectivo' }],
+        sesion_caja_id: sesionCajaId,
+      });
+      setCarrito([]);
+      setCarritoAbierto(false);
+      onVolver();
     } catch {
-      Alert.alert("Error", "Problema al resolver la solicitud del bot.");
+      Alert.alert('Error', 'No se pudo cobrar.');
     }
   };
 
-  // ─── RENDER DE ESTADOS ESPECIALES ─────────────────────────────
+  // ─── Render producto ──────────────────────────────────────
+  const renderProducto = ({ item }) => {
+    const cant = cantidadSimple(item.id);
+    const tieneVariaciones = item.grupos_variacion?.length > 0 || item.requiere_seleccion;
+    const precioMin = parseFloat(item.precio_minimo || item.precio_base || 0);
+    const precioMax = parseFloat(item.precio_maximo || item.precio_base || 0);
 
-  // 1. Cargando
-  if (vistaLocal === null) {
+    // ✅ Solo mostrar precio si hay uno válido
+    const mostrarPrecio = precioMin > 0;
+    const mostrarDesde  = tieneVariaciones && precioMin !== precioMax && precioMin > 0;
+
+    const catNombre = categorias.find(c => String(c.id) === String(item.categoria))?.nombre || '';
+
     return (
-      <View style={[s.centerContainer, { backgroundColor: t.bg }]}>
-        <ActivityIndicator size="large" color={t.color} />
-        <Text style={[s.loadingText, { color: t.textSec }]}>CONECTANDO SISTEMA...</Text>
-      </View>
-    );
-  }
-
-  // 2. Caja Cerrada
-  if (!cajaAbierta && !cargandoCaja) {
-    return (
-      <View style={[s.centerContainer, { backgroundColor: t.bg, padding: 24 }]}>
-        <Icon name="lock" size={60} color={t.textMuted} style={{ marginBottom: 20 }} />
-        <Text style={[s.titleText, { color: t.textPrim }]}>Caja Cerrada</Text>
-        <Text style={[s.descText, { color: t.textSec, marginBottom: 40 }]}>
-          {puedeAbrirCaja ? 'No hay una sesión de caja activa. Inicia el turno.' : 'Esperando que un administrador abra la caja.'}
-        </Text>
-
-        {puedeAbrirCaja && (
-          <TouchableOpacity style={[s.btnPrimary, { backgroundColor: t.color }]} onPress={() => setModalAperturaAbierto(true)}>
-            <Icon name="money" size={16} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={s.btnPrimaryText}>ABRIR CAJA</Text>
-          </TouchableOpacity>
+      <TouchableOpacity
+        style={[s.prodCard, { backgroundColor: t.bgCard, borderColor: cant > 0 ? t.color : t.border }]}
+        onPress={() => agregarAlCarrito(item)}
+        activeOpacity={0.8}
+      >
+        {item.imagen ? (
+          <Image source={{ uri: item.imagen }} style={s.prodImg} resizeMode="cover" />
+        ) : (
+          <View style={[s.prodImgPlaceholder, { backgroundColor: t.bgCard2 }]}>
+            <Icon name="cutlery" size={20} color={t.textMuted} />
+          </View>
         )}
 
-        <Modal visible={modalAperturaAbierto} transparent animationType="fade">
-          <View style={s.modalOverlay}>
-            <View style={[s.modalBox, { backgroundColor: t.bgCard, borderColor: t.border }]}>
-              <Text style={[s.modalTitle, { color: t.textPrim }]}>Abrir Turno</Text>
-              <Text style={[s.modalSub, { color: t.textSec }]}>Fondo inicial de la caja</Text>
-              
-              <TextInput
-                style={[s.inputBig, { backgroundColor: t.bgInput, borderColor: t.border, color: t.textPrim }]}
-                value={fondoCaja}
-                onChangeText={setFondoCaja}
-                placeholder="S/ 0.00"
-                placeholderTextColor={t.textMuted}
-                keyboardType="decimal-pad"
-                autoFocus
-              />
-              
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity style={[s.btnOutline, { borderColor: t.border, flex: 1 }]} onPress={() => setModalAperturaAbierto(false)}>
-                  <Text style={[s.btnOutlineText, { color: t.textSec }]}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.btnPrimary, { backgroundColor: t.color, flex: 1 }]} onPress={handleAbrirCaja} disabled={abriendoCaja}>
-                  <Text style={s.btnPrimaryText}>{abriendoCaja ? 'Abriendo...' : 'Confirmar'}</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={s.prodBody}>
+          {catNombre ? <Text style={[s.prodCateg, { color: t.textMuted }]}>{catNombre.toUpperCase()}</Text> : null}
+          <Text style={[s.prodNombre, { color: t.textPrim }]} numberOfLines={2}>{item.nombre}</Text>
+          {item.es_combo && (
+            <View style={[s.comboBadge, { backgroundColor: `${t.color}20`, borderColor: `${t.color}30` }]}>
+              <Text style={[s.comboBadgeText, { color: t.color }]}>COMBO</Text>
             </View>
-          </View>
-        </Modal>
-      </View>
-    );
-  }
-
-  // 3. Modo Fast Food
-  if (modulos.salon === false && modulos.delivery === false) {
-    return (
-      <View style={[s.centerContainer, { backgroundColor: t.bg, padding: 24 }]}>
-        <Icon name="bolt" size={60} color={t.color} style={{ marginBottom: 20 }} />
-        <Text style={[s.titleText, { color: t.textPrim }]}>Modo Fast Food</Text>
-        <Text style={[s.descText, { color: t.textSec, marginBottom: 40 }]}>
-          El salón y delivery están desactivados. Usa la Venta Rápida.
-        </Text>
-        <TouchableOpacity style={[s.btnPrimary, { backgroundColor: t.color, paddingHorizontal: 32 }]} onPress={() => setDrawerVentaRapidaAbierto(true)}>
-          <Text style={s.btnPrimaryText}>⚡ INICIAR VENTA RÁPIDA</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ─── RENDER PRINCIPAL (APP) ───────────────────────────────────
-  return (
-    <View style={[s.container, { backgroundColor: t.bg }]}>
-      <StatusBar barStyle={t.isDark ? 'light-content' : 'dark-content'} backgroundColor={t.bgCard} />
-      
-      {/* HEADER (Arquitectura extraída) */}
-      <TerminalHeader 
-        tema={t} colorPrimario={t.color} vistaLocal={vistaLocal} 
-        mesaSeleccionada={mesaSeleccionada} esDueño={esDueño} sedes={sedes} 
-        sedeActualId={sedeActualId} manejarCambioSede={manejarCambioSede} 
-        modoUnir={modoUnir} setModoUnir={setModoUnir} setMesaPrincipal={setMesaPrincipal} 
-        modSalonActivo={modulos.salon} modLlevarActivo={modulos.delivery} 
-        setVistaLocal={setVistaLocal} ordenesLlevar={ordenesLlevar} 
-        setDrawerVentaRapidaAbierto={setDrawerVentaRapidaAbierto} rolUsuario={rolUsuario} 
-        onIrAErp={onIrAErp} setModalMovimientosAbierto={setModalMovimientosAbierto} 
-        manejarCierreCajaSeguro={manejarCierreCajaSeguro} 
-      />
-
-      <View style={s.bodyRow}>
-        {/* VISTA PRINCIPAL (Mesas o Llevar) */}
-        <View style={[s.mainContent, mesaSeleccionada && Platform.OS !== 'web' ? { display: 'none' } : {}]}>
-          {vistaLocal === 'salon' && modulos.salon && (
-            <TerminalMesasGrid 
-              mesas={mesas} modoUnir={modoUnir} mesaPrincipal={mesaPrincipal} 
-              mesaSeleccionada={mesaSeleccionada} manejarClickMesa={manejarClickMesa} 
-              mostrarPuertaMovil={mostrarPuertaMovil} setMostrarPuertaMovil={setMostrarPuertaMovil} 
-              tema={t} colorPrimario={t.color} sedeActual={sedes.find(s => String(s.id) === String(sedeActualId))}
-              manejarSepararMesa={manejarSepararMesa}
-            />
           )}
-
-          {vistaLocal === 'llevar' && modulos.delivery && (
-            <TerminalLlevarView 
-              ordenesLlevar={ordenesLlevar} tema={t} colorPrimario={t.color} 
-              setModalClienteAbierto={setModalClienteAbierto} manejarCancelacion={manejarCancelacion} 
-              setOrdenACobrar={setOrdenACobrar} entregarOrdenLlevar={entregarOrdenLlevar} 
-            />
+          {mostrarPrecio && (
+            <Text style={[s.prodPrecio, { color: t.color }]}>
+              {mostrarDesde ? <Text style={{ fontSize: 10 }}>Desde </Text> : null}
+              S/ {precioMin.toFixed(2)}
+            </Text>
           )}
         </View>
 
-        {/* SIDEBAR DE ORDEN (Aparece al seleccionar una mesa) */}
-        {mesaSeleccionada && (
-          <View style={[s.sidebar, { borderLeftColor: t.border }]}>
-            <TerminalSidebar 
-              mesaSeleccionada={mesaSeleccionada} setMesaSeleccionada={setMesaSeleccionada} 
-              setTriggerRecarga={setTriggerRecarga} todasLasOrdenesActivas={todasLasOrdenesActivas} 
-              setVistaLocal={setVistaLocal} mesas={mesas} tema={t} colorPrimario={t.color} 
-            />
+        {/* Parte inferior */}
+        {cant > 0 && !item.requiere_seleccion ? (
+          <View style={s.prodCantRow}>
+            <TouchableOpacity
+              style={[s.prodCantBtn, { backgroundColor: t.bgCard2, borderColor: t.border }]}
+              onPress={() => restarDelCarrito(`base_${item.id}`)}
+            >
+              <Icon name="minus" size={12} color={t.textSec} />
+            </TouchableOpacity>
+            <View style={[s.prodCantBadge, { backgroundColor: t.color }]}>
+              <Text style={s.prodCantNum}>{cant}</Text>
+            </View>
+            <TouchableOpacity
+              style={[s.prodCantBtn, { backgroundColor: t.color }]}
+              onPress={() => agregarAlCarrito(item)}
+            >
+              <Icon name="plus" size={12} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.prodCantBtn, { backgroundColor: t.bgCard2, borderColor: t.border, marginLeft: 2 }]}
+              onPress={() => { setProductoParaVariar(item); setModalVariacionesVisible(true); }}
+            >
+              <Icon name="comment" size={12} color={t.textSec} />
+            </TouchableOpacity>
+          </View>
+        ) : item.tiene_variaciones && !item.requiere_seleccion ? (
+          <TouchableOpacity
+            style={[s.opcionesBtn, { backgroundColor: `${t.color}15`, borderColor: `${t.color}40` }]}
+            onPress={() => { setProductoParaVariar(item); setModalVariacionesVisible(true); }}
+            activeOpacity={0.8}
+          >
+            <Icon name="sliders" size={11} color={t.color} style={{ marginRight: 6 }} />
+            <Text style={[s.opcionesBtnText, { color: t.color }]}>+ CON OPCIONES</Text>
+          </TouchableOpacity>
+        ) : item.requiere_seleccion ? (
+          <TouchableOpacity
+            style={[s.opcionesBtn, { backgroundColor: `${t.color}15`, borderColor: `${t.color}40` }]}
+            onPress={() => agregarAlCarrito(item)}
+            activeOpacity={0.8}
+          >
+            <Icon name="list" size={11} color={t.color} style={{ marginRight: 6 }} />
+            <Text style={[s.opcionesBtnText, { color: t.color }]}>VER OPCIONES</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[s.prodCantRow, { justifyContent: 'flex-end' }]}>
+            <TouchableOpacity
+              style={[s.prodCantBtn, { backgroundColor: t.bgCard2, borderColor: t.border }]}
+              onPress={() => { setProductoParaVariar(item); setModalVariacionesVisible(true); }}
+            >
+              <Icon name="comment" size={12} color={t.textSec} />
+            </TouchableOpacity>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
+    );
+  };
 
-      {/* ─── MODALES GLOBALES ─── */}
-      
-      {/* Modal Cliente Delivery */}
-      <Modal visible={modalClienteAbierto} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={[s.modalBox, { backgroundColor: t.bgCard, borderColor: t.border }]}>
-            <View style={[s.modalHeader, { borderBottomColor: t.border }]}>
-              <View>
-                <Text style={[s.modalTitle, { color: t.textPrim }]}>Datos del Cliente</Text>
-                <Text style={[s.modalSub, { color: t.textSec }]}>Identifica el pedido</Text>
-              </View>
-              <TouchableOpacity onPress={() => setModalClienteAbierto(false)}>
-                <Icon name="times" size={20} color={t.textSec} />
+  if (cargando) {
+    return (
+      <View style={[s.loader, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.color} />
+        <Text style={[s.loaderText, { color: t.textMuted }]}>SINCRONIZANDO CAJA...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[s.container, { backgroundColor: t.bg }]}>
+      <StatusBar barStyle={t.isDark ? 'light-content' : 'dark-content'} backgroundColor={t.bgCard} />
+
+      {/* ─── HEADER ─────────────────────────────────────── */}
+      <View style={[s.header, { backgroundColor: t.bgCard, borderBottomColor: t.border }]}>
+        <View style={s.headerTop}>
+          {/* Botón volver */}
+          <TouchableOpacity
+            onPress={onVolver}
+            style={[s.backBtn, { backgroundColor: t.bgCard2, borderColor: t.border }]}
+            activeOpacity={0.7}
+          >
+            <Icon name="angle-left" size={20} color={t.textSec} />
+          </TouchableOpacity>
+
+          {/* Título o búsqueda */}
+          {busqueda !== null && busquedaActiva ? (
+            <View style={s.searchActiveRow}>
+              <TextInput
+                style={[s.searchActiveInput, { backgroundColor: t.bgInput, borderColor: t.border2, color: t.textPrim }]}
+                value={busqueda}
+                onChangeText={setBusqueda}
+                placeholder="Buscar plato..."
+                placeholderTextColor={t.textMuted}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => { setBusquedaActiva(false); setBusqueda(''); }}>
+                <Icon name="times" size={18} color={t.textSec} />
               </TouchableOpacity>
             </View>
-
-            <View style={{ padding: 20, gap: 16 }}>
-              <View>
-                <Text style={[s.inputLabel, { color: t.textSec }]}>NOMBRE (OBLIGATORIO)</Text>
-                <TextInput
-                  style={[s.inputNormal, { backgroundColor: t.bgInput, borderColor: t.border2, color: t.textPrim }]}
-                  value={nombreCliente} onChangeText={setNombreCliente} placeholder="Ej. Carlos" placeholderTextColor={t.textMuted}
-                />
+          ) : (
+            <View style={s.headerTituloRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.headerSubtipo, { color: t.textMuted }]}>
+                  {esParaLlevar ? '🛵 DELIVERY' : '🍽 SALÓN'}
+                </Text>
+                <Text style={[s.headerTitulo, { color: t.textPrim }]} numberOfLines={1}>
+                  {esParaLlevar ? nombreLlevar.toUpperCase() : `MESA ${mesaIdReal}`}
+                </Text>
               </View>
-              <View>
-                <Text style={[s.inputLabel, { color: t.textSec }]}>WHATSAPP (OPCIONAL)</Text>
-                <TextInput
-                  style={[s.inputNormal, { backgroundColor: t.bgInput, borderColor: t.border2, color: t.textPrim }]}
-                  value={telefonoCliente} onChangeText={setTelefonoCliente} placeholder="Ej. 999 999 999" placeholderTextColor={t.textMuted} keyboardType="phone-pad"
-                />
-              </View>
-              <TouchableOpacity style={[s.btnPrimary, { backgroundColor: t.color, marginTop: 8 }]} onPress={iniciarOrdenDelivery}>
-                <Text style={s.btnPrimaryText}>IR AL MENÚ</Text>
-                <Icon name="arrow-right" size={14} color="#fff" style={{ marginLeft: 8 }} />
+              <TouchableOpacity
+                onPress={() => setBusquedaActiva(true)}
+                style={[s.backBtn, { backgroundColor: t.bgCard2, borderColor: t.border }]}
+                activeOpacity={0.7}
+              >
+                <Icon name="search" size={16} color={t.textSec} />
               </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Categorías */}
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: 'row' }}
+        >
+          {[{ id: 'todas', nombre: 'TODAS' }, ...categorias].map(cat => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                s.categPill,
+                { borderColor: t.border, backgroundColor: 'transparent' },
+                String(categoriaActiva) === String(cat.id) && { backgroundColor: t.color, borderColor: t.color },
+              ]}
+              onPress={() => setCategoriaActiva(String(cat.id))}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                s.categText,
+                { color: t.textMuted },
+                String(categoriaActiva) === String(cat.id) && { color: '#fff' },
+              ]}>
+                {cat.nombre}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* ─── GRID DE PRODUCTOS ───────────────────────────── */}
+      <FlatList
+        data={productosFiltrados}
+        renderItem={renderProducto}
+        keyExtractor={item => String(item.id)}
+        numColumns={2}
+        contentContainerStyle={[s.prodGrid, { paddingBottom: (carrito.length > 0 || ordenActiva) ? 100 : 40 }]}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={[s.emptyState, { borderColor: t.border }]}>
+            <Icon name="cutlery" size={32} color={t.textMuted} />
+            <Text style={[s.emptyTitulo, { color: t.textPrim }]}>Sin productos</Text>
+          </View>
+        }
+      />
+
+      {/* ─── FOOTER ──────────────────────────────────────── */}
+      {(carrito.length > 0 || ordenActiva) && (
+        <View style={[s.footer, { backgroundColor: t.bgCard, borderTopColor: t.border }]}>
+          
+          {/* Botón Ver Cuenta */}
+          <TouchableOpacity
+            style={[s.footerVerCuenta, { 
+              backgroundColor: t.bgCard2, 
+              borderColor: t.border,
+              opacity: cantItems === 0 ? 0.4 : 1 
+            }]}
+            onPress={() => setCarritoAbierto(true)}
+            disabled={cantItems === 0}
+            activeOpacity={0.8}
+          >
+            {/* Badge cantidad */}
+            <View style={[s.footerBadge, { backgroundColor: t.color }]}>
+              <Text style={s.footerBadgeText}>{cantItems}</Text>
+            </View>
+
+            {/* Label */}
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[s.footerVerLabel, { color: t.textPrim }]}>VER CUENTA</Text>
+            </View>
+
+            {/* Total */}
+            <Text style={[s.footerVerTotal, { color: t.color }]}>
+              S/ {totalMesa.toFixed(2)}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Botón Enviar a cocina */}
+          <TouchableOpacity
+            style={[
+              s.footerEnviar,
+              { backgroundColor: carrito.length > 0 ? t.color : t.bgCard2 },
+              procesando && { opacity: 0.6 },
+            ]}
+            onPress={carrito.length > 0 ? enviarACocina : () => setModalCobroVisible(true)}
+            disabled={procesando || (carrito.length === 0 && !ordenActiva)}
+            activeOpacity={0.8}
+          >
+            {procesando ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : carrito.length > 0 ? (
+              <>
+                <Text style={[s.footerEnviarText, { color: '#fff' }]}>ENVIAR</Text>
+                <Icon name="paper-plane" size={14} color="#fff" style={{ marginLeft: 6 }} />
+              </>
+            ) : ordenActiva ? (
+              <>
+                <Text style={[s.footerEnviarText, { color: '#fff' }]}>COBRAR</Text>
+                <Icon name="money" size={14} color="#fff" style={{ marginLeft: 6 }} />
+              </>
+            ) : null}
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+      {/* ─── DRAWER CARRITO ──────────────────────────────── */}
+      <Modal visible={carritoAbierto} animationType="slide" transparent onRequestClose={() => setCarritoAbierto(false)}>
+        <View style={s.carritoOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setCarritoAbierto(false)} />
+          <View style={[s.carritoDrawer, { backgroundColor: t.bgCard, borderTopColor: t.border }]}>
+
+            {/* Handle */}
+            <TouchableOpacity style={s.handle} onPress={() => setCarritoAbierto(false)}>
+              <View style={[s.handleBar, { backgroundColor: t.border2 }]} />
+            </TouchableOpacity>
+
+            {/* Header carrito */}
+            <View style={[s.carritoHeader, { borderBottomColor: t.border }]}>
+              <View>
+                <Text style={[s.carritoTotalLabel, { color: t.textSec }]}>TOTAL DE LA CUENTA</Text>
+                <Text style={[s.carritoTotalMonto, { color: t.textPrim }]}>S/ {totalMesa.toFixed(2)}</Text>
+                <Text style={[s.carritoCantLabel, { color: t.textSec }]}>{cantItems} artículos</Text>
+              </View>
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity onPress={() => setCarritoAbierto(false)} style={[s.carritoCloseBtn, { backgroundColor: t.bgCard2 }]}>
+                  <Icon name="times" size={14} color={t.textSec} />
+                </TouchableOpacity>
+                {carrito.length > 0 && (
+                  <TouchableOpacity
+                    style={[s.vaciarBtn, { backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)' }]}
+                    onPress={() => setCarrito([])}
+                  >
+                    <Icon name="trash" size={10} color="#ef4444" style={{ marginRight: 4 }} />
+                    <Text style={s.vaciarBtnText}>Vaciar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+
+              {/* Items en cocina */}
+              {ordenActiva && ordenActiva.detalles.length > 0 && (
+                <View style={{ marginBottom: 20 }}>
+                  <View style={s.seccionHeader}>
+                    <Icon name="fire" size={10} color={t.textMuted} style={{ marginRight: 6 }} />
+                    <Text style={[s.seccionLabel, { color: t.textMuted }]}>YA EN COCINA</Text>
+                    <View style={[s.seccionLinea, { backgroundColor: t.border }]} />
+                  </View>
+                    {ordenActiva.detalles.map(detalle => (
+                      <View key={detalle.id} style={[s.carritoItem, { backgroundColor: t.bgCard2, borderColor: t.border, opacity: 0.85 }]}>
+                        <View style={[s.carritoItemCant, { backgroundColor: t.bgCard }]}>
+                          <Text style={[s.carritoItemCantNum, { color: t.textSec }]}>{detalle.cantidad}</Text>
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[s.carritoItemNombre, { color: t.textPrim }]}>
+                            {detalle.producto_nombre}
+                          </Text>
+                          {/* ✅ Mostrar opciones elegidas */}
+                          {detalle.notas_cocina ? (
+                            <Text style={{ fontSize: 11, color: t.color, marginTop: 2 }}>
+                              {detalle.notas_cocina}
+                            </Text>
+                          ) : null}
+                          <Text style={[s.carritoItemPrecio, { color: t.textSec }]}>
+                            S/ {(parseFloat(detalle.precio_unitario) * detalle.cantidad).toFixed(2)}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={s.anularBtn}
+                          onPress={() => anularItem(detalle)}
+                        >
+                          <Icon name="trash" size={12} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                </View>
+              )}
+
+              {/* Nuevos items */}
+              {carrito.length > 0 && (
+                <View>
+                  <View style={s.seccionHeader}>
+                    <View style={[s.seccionDot, { backgroundColor: t.color }]} />
+                    <Text style={[s.seccionLabel, { color: t.color }]}>NUEVOS PEDIDOS</Text>
+                    <View style={[s.seccionLinea, { backgroundColor: `${t.color}40` }]} />
+                  </View>
+                  {carrito.map(item => (
+                    <View key={item.cart_id} style={[s.carritoItem, { backgroundColor: t.bgCard2, borderColor: t.border }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.carritoItemNombre, { color: t.textPrim }]}>{item.nombre}</Text>
+                        {item.notas_cocina ? (
+                          <Text style={[{ fontSize: 11, color: t.color, marginTop: 2 }]}>{item.notas_cocina}</Text>
+                        ) : null}
+                        <Text style={[s.carritoItemPrecio, { color: t.color }]}>
+                          S/ {(item.precio * item.cantidad).toFixed(2)}
+                        </Text>
+                      </View>
+                      <View style={s.cantRow}>
+                        <TouchableOpacity
+                          style={[s.cantBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)' }]}
+                          onPress={() => restarDelCarrito(item.cart_id)}
+                        >
+                          <Icon name="minus" size={10} color="#ef4444" />
+                        </TouchableOpacity>
+                        <Text style={[s.cantNum, { color: t.textPrim }]}>{item.cantidad}</Text>
+                        <TouchableOpacity
+                          style={[s.cantBtn, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.2)' }]}
+                          onPress={() => sumarUnidad(item.cart_id)}
+                        >
+                          <Icon name="plus" size={10} color="#10b981" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {cantItems === 0 && (
+                <View style={[s.carritoVacio, { borderColor: t.border }]}>
+                  <Icon name="shopping-cart" size={36} color={t.textMuted} />
+                  <Text style={[s.carritoVacioText, { color: t.textSec }]}>Carrito vacío</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Footer carrito */}
+            <View style={[s.carritoFooter, { borderTopColor: t.border }]}>
+              {carrito.length > 0 && (
+                <TouchableOpacity
+                  style={[s.btnEnviarCocina, { backgroundColor: t.color }, procesando && { opacity: 0.6 }]}
+                  onPress={enviarACocina}
+                  disabled={procesando}
+                  activeOpacity={0.8}
+                >
+                  {procesando
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <>
+                        <Icon name="paper-plane" size={16} color="#fff" style={{ marginRight: 8 }} />
+                        <Text style={s.btnEnviarCocinaText}>ENVIAR A COCINA</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              )}
+              {ordenActiva && carrito.length === 0 && totalMesa > 0 && (
+                <TouchableOpacity
+                  style={[s.btnEnviarCocina, { backgroundColor: '#10b981' }]}
+                  onPress={() => { setCarritoAbierto(false); setModalCobroVisible(true); }}  // ← abrir modal
+                  activeOpacity={0.8}
+                >
+                  <Icon name="money" size={16} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={s.btnEnviarCocinaText}>COBRAR TICKET</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
       </Modal>
+      <ModalCobro
+        visible={modalCobroVisible}
+        onClose={() => setModalCobroVisible(false)}
+        total={totalMesa}
+        ordenId={ordenActiva?.id}
+        carrito={ordenActiva?.detalles || []}
+        onCobroExitoso={async ({ pagos, telefono }) => {
+          try {
+            const sesionCajaId = await EncryptedStorage.getItem('sesion_caja_id');
+            await api.post(`/ordenes/${ordenActiva.id}/cobrar_orden/`, {
+              pagos,
+              telefono,
+              sesion_caja_id: sesionCajaId,
+            });
+            setModalCobroVisible(false);
+            onVolver();
+          } catch {
+            Alert.alert('Error', 'No se pudo procesar el cobro.');
+          }
+        }}
+      />
+      {/* ─── MODAL VARIACIONES ───────────────────────────── */}
+      <ModalModificadores
+        visible={modalVariacionesVisible}
+        producto={productoParaVariar}
+        modificadoresGlobales={modificadores}
+        onAgregarAlCarrito={(item, esEdicion) => {
+          const cartId = esEdicion ? item.cart_id : `var_${item.id}_${Date.now()}`;
+          const precioFinal = parseFloat(
+            item.precio_unitario_calculado || 
+            item.precio || 
+            item.precio_base || 
+            0
+          );
+          if (esEdicion) {
+            setCarrito(prev => prev.map(i => 
+              i.cart_id === cartId ? { ...item, cart_id: cartId, precio: precioFinal } : i
+            ));
+          } else {
+            
+            setCarrito(prev => [...prev, {
+              cart_id:               cartId,
+              id:                    item.id,
+              nombre:                item.nombre,
+              precio:                precioFinal,
+              cantidad:              item.cantidad || 1,
+              imagen:                item.imagen,
+              opciones_seleccionadas: item.opciones_seleccionadas || [],
+              notas_cocina:          item.notas_cocina || '',
+            }]);
+          }
+        }}
+        onClose={() => setModalVariacionesVisible(false)}
+      />
 
-      {/* Renderizado de Modales Importados */}
-      {!!ordenACobrar && (
-        <ModalCobro 
-          isOpen={!!ordenACobrar} onClose={() => setOrdenACobrar(null)}
-          total={parseFloat(ordenACobrar.total || 0)}
-          carrito={ordenACobrar?.detalles || []} esVentaRapida={ordenACobrar.es_venta_rapida}
-          onCobroExitoso={async (datosCobro) => {
-             // Lógica adaptada en el hook interno de ModalCobro o pasada como prop
-             setOrdenACobrar(null); setTriggerRecarga(p => !p);
-          }}
-        />
-      )}
-
-      {drawerVentaRapidaAbierto && (
-        <DrawerVentaRapida 
-          isOpen={drawerVentaRapidaAbierto} onClose={() => setDrawerVentaRapidaAbierto(false)}
-          onProcederPago={(carrito, total) => {
-            setOrdenACobrar({ id: 'venta_rapida', es_venta_rapida: true, total, detalles: carrito });
-            setDrawerVentaRapidaAbierto(false);
-          }}
-        />
-      )}
-
-      {modalCierreAbierto && <ModalCierreCaja isOpen={modalCierreAbierto} onClose={() => setModalCierreAbierto(false)} />}
-      {modalMovimientosAbierto && <ModalMovimientoCaja isOpen={modalMovimientosAbierto} onClose={() => setModalMovimientosAbierto(false)} />}
-      {solicitudesBot.length > 0 && <ModalAlertaBot solicitud={solicitudesBot[0]} onResolver={manejarResolucionBot} />}
-
+      {/* ─── MODAL ÉXITO ─────────────────────────────────── */}
+      <Modal visible={mostrarExito} transparent animationType="fade">
+        <View style={s.exitoOverlay}>
+          <View style={[s.exitoCard, { backgroundColor: t.bgCard, borderColor: `${t.color}4D` }]}>
+            <View style={[s.exitoCheck, { shadowColor: '#10b981' }]}>
+              <Icon name="check" size={36} color="#fff" />
+            </View>
+            <Text style={[s.exitoTitulo, { color: t.textPrim }]}>Pedido Enviado</Text>
+            <Text style={[s.exitoSub, { color: t.textSec }]}>La cocina ya está en marcha.</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-// ─── ESTILOS ──────────────────────────────────────────────────
+// ─── Estilos ──────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1 },
-  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { marginTop: 16, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  titleText: { fontSize: 24, fontWeight: '900', textTransform: 'uppercase' },
-  descText: { fontSize: 14, textAlign: 'center', maxWidth: 300 },
-  
-  bodyRow: { flex: 1, flexDirection: 'row' },
-  mainContent: { flex: 1 },
-  sidebar: { width: '100%', maxWidth: 450, borderLeftWidth: 1 },
+  container:     { flex: 1 },
+  loader:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loaderText:    { fontSize: 11, fontWeight: '800', letterSpacing: 2 },
 
-  btnPrimary: { flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  btnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  btnOutline: { paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  btnOutlineText: { fontSize: 14, fontWeight: '800' },
+  header:          { borderBottomWidth: 1 },
+  headerTop:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: Platform.OS === 'ios' ? 56 : (StatusBar.currentHeight || 24) + 8, paddingBottom: 8, gap: 10 },
+  backBtn:         { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerTituloRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerSubtipo:   { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
+  headerTitulo:    { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
+  searchActiveRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchActiveInput: { flex: 1, height: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: 14, fontWeight: '600' },
+    
+  searchRow:     { paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
+  searchBox:     { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
+  searchInput:   { flex: 1, fontSize: 14, fontWeight: '500' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 16 },
-  modalBox: { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
-  modalTitle: { fontSize: 18, fontWeight: '900' },
-  modalSub: { fontSize: 12, marginTop: 2 },
+  categScroll:   { maxHeight: 52, borderBottomWidth: 1 },
+  categPill:     { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  categText:     { fontSize: 16, fontWeight: '500' },
+
+  prodGrid:      { paddingHorizontal: 8, paddingTop: 10 },
+  prodCard:      { 
+    flex: 1, margin: 5, borderRadius: 20, borderWidth: 1.5, 
+    overflow: 'hidden', minHeight: 160,  // ← altura fija
+    justifyContent: 'space-between',
+  },  
+  prodImg:       { width: '100%', height: 90 },
+  prodImgPlaceholder: { 
+    width: '100%', height: 80,           // ← reducir si no hay imagen
+    alignItems: 'center', justifyContent: 'center' 
+  },  
+  prodBody:      { 
+    padding: 10, gap: 4, flex: 1        // ← flex: 1 para ocupar espacio
+  },
+  prodCateg:     { fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  prodNombre:    { fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  prodPrecio:    { fontSize: 14, fontWeight: '900' },
+  varBadge:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, marginTop: 2 },
+  varBadgeText:  { fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+  prodCantRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 10, gap: 4 },
   
-  inputBig: { borderWidth: 1, borderRadius: 16, padding: 20, fontSize: 28, fontWeight: '900', textAlign: 'center', marginBottom: 20 },
-  inputNormal: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: '600' },
-  inputLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
+  prodCantBtn:   { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  prodCantBadge: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  prodCantNum:   { color: '#fff', fontSize: 14, fontWeight: '900' },
+  
+  prodAddBtn:    { marginHorizontal: 10, marginBottom: 10, borderRadius: 10, borderWidth: 1, paddingVertical: 7, alignItems: 'center' },
+  comboBadge:     { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  comboBadgeText: { fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  emptyState:    { padding: 40, alignItems: 'center', borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', margin: 20, gap: 8 },
+  emptyTitulo:   { fontSize: 15, fontWeight: '900' },
+
+  footer:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, gap: 10, position: 'absolute', bottom: 25, left: 0, right: 0 },
+  footerVerCuenta: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 14 },
+  footerBadge:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  footerBadgeText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  footerVerLabel:  { fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  footerVerTotal:  { fontSize: 18, fontWeight: '900' },
+  footerEnviar:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 25, paddingHorizontal: 20, borderRadius: 16, minWidth: 110 },
+  footerEnviarText:{ color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
+    
+  carritoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  carritoDrawer: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    height: '88%',
+  },
+  handle:         { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
+  handleBar:      { width: 48, height: 4, borderRadius: 2 },
+  carritoHeader:  { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1 },
+  carritoTotalLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 },
+  carritoTotalMonto: { fontSize: 40, fontWeight: '900', letterSpacing: -1 },
+  carritoCantLabel:  { fontSize: 11, fontWeight: '600', marginTop: 4 },
+  carritoCloseBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  vaciarBtn:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  vaciarBtnText:  { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+
+  seccionHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  seccionDot:     { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  seccionLabel:   { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginRight: 8 },
+  seccionLinea:   { flex: 1, height: 1 },
+
+  carritoItem:    { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 8 },
+  carritoItemCant: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  carritoItemCantNum: { fontSize: 16, fontWeight: '900' },
+  carritoItemNombre: { fontSize: 14, fontWeight: '700' },
+  carritoItemPrecio: { fontSize: 13, fontWeight: '800', marginTop: 2 },
+  anularBtn:      { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
+
+  cantRow:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cantBtn:        { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cantNum:        { fontSize: 15, fontWeight: '900', minWidth: 22, textAlign: 'center' },
+
+  carritoVacio:   { padding: 40, alignItems: 'center', borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', marginTop: 20, gap: 8 },
+  carritoVacioText: { fontSize: 14, fontWeight: '700' },
+
+  carritoFooter:  { padding: 16, borderTopWidth: 1, gap: 10 },
+  btnEnviarCocina: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 18, paddingVertical: 18 },
+  btnEnviarCocinaText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  opcionesBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: 8, marginBottom: 10, borderRadius: 10, borderWidth: 1, paddingVertical: 8 },
+  opcionesBtnText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  exitoOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
+  exitoCard:     { padding: 40, borderRadius: 28, borderWidth: 1, alignItems: 'center', minWidth: 240 },
+  exitoCheck:    { width: 80, height: 80, borderRadius: 40, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', marginBottom: 16, elevation: 10 },
+  exitoTitulo:   { fontSize: 24, fontWeight: '900', marginBottom: 4 },
+  exitoSub:      { fontSize: 13, textAlign: 'center' },
 });
