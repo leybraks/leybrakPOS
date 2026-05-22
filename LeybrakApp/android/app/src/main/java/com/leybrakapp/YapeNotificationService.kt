@@ -10,15 +10,19 @@ import org.json.JSONObject
 import java.util.regex.Pattern
 
 class YapeNotificationService : NotificationListenerService() {
-
     companion object {
         private const val TAG = "YapeNotifService"
-
-        private val PAQUETES_YAPE = listOf("com.bcp.yape", "pe.com.interbank.yape")
-        private val PAQUETES_PLIN = listOf("com.bbva.plin", "com.scotiabank.plin", "pe.com.viabcp.plin")
+        private val PAQUETES_YAPE = listOf(
+            "com.bcp.innovacxion.yapeapp",
+            "com.bcp.yape",
+            "pe.com.interbank.yape"
+        )
+        private val PAQUETES_PLIN = listOf(
+            "com.bbva.plin", "com.scotiabank.plin", "pe.com.viabcp.plin",
+            "pe.com.interbank.mobilebanking", "com.banbif.plin"
+        )
         private val PATRON_MONTO  = Pattern.compile("S/\\s*(\\d+(?:[.,]\\d{1,2})?)", Pattern.CASE_INSENSITIVE)
-        private val PATRON_CODIGO = Pattern.compile("\\b(\\d{4})\\b")
-
+        private val PATRON_CODIGO = Pattern.compile("\\b(\\d{3,4})\\b")
         var reactContext: ReactApplicationContext? = null
     }
 
@@ -35,9 +39,13 @@ class YapeNotificationService : NotificationListenerService() {
                       ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
             val textoCompleto = "$titulo $texto"
 
-            val matcherMonto = PATRON_MONTO.matcher(textoCompleto)
-            if (!matcherMonto.find()) return
+            Log.d(TAG, "✅ ES ${if (esYape) "YAPE" else "PLIN"} | Texto: $textoCompleto")
 
+            val matcherMonto = PATRON_MONTO.matcher(textoCompleto)
+            if (!matcherMonto.find()) {
+                Log.d(TAG, "❌ NO se encontró monto en: $textoCompleto")
+                return
+            }
             val monto = matcherMonto.group(1)?.replace(",", ".")?.toDoubleOrNull() ?: return
             if (monto < 0.10 || monto > 9999.0) return
 
@@ -55,6 +63,8 @@ class YapeNotificationService : NotificationListenerService() {
                 put("notificacion_id",  "${sbn.id}_${System.currentTimeMillis()}")
                 put("texto_original",   textoCompleto)
             }
+
+            Log.d(TAG, "💜 PAGO DETECTADO: monto=$monto codigo=$codigoSeguridad")
 
             reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("PagoYapePlinRecibido", payload.toString())

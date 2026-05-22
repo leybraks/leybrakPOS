@@ -92,6 +92,7 @@ export default function PosScreen({ mesaId, onVolver }) {
       setModificadores(resMods.data || []);
 
       const ordenes = resOrdenes.data || [];
+      console.warn('MESA:', mesaIdReal, '| ÓRDENES:', JSON.stringify(ordenes.map(o => ({ id: o.id, mesa: o.mesa }))))
       if (ordenes.length > 0) setOrdenActiva(ordenes[0]);
 
     } catch (e) {
