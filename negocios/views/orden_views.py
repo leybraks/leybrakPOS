@@ -106,6 +106,10 @@ class OrdenViewSet(viewsets.ModelViewSet):
         estado = self.request.query_params.get('estado')
         if not es_valor_nulo(estado):
             queryset = queryset.filter(estado=estado)
+        
+        mesa = self.request.query_params.get('mesa')
+        if not es_valor_nulo(mesa):
+            queryset = queryset.filter(mesa_id=mesa)
 
         return queryset
 
