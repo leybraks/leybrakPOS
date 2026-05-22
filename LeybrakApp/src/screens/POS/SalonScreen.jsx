@@ -142,15 +142,15 @@ function ModalCliente({ visible, t, color, onConfirmar, onCerrar }) {
             <TextInput
               style={[mc.input, { backgroundColor: t.bgInput, borderColor: t.border, color: t.textPrim }]}
               value={nombre} onChangeText={setNombre} placeholder="Ej. Carlos Gutiérrez"
-              placeholderTextColor={t.textMuted} autoFocus
+              placeholderTextColor={t.textMuted} autoFocus maxLength={80}
             />
             <Text style={[mc.label, { color: t.textMuted, marginTop: 20 }]}>
               <Icon name="whatsapp" size={10} /> WHATSAPP (OPCIONAL)
             </Text>
             <TextInput
               style={[mc.input, { backgroundColor: t.bgInput, borderColor: t.border, color: t.textPrim }]}
-              value={telefono} onChangeText={setTelefono} placeholder="Ej. 999 999 999"
-              placeholderTextColor={t.textMuted} keyboardType="phone-pad"
+              value={telefono} onChangeText={(v) => setTelefono(v.replace(/\D/g, ''))} placeholder="Ej. 999999999"
+              placeholderTextColor={t.textMuted} keyboardType="phone-pad" maxLength={9}
             />
             <TouchableOpacity style={[mc.btnConfirmar, { backgroundColor: color, marginTop: 28 }]} onPress={handleConfirmar}>
               <Text style={mc.btnConfirmarText}>IR AL MENÚ</Text>
@@ -229,7 +229,6 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
         getOrdenesLlevar(params),
         getOrdenes({ negocio_id: negocioId, sede_id: savedSede, estado: 'preparando' }),
       ]);
-      console.warn('🟡 ORDENES LLEVAR:', JSON.stringify(resOrdenes.data?.map(o => ({ id: o.id, tipo: o.tipo, estado: o.estado }))));
       const mesasConEstado = resMesas.data.map(mesa => {
         const ordenActiva = resOrdenesActivas.data?.find(o => String(o.mesa) === String(mesa.id));
         return {
@@ -270,7 +269,10 @@ export default function SalonScreen({ onSeleccionarMesa, onVolver }) {
       try {
         const res   = await api.get('/verificar-sesion/');
         const token = res.data.ws_token;
-        ws = new WebSocket(`wss://pos.leybrak.com/ws/salon/${sedeId}/?token=${token}`);
+        // Token en header en vez de URL para no exponerlo en logs de servidor
+        ws = new WebSocket(`wss://pos.leybrak.com/ws/salon/${sedeId}/`, null, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         wsRef.current = ws;
 
         ws.onmessage = (e) => {

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Switch, ActivityIndicator, Alert, Platform, StatusBar,
+  TextInput, Switch, ActivityIndicator, Alert, Platform, StatusBar,Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import api, { getNegocio } from '../../api/api';
+import { actualizarNegocio } from '../../api/api';
 import useAppStore from '../../store/useAppStore';
-
+import { NativeModules } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 // ─── Colores disponibles ──────────────────────────────────────
 const COLORES = [
   '#ff5a1f', '#3b82f6', '#10b981',
@@ -26,6 +28,42 @@ const MODULOS_META = [
   { id: 'modMl',          key_plan: 'modulo_ml',         icon: 'cogs',      color: '#ec4899', title: 'Predicciones IA',    desc: 'Anticípate a la demanda con IA.',             badge: 'ENTERPRISE', badgeColor: '#ec4899'  },
 ];
 
+function BotonPermisoNotificaciones({ t, color }) {
+  const [tienePermiso, setTienePermiso] = useState(false);
+
+  useEffect(() => {
+    const verificar = async () => {
+      if (NativeModules.NotificationModule) {
+        const permiso = await NativeModules.NotificationModule.tienePermisoNotificaciones();
+        setTienePermiso(permiso);
+      }
+    };
+    verificar();
+  }, []);
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      {tienePermiso ? (
+        <View style={[s.alertBoxSuccess, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+          <Icon name="check-circle" size={14} color="#10b981" />
+          <Text style={s.alertTextSuccess}>Permiso de notificaciones activo</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[{ backgroundColor: `${color}15`, borderColor: `${color}40`, borderWidth: 1, borderRadius: 12, padding: 14, alignItems: 'center' }]}
+          onPress={() => NativeModules.NotificationModule?.abrirConfiguracionPermisos()}
+          activeOpacity={0.8}
+        >
+          <Icon name="bell" size={16} color={color} style={{ marginBottom: 6 }} />
+          <Text style={{ color, fontSize: 13, fontWeight: '800' }}>ACTIVAR LECTURA DE NOTIFICACIONES</Text>
+          <Text style={{ color: t.textSec, fontSize: 11, marginTop: 4, textAlign: 'center' }}>
+            Necesario para detectar pagos de Yape/Plin automáticamente
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
 // ─── Hook de tema ─────────────────────────────────────────────
 const useTema = (temaFondo, colorPrimario) => {
   const isDark = temaFondo !== 'light';
@@ -61,8 +99,10 @@ const Tarjeta = ({ titulo, icono, color, t, children, extra }) => (
   </View>
 );
 
+
+
 // ─── Tab Perfil ───────────────────────────────────────────────
-function TabPerfil({ config, setConfig, t }) {
+function TabPerfil({ config, setConfig, t , subirQr}) {
   const [buscando, setBuscando] = useState(false);
 
   const consultarSunat = () => {
@@ -134,15 +174,27 @@ function TabPerfil({ config, setConfig, t }) {
           <TextInput
             style={[s.input, { backgroundColor: t.bgInput, borderColor: '#74089c50', color: t.textPrim }]}
             value={config.yape_numero || ''}
-            onChangeText={(v) => setConfig({ ...config, yape_numero: v })}
+            onChangeText={(v) => setConfig({ ...config, yape_numero: v.replace(/\D/g, '') })}
             placeholder="Número de Yape"
             placeholderTextColor={t.textMuted}
             keyboardType="phone-pad"
+            maxLength={9}
           />
-          <TouchableOpacity style={[s.uploadQrBox, { borderColor: t.border2, backgroundColor: t.bgInput }]} activeOpacity={0.7}>
-            <Icon name="upload" size={14} color={t.textMuted} />
-            <Text style={[s.uploadQrText, { color: t.textMuted }]}>Subir QR Yape</Text>
+          <TouchableOpacity
+              style={[s.uploadQrBox, { borderColor: t.border2, backgroundColor: t.bgInput }]}
+              onPress={() => subirQr('yape')}
+              activeOpacity={0.7}
+            >
+  <Icon name="upload" size={14} color={t.textMuted} />
+  <Text style={[s.uploadQrText, { color: t.textMuted }]}>Subir QR Yape</Text>
           </TouchableOpacity>
+          {config.yape_qr ? (
+            <Image
+              source={{ uri: config.yape_qr }}
+              style={{ width: 80, height: 80, borderRadius: 8, marginTop: 8, alignSelf: 'center' }}
+              resizeMode="contain"
+            />
+          ) : null}
         </View>
 
         {/* PLIN */}
@@ -154,15 +206,27 @@ function TabPerfil({ config, setConfig, t }) {
           <TextInput
             style={[s.input, { backgroundColor: t.bgInput, borderColor: '#00e3a650', color: t.textPrim }]}
             value={config.plin_numero || ''}
-            onChangeText={(v) => setConfig({ ...config, plin_numero: v })}
+            onChangeText={(v) => setConfig({ ...config, plin_numero: v.replace(/\D/g, '') })}
             placeholder="Número de Plin"
             placeholderTextColor={t.textMuted}
             keyboardType="phone-pad"
+            maxLength={9}
           />
-          <TouchableOpacity style={[s.uploadQrBox, { borderColor: t.border2, backgroundColor: t.bgInput }]} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[s.uploadQrBox, { borderColor: t.border2, backgroundColor: t.bgInput }]}
+            onPress={() => subirQr('plin')}
+            activeOpacity={0.7}
+          >
             <Icon name="upload" size={14} color={t.textMuted} />
             <Text style={[s.uploadQrText, { color: t.textMuted }]}>Subir QR Plin</Text>
           </TouchableOpacity>
+          {config.plin_qr ? (
+            <Image
+              source={{ uri: config.plin_qr }}
+              style={{ width: 80, height: 80, borderRadius: 8, marginTop: 8, alignSelf: 'center' }}
+              resizeMode="contain"
+            />
+          ) : null}
         </View>
       </Tarjeta>
 
@@ -185,18 +249,19 @@ function TabPerfil({ config, setConfig, t }) {
           Activa la validación automática de Yape y Plin mediante la App instalada en el celular del negocio.
         </Text>
         {config.confirmacion_automatica && (
-          <View style={s.alertBoxSuccess}>
-            <Text style={s.alertTextSuccess}>✓ Captura notificaciones push en tiempo real</Text>
-            <Text style={s.alertTextSuccess}>✓ 0% de comisión — dinero directo a tu cuenta</Text>
-          </View>
-        )}
-        {config.confirmacion_automatica && config.device_token && (
-          <View style={{ marginTop: 12 }}>
-            <Text style={[s.label, { color: t.textMuted }]}>TOKEN DE LA APP ANDROID</Text>
-            <View style={[s.tokenBox, { backgroundColor: t.bgInput, borderColor: t.border }]}>
-              <Text style={[s.tokenText, { color: t.textSec }]} selectable>{config.device_token}</Text>
+          <>
+            <View style={s.alertBoxSuccess}>
+              <Text style={s.alertTextSuccess}>✓ Captura notificaciones push en tiempo real</Text>
+              <Text style={s.alertTextSuccess}>✓ 0% de comisión — dinero directo a tu cuenta</Text>
             </View>
-            <Text style={[s.descTextSmall, { color: t.textMuted }]}>Pega este token en la App Leybrak del celular del negocio.</Text>
+
+            {/* ✅ Botón para activar permiso de notificaciones */}
+            <BotonPermisoNotificaciones t={t} color={t.color} />
+          </>
+        )}
+        {config.confirmacion_automatica && config.device_vinculado && (
+          <View style={[s.alertBoxSuccess, { marginTop: 8 }]}>
+            <Text style={s.alertTextSuccess}>✓ Dispositivo vinculado correctamente</Text>
           </View>
         )}
       </Tarjeta>
@@ -414,12 +479,51 @@ const TABS = [
 
 export default function ConfiguracionScreen() {
   const { configuracionGlobal, setConfiguracionGlobal } = useAppStore();
-
+  const { NotificationModule } = NativeModules;
   const [tabActiva, setTabActiva] = useState('perfil');
   const [config, setConfig]       = useState({});
   const [guardando, setGuardando] = useState(false);
   const [cargando, setCargando]   = useState(true);
 
+  const subirQr = async (tipo) => {
+    launchImageLibrary(
+      { mediaType: 'photo', quality: 0.8 },
+      async (response) => {
+        if (response.didCancel || response.errorCode) return;
+        const asset = response.assets?.[0];
+        if (!asset) return;
+
+        try {
+          const negocioId = await EncryptedStorage.getItem('negocio_id');
+          console.warn('Subiendo QR:', tipo, asset.uri);
+
+          const formData = new FormData();
+          formData.append(tipo === 'yape' ? 'yape_qr' : 'plin_qr', {
+            uri:  asset.uri,
+            type: asset.type || 'image/jpeg',
+            name: `qr_${tipo}.jpg`,
+          });
+
+          // ✅ Usar actualizarNegocio que ya tiene multipart/form-data
+          const res = await actualizarNegocio(negocioId, formData);
+          console.warn('RESPUESTA:', res.data.yape_qr, res.data.plin_qr);
+
+          const urlQr = tipo === 'yape' ? res.data.yape_qr : res.data.plin_qr;
+          setConfig(prev => ({
+            ...prev,
+            [tipo === 'yape' ? 'yape_qr' : 'plin_qr']: urlQr,
+          }));
+          Alert.alert('✅ Listo', `QR de ${tipo.toUpperCase()} guardado.`);
+
+        } catch (e) {
+          console.warn('ERROR status:', e?.response?.status);
+          console.warn('ERROR data:', JSON.stringify(e?.response?.data));
+          console.warn('ERROR msg:', e?.message);
+          Alert.alert('Error', e?.message || 'No se pudo subir el QR.');
+        }
+      }
+    );
+  };
   // ✅ Tema dinámico desde el store
   const t = useTema(
     config.temaFondo || configuracionGlobal.temaFondo,
@@ -436,9 +540,11 @@ export default function ConfiguracionScreen() {
         ruc:                     d.ruc                     || '',
         razon_social:            d.razon_social            || '',
         yape_numero:             d.yape_numero             || '',
+        yape_qr:                 d.yape_qr                 || '',
         plin_numero:             d.plin_numero             || '',
+        plin_qr:                 d.plin_qr                 || '',
         confirmacion_automatica: d.confirmacion_automatica || false,
-        device_token:            d.device_token            || null,
+        device_vinculado:        !!d.device_token,
         colorPrimario:           d.color_primario          || '#3b82f6',
         temaFondo:               d.tema_fondo              || 'dark',
         plan_detalles:           d.plan_detalles           || null,
@@ -513,7 +619,6 @@ export default function ConfiguracionScreen() {
 
       Alert.alert('✅ Guardado', 'Configuración actualizada correctamente.');
     } catch (e) {
-      console.error('Error guardando:', e?.response?.data || e.message);
       Alert.alert('Error', 'No se pudo guardar. Verifica tu conexión.');
     } finally {
       setGuardando(false);
@@ -529,7 +634,7 @@ export default function ConfiguracionScreen() {
     );
   }
 
-  const tabProps = { config, setConfig, t };
+  const tabProps = { config, setConfig, t , subirQr};
 
   return (
     <View style={[s.container, { backgroundColor: t.bg }]}>

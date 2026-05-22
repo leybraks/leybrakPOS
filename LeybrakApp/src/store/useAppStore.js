@@ -11,11 +11,8 @@ const useAppStore = create((set) => ({
     negocio_id: null,
     nombre: '',
     confirmacion_automatica: false,
-    device_token: null,
     yape_numero: '',
-    yape_qr: null,
     plin_numero: '',
-    plin_qr: null,
     modulos: {
       salon: true, cocina: false, delivery: false,
       inventario: false, clientes: false, facturacion: false,

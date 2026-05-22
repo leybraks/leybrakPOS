@@ -5,6 +5,9 @@ const BASE_URL = __DEV__
   ? 'https://pos.leybrak.com/api'
   : 'https://pos.leybrak.com/api';
 
+let onLogoutCallback = null;
+export const setLogoutCallback = (fn) => { onLogoutCallback = fn; };
+
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
@@ -100,7 +103,7 @@ api.interceptors.response.use(
       } catch (err) {
         procesarCola(err);
         await limpiarTokens();
-        // navegación al login — la conectamos cuando tengamos el navigator
+        if (onLogoutCallback) onLogoutCallback();
       } finally {
         estaRefrescando = false;
       }
@@ -147,28 +150,13 @@ export const getEstadoCaja = (params)  => api.get('/sesiones_caja/estado_actual/
 export const abrirCajaBD = async (payload) => {
   const sedeId = await EncryptedStorage.getItem('sede_id');
   const finalPayload = { ...payload, sede_id: payload.sede_id || sedeId };
-  console.log('ABRIR CAJA PAYLOAD:', JSON.stringify(finalPayload));
-  try {
-    const res = await api.post('/sesiones_caja/abrir_caja/', finalPayload);
-    console.log('ABRIR CAJA OK:', JSON.stringify(res.data));
-    return res;
-  } catch (e) {
-    console.log('ABRIR CAJA ERROR:', e?.response?.status, JSON.stringify(e?.response?.data));
-    console.log('ABRIR CAJA MESSAGE:', e?.message);
-    throw e;
-  }
+  const res = await api.post('/sesiones_caja/abrir_caja/', finalPayload);
+  return res;
 };
 export const cerrarCaja = async (data) => {
   const sedeId = await EncryptedStorage.getItem('sede_id');
-  try {
-    const res = await api.post('/sesiones_caja/cerrar_caja/', { ...data, sede_id: data.sede_id || sedeId });
-    console.log('CERRAR CAJA OK:', JSON.stringify(res.data));
-    return res;
-  } catch (e) {
-    console.log('CERRAR CAJA ERROR:', e?.response?.status, JSON.stringify(e?.response?.data));
-    console.log('CERRAR CAJA MESSAGE:', e?.message);
-    throw e;
-  }
+  const res = await api.post('/sesiones_caja/cerrar_caja/', { ...data, sede_id: data.sede_id || sedeId });
+  return res;
 };
 export const validarPinEmpleado = async (payload) => {
   const sedeId = await EncryptedStorage.getItem('sede_id');

@@ -16,7 +16,8 @@ import PersonalScreen      from '../screens/ERP/PersonalScreen';
 import MenuScreen          from '../screens/ERP/Menu/MenuScreen';
 import SalonScreen         from '../screens/POS/SalonScreen';
 import useAppStore         from '../store/useAppStore';
-
+import PosScreen           from '../screens/POS/PosScreen';
+import { setLogoutCallback } from '../api/api';
 const { width } = Dimensions.get('window');
 
 const COLOR_DEFAULT = '#3b82f6';
@@ -283,47 +284,12 @@ function POSLayout({ onVolver }) {
     );
   }
 
-  // Mesa seleccionada → placeholder hasta que PosScreen esté listo
+  // Mesa seleccionada → PosScreen real
   return (
-    <View style={{ flex: 1, backgroundColor: '#050505' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
-
-      {/* Header temporal */}
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-        paddingTop: SAFE_TOP, paddingBottom: 16,
-        backgroundColor: '#0a0a0a', borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
-      }}>
-        <TouchableOpacity
-          onPress={() => setMesaActiva(null)}
-          style={{ width: 36, height: 36, backgroundColor: '#161616', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1, borderColor: '#222' }}
-          activeOpacity={0.8}
-        >
-          <Icon name="arrow-left" size={14} color="#9ca3af" />
-        </TouchableOpacity>
-        <View>
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>
-            {typeof mesaActiva === 'object' && mesaActiva.id === 'llevar'
-              ? `Para llevar — ${mesaActiva.cliente}`
-              : `Mesa ${mesaActiva}`
-            }
-          </Text>
-          <Text style={{ color: '#6b7280', fontSize: 11, marginTop: 1 }}>Terminal POS</Text>
-        </View>
-      </View>
-
-      {/* Placeholder */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <View style={{ width: 72, height: 72, backgroundColor: `${color}15`, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="desktop" size={32} color={color} />
-        </View>
-        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>PosScreen</Text>
-        <Text style={{ color: '#6b7280', fontSize: 13 }}>En construcción</Text>
-        <View style={{ backgroundColor: `${color}10`, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: `${color}30` }}>
-          <Text style={{ color, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>PRÓXIMAMENTE</Text>
-        </View>
-      </View>
-    </View>
+    <PosScreen
+      mesaId={mesaActiva}
+      onVolver={() => setMesaActiva(null)}
+    />
   );
 }
 
@@ -332,6 +298,11 @@ const Stack = createNativeStackNavigator();
 
 export default function AppNavigator({ sesion, onLogout }) {
   const [enPos, setEnPos] = useState(false);
+
+  useEffect(() => {
+    setLogoutCallback(onLogout);
+    return () => setLogoutCallback(null);
+  }, [onLogout]);
 
   return (
     <NavigationContainer>
