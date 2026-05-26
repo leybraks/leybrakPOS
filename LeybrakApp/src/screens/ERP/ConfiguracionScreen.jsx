@@ -558,6 +558,10 @@ export default function ConfiguracionScreen() {
         modBotWsp:      d.mod_bot_wsp_activo     ?? false,
         modMl:          d.mod_ml_activo          ?? false,
       });
+      if (d.device_token && NativeModules.NotificationModule?.setDeviceToken) {
+        NativeModules.NotificationModule.setDeviceToken(d.device_token);
+        console.warn('✅ Device token seteado:', d.device_token);
+      }
     } catch (e) {
       Alert.alert('Error', 'No se pudo cargar la configuración.');
     } finally {
@@ -635,7 +639,6 @@ export default function ConfiguracionScreen() {
   }
 
   const tabProps = { config, setConfig, t , subirQr};
-
   return (
     <View style={[s.container, { backgroundColor: t.bg }]}>
       <StatusBar barStyle={t.isDark ? 'light-content' : 'dark-content'} backgroundColor={t.tabBg} />

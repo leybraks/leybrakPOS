@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, ActivityIndicator, Alert, Modal, FlatList,
-  StatusBar, Platform, Image,
+  StatusBar, Platform, Image, NativeModules, NativeEventEmitter // ← AGREGADOS AQUÍ
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
@@ -13,7 +13,8 @@ import api, {
   getProductos, getCategorias, getOrdenes, getModificadores,
   crearOrden, actualizarOrden, agregarProductosAOrden, anularItemDeOrden,
 } from '../../api/api';
-
+const { NotificationModule } = NativeModules;
+const eventEmitter = new NativeEventEmitter(NotificationModule);
 // ─── Hook de tema ─────────────────────────────────────────────
 const useTema = () => {
   const { configuracionGlobal } = useAppStore();
@@ -92,6 +93,7 @@ export default function PosScreen({ mesaId, onVolver }) {
       setModificadores(resMods.data || []);
 
       const ordenes = resOrdenes.data || [];
+      console.warn('MESA:', mesaIdReal, '| ÓRDENES:', JSON.stringify(ordenes.map(o => ({ id: o.id, mesa: o.mesa }))))
       if (ordenes.length > 0) setOrdenActiva(ordenes[0]);
 
     } catch (e) {
@@ -103,6 +105,32 @@ export default function PosScreen({ mesaId, onVolver }) {
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
+  useEffect(() => {
+    const subscripcion = eventEmitter.addListener('PagoYapeRecibido', (mensaje) => {
+      console.log('✅ Yape detectado desde Kotlin:', mensaje);
+
+      // 1. Cerramos el modal de cobro y el drawer del carrito si estaban abiertos
+      setModalCobroVisible(false);
+      setCarritoAbierto(false);
+
+      // 2. Vaciamos el carrito local
+      setCarrito([]);
+
+      // 3. Mostramos tu modal de éxito verde con el check
+      setMostrarExito(true);
+
+      // 4. Esperamos 2 segundos para que el cajero vea el éxito, y lo devolvemos a las mesas
+      setTimeout(() => {
+        setMostrarExito(false);
+        onVolver();
+      }, 2000);
+    });
+
+    // Apagamos la antena si el componente se desmonta
+    return () => {
+      subscripcion.remove();
+    };
+  }, [onVolver]);
   // ─── Carrito helpers ──────────────────────────────────────
   const totalCarrito      = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const totalOrdenActiva  = ordenActiva

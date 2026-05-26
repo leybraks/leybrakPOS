@@ -287,6 +287,7 @@ function POSLayout({ onVolver }) {
   // Mesa seleccionada → PosScreen real
   return (
     <PosScreen
+      key={typeof mesaActiva === 'object' ? mesaActiva.id : mesaActiva}
       mesaId={mesaActiva}
       onVolver={() => setMesaActiva(null)}
     />

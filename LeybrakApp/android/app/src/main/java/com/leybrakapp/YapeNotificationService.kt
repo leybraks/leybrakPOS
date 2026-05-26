@@ -5,26 +5,32 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONObject
-import java.util.regex.Pattern
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 
 class YapeNotificationService : NotificationListenerService() {
-
     companion object {
         private const val TAG = "YapeNotifService"
-
-        private val PAQUETES_YAPE = listOf("com.bcp.yape", "pe.com.interbank.yape")
-        private val PAQUETES_PLIN = listOf("com.bbva.plin", "com.scotiabank.plin", "pe.com.viabcp.plin")
-        private val PATRON_MONTO  = Pattern.compile("S/\\s*(\\d+(?:[.,]\\d{1,2})?)", Pattern.CASE_INSENSITIVE)
-        private val PATRON_CODIGO = Pattern.compile("\\b(\\d{4})\\b")
-
+        private const val BASE_URL = "https://pos.leybrak.com/api"
+        private val PAQUETES_YAPE = listOf(
+            "com.bcp.innovacxion.yapeapp",
+            "com.bcp.yape",
+            "pe.com.interbank.yape"
+        )
+        private val PAQUETES_PLIN = listOf(
+            "com.bbva.plin", "com.scotiabank.plin", "pe.com.viabcp.plin",
+            "pe.com.interbank.mobilebanking", "com.banbif.plin"
+        )
         var reactContext: ReactApplicationContext? = null
+        var deviceToken: String? = null
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         try {
             val paquete = sbn.packageName ?: return
+            Log.d("LeybrakTest", "🔔 Notificación detectada de: $paquete")
             val esYape  = PAQUETES_YAPE.any { paquete.contains(it, ignoreCase = true) }
             val esPlin  = PAQUETES_PLIN.any { paquete.contains(it, ignoreCase = true) }
             if (!esYape && !esPlin) return
@@ -33,34 +39,66 @@ class YapeNotificationService : NotificationListenerService() {
             val titulo = extras.getString(Notification.EXTRA_TITLE) ?: ""
             val texto  = extras.getString(Notification.EXTRA_TEXT)
                       ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-            val textoCompleto = "$titulo $texto"
+            val textoCompleto = "$titulo $texto".trim()
 
-            val matcherMonto = PATRON_MONTO.matcher(textoCompleto)
-            if (!matcherMonto.find()) return
+            if (textoCompleto.isBlank()) return
+            Log.d(TAG, "✅ ${if (esYape) "YAPE" else "PLIN"} | $textoCompleto")
 
-            val monto = matcherMonto.group(1)?.replace(",", ".")?.toDoubleOrNull() ?: return
-            if (monto < 0.10 || monto > 9999.0) return
-
-            var codigoSeguridad = ""
-            if (esYape) {
-                val m = PATRON_CODIGO.matcher(textoCompleto)
-                if (m.find()) codigoSeguridad = m.group(1) ?: ""
+            var token = deviceToken
+            if (token.isNullOrBlank()) {
+                // Si la variable está vacía, lo rescatamos de SharedPreferences
+                val sharedPref = applicationContext.getSharedPreferences("LeybrakPrefs", android.content.Context.MODE_PRIVATE)
+                token = sharedPref.getString("DEVICE_TOKEN", null)
             }
 
-            val payload = JSONObject().apply {
-                put("tipo",              if (esYape) "YAPE" else "PLIN")
-                put("monto",            monto)
-                put("nombre_cliente",   if (esYape) "Cliente Yape" else "Cliente Plin")
-                put("codigo_seguridad", codigoSeguridad)
-                put("notificacion_id",  "${sbn.id}_${System.currentTimeMillis()}")
-                put("texto_original",   textoCompleto)
+            if (token.isNullOrBlank()) {
+                Log.e(TAG, "❌ Sin device_token")
+                return
             }
 
-            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                ?.emit("PagoYapePlinRecibido", payload.toString())
+            Thread { enviarAlBackend(token, textoCompleto) }.start()
 
         } catch (e: Exception) {
             Log.e(TAG, "Error: ${e.message}")
+        }
+    }
+
+    private fun enviarAlBackend(token: String, texto: String) {
+        try {
+            val url = URL("$BASE_URL/yape/notificacion/")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+
+            val body = JSONObject().apply {
+                put("device_token", token)
+                put("texto_notificacion", texto)
+            }
+
+            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+
+            val code = conn.responseCode
+            Log.d(TAG, "📤 Backend: $code")
+            
+            if (code == 200 || code == 201) {
+                // 1. Leemos el JSON real que nos devuelve Django
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(conn.inputStream))
+                val responseJson = reader.readText()
+                reader.close()
+
+                Log.d(TAG, "📥 Respuesta Django: $responseJson")
+
+                // 2. Emitimos el evento con el nombre exacto de tu hook y pasamos el JSON
+                reactContext?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    ?.emit("PagoYapePlinRecibido", responseJson) 
+            }
+            conn.disconnect()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error backend: ${e.message}")
         }
     }
 

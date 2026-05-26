@@ -160,7 +160,14 @@ def recibir_notificacion_yape(request):
         }
     )
 
-    return Response({'ok': True, 'notificacion_id': notificacion.id}, status=status.HTTP_201_CREATED)
+    return Response({
+        'ok': True,
+        'notificacion_id': notificacion.id,
+        'tipo': notificacion.tipo,
+        'monto': str(notificacion.monto),  # Convertido a string para que JS lo lea sin problemas
+        'codigo_seguridad': notificacion.codigo_seguridad,
+        'nombre_cliente': notificacion.nombre_cliente,
+    }, status=status.HTTP_201_CREATED)
 
 
 # ============================================================

@@ -4,11 +4,14 @@ import AppNavigator from './src/navigation/AppNavigator';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { getNegocio } from './src/api/api';
 import useAppStore from './src/store/useAppStore';
-import { StatusBar, View, ActivityIndicator } from 'react-native';
+import { StatusBar, View, ActivityIndicator,NativeModules } from 'react-native';
+
 export default function App() {
   const [sesion, setSesion] = useState<any>(null);
   const [cargando, setCargando] = useState(true); // ← nuevo
   const { setConfiguracionGlobal } = useAppStore();
+  const { NotificationModule } = NativeModules;
+
 
   // ✅ Verificar sesión guardada al iniciar
   useEffect(() => {
@@ -39,6 +42,16 @@ export default function App() {
         const res  = await getNegocio(negocioId);
         const d    = res.data;
         const plan = d.plan_detalles || {};
+        if (d.device_token) {
+          try {
+            NotificationModule.setDeviceToken(d.device_token);
+            console.log('✅ Token sincronizado con Android:', d.device_token);
+          } catch (err) {
+            console.log('❌ Error al pasar token a Kotlin:', err);
+          }
+        } else {
+          console.log('⚠️ El negocio no tiene un device_token asignado en la BD');
+        }
         setConfiguracionGlobal({
           colorPrimario:           d.color_primario          || '#3b82f6',
           temaFondo:               d.tema_fondo              || 'dark',
