@@ -40,6 +40,18 @@ class NotificationModule(private val reactContext: ReactApplicationContext)
             promise.resolve(false)
         }
     }
+    @ReactMethod
+    fun setDeviceToken(token: String) {
+        // Lo guarda en memoria rápida
+        YapeNotificationService.deviceToken = token
+        
+        // Lo guarda permanentemente en SharedPreferences
+        val sharedPref = reactApplicationContext.getSharedPreferences("LeybrakPrefs", android.content.Context.MODE_PRIVATE)
+        with (sharedPref.edit()) {
+            putString("DEVICE_TOKEN", token)
+            apply()
+        }
+    }
 
     @ReactMethod
     fun addListener(eventName: String) {}
