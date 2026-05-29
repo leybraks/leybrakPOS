@@ -190,6 +190,13 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # ✅ HTTPS controlado por variable de entorno — nunca hardcodeado
 # Cuando tengas TLS activo, pon HTTPS_ENABLED=True en tu .env
 _https = os.environ.get('HTTPS_ENABLED', 'False') == 'True'
+
+# El TLS termina en Cloudflare/NPM; el contenedor recibe HTTP plano con la
+# cabecera X-Forwarded-Proto (la setea nginx.conf). Esto le dice a Django que
+# confíe en esa cabecera para detectar HTTPS y NO entrar en bucle de redirección
+# cuando SECURE_SSL_REDIRECT=True.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 SECURE_SSL_REDIRECT             = _https
 SESSION_COOKIE_SECURE           = _https
 CSRF_COOKIE_SECURE              = _https
