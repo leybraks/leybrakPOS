@@ -18,7 +18,9 @@ from .base import BillingProvider, BillingProviderError
 logger = logging.getLogger(__name__)
 
 MP_API_BASE = 'https://api.mercadopago.com'
-TIMEOUT = 10
+# (connect, read): si no hay salida a internet, falla en 5s en vez de colgarse
+# y provocar un 502 de timeout en NPM/Cloudflare.
+TIMEOUT = (5, 15)
 # Tolerancia anti-replay para el timestamp de la firma del webhook (segundos)
 SIGNATURE_MAX_AGE = 300
 
@@ -106,8 +108,13 @@ class MercadoPagoProvider(BillingProvider):
             logger.error('MP: error de red consultando pago %s: %s', payment_id, e)
             raise BillingProviderError('Error de red con MercadoPago.')
 
+        if resp.status_code == 404:
+            # El pago no existe (ej. id de prueba): permanente, no reintentar.
+            logger.warning('MP: pago %s no encontrado (404).', payment_id)
+            return None
         if resp.status_code != 200:
-            logger.error('MP: pago %s no encontrado (%s): %s', payment_id, resp.status_code, resp.text)
+            # Error transitorio (5xx, 401, etc.): que MercadoPago reintente.
+            logger.error('MP: error consultando pago %s (%s): %s', payment_id, resp.status_code, resp.text)
             raise BillingProviderError('No se pudo consultar el pago en MercadoPago.')
 
         return resp.json()

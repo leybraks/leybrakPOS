@@ -95,7 +95,19 @@ def generar_pago_suscripcion(request):
         pago.estado = 'fallido'
         pago.notas = f'Error al crear checkout: {e}'
         pago.save(update_fields=['estado', 'notas'])
-        return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        logger.error('generar_pago: fallo del proveedor MP: %s', e)
+        # 400 (no 5xx) para que Cloudflare NO lo enmascare con su página
+        # genérica y el frontend pueda mostrar el motivo real.
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:  # noqa: BLE001 — defensivo: cualquier error inesperado
+        pago.estado = 'fallido'
+        pago.notas = f'Error inesperado: {e}'
+        pago.save(update_fields=['estado', 'notas'])
+        logger.exception('generar_pago: error inesperado creando checkout')
+        return Response(
+            {'error': 'No se pudo generar el pago. Revisa la configuración de MercadoPago.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # 3) Guardar referencias y devolver el init_point al frontend
     pago.preference_id = checkout['preference_id']
@@ -147,8 +159,12 @@ def webhook_mercadopago(request):
     try:
         payment = provider.get_payment(payment_id)
     except BillingProviderError as e:
-        # 5xx para que MP reintente
+        # 5xx para que MP reintente (error transitorio de la API)
         return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    if payment is None:
+        # Pago inexistente (ej. notificación de prueba): 200 para no reintentar.
+        return Response({'ok': True, 'ignored': 'payment_not_found'}, status=status.HTTP_200_OK)
 
     estado_mp = payment.get('status')
     external_reference = payment.get('external_reference') or ''
