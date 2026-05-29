@@ -189,6 +189,19 @@ class SuscripcionBillingTest(APITestCase):
         self.negocio.refresh_from_db()
         self.assertFalse(self.negocio.activo)
 
+    # ── Webhook: pago inexistente (notificación de prueba) ──────────
+    @patch(PROVIDER_PATH)
+    def test_webhook_pago_inexistente(self, mock_get_provider):
+        prov = MagicMock()
+        prov.verify_webhook_signature.return_value = True
+        prov.get_payment.return_value = None   # 404 en MP -> None
+        mock_get_provider.return_value = prov
+
+        resp = self.client.post(f'{WEBHOOK_URL}?type=payment&data.id=123456')
+
+        self.assertEqual(resp.status_code, 200)   # 200, NO 502 -> MP no reintenta
+        self.assertEqual(resp.data.get('ignored'), 'payment_not_found')
+
     # ── Webhook: ignora notificaciones que no son de pago ───────────
     @patch(PROVIDER_PATH)
     def test_webhook_ignora_no_payment(self, mock_get_provider):
