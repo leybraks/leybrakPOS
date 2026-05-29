@@ -14,6 +14,7 @@ from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 from negocios.views.suscripcion_views import estado_suscripcion
 from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape
+from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
@@ -84,4 +85,10 @@ urlpatterns = [
     # ==========================================
     path('yape/notificacion/',  recibir_notificacion_yape, name='yape-notificacion'),
     path('yape/confirmar/',     confirmar_pago_yape,       name='yape-confirmar'),
+
+    # ==========================================
+    # 💳 SUSCRIPCIÓN — Cobro con MercadoPago
+    # ==========================================
+    path('negocio/suscripcion/generar-pago/', generar_pago_suscripcion, name='generar-pago-suscripcion'),
+    path('negocio/suscripcion/webhook/',      webhook_mercadopago,      name='mp-webhook'),
 ]

@@ -12,6 +12,11 @@ const { NotificationModule } = NativeModules;
  */
 export function useYapePlinListener(activo, onPagoRecibido) {
   const listenerRef = useRef(null);
+  const onPagoRecibidoRef = useRef(onPagoRecibido);
+
+  useEffect(() => {
+    onPagoRecibidoRef.current = onPagoRecibido;
+  }, [onPagoRecibido]);
 
   useEffect(() => {
     if (!activo || Platform.OS !== 'android' || !NotificationModule) return;
@@ -24,7 +29,7 @@ export function useYapePlinListener(activo, onPagoRecibido) {
           ? JSON.parse(payloadJson)
           : payloadJson;
         console.log('💜 Pago recibido:', data);
-        onPagoRecibido(data);
+        onPagoRecibidoRef.current?.(data);
       } catch (e) {
         console.error('Error parseando pago:', e);
       }
@@ -33,7 +38,7 @@ export function useYapePlinListener(activo, onPagoRecibido) {
     return () => {
       listenerRef.current?.remove();
     };
-  }, [activo, onPagoRecibido]);
+  }, [activo]);
 }
 
 /**

@@ -26,7 +26,7 @@ class PagoSuscripcionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'monto', 'estado', 'metodo_pago',
             'periodo', 'fecha_pago', 'notas',
-            'referencia_externa', 'plan_nombre', 'creado_en',
+            'referencia_externa', 'preference_id', 'plan_nombre', 'creado_en',
         ]
         read_only_fields = ['id', 'creado_en', 'plan_nombre']
 

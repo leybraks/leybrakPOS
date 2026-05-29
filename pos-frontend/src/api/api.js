@@ -328,4 +328,12 @@ export const crearComboPromocional = (data) => api.post('/combos-promocionales/'
 export const actualizarComboPromocional = (id, data) => api.put(`/combos-promocionales/${id}/`, data);
 export const eliminarComboPromocional = (id) => api.delete(`/combos-promocionales/${id}/`);
 export const getPagosSuscripcion = (negocioId) => api.get('/pagos-suscripcion/', { params: { negocio_id: negocioId } });
+
+// ============================================================
+// SUSCRIPCIÓN — Cobro con MercadoPago
+// ============================================================
+export const getEstadoSuscripcion    = () => api.get('/negocio/estado-suscripcion/');
+export const generarPagoSuscripcion   = (planId) =>
+  api.post('/negocio/suscripcion/generar-pago/', planId ? { plan_id: planId } : {});
+
 export default api;

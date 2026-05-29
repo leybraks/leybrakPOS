@@ -714,15 +714,23 @@ export default function PosScreen({ mesaId, onVolver }) {
         onCobroExitoso={async ({ pagos, telefono }) => {
           try {
             const sesionCajaId = await EncryptedStorage.getItem('sesion_caja_id');
+            
+            // 1. Filtramos solo los pagos que NO han sido confirmados por Yape/Plin nativo
+            const pagosManuales = pagos.filter(p => !p.yaConfirmado);
+
+            // 2. Ejecutamos el POST siempre para procesar el cierre y el teléfono
             await api.post(`/ordenes/${ordenActiva.id}/cobrar_orden/`, {
-              pagos,
-              telefono,
+              pagos: pagosManuales, // Si fue Yape puro, enviará un arreglo vacío [] y no duplicará caja
+              telefono,             // Aquí viaja el número de WhatsApp para guardarse en la BD
               sesion_caja_id: sesionCajaId,
             });
+
+            // 3. Limpieza de interfaz y regreso al salón
             setModalCobroVisible(false);
             onVolver();
-          } catch {
-            Alert.alert('Error', 'No se pudo procesar el cobro.');
+          } catch (err) {
+            console.error(err);
+            Alert.alert('Error', 'No se pudo registrar los datos del cierre.');
           }
         }}
       />

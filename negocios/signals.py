@@ -220,15 +220,6 @@ def auditoria_regla_delete(sender, instance, **kwargs):
         detalle=f'Tipo: {instance.get_tipo_display()}'
     )
 
-@receiver(post_save, sender=PagoSuscripcion)
-def reactivar_negocio_al_pagar(sender, instance, created, **kwargs):
-    """
-    Cuando un PagoSuscripcion se confirma, reactiva el negocio
-    si estaba bloqueado (activo=False).
-    """
-    if instance.estado == 'confirmado' and not instance.negocio.activo:
-        Negocio.objects.filter(id=instance.negocio.id).update(activo=True)
-
 # ══════════════════════════════════════════════════════
 # 💰 CAMBIO DE PRECIO DE PRODUCTO
 # ══════════════════════════════════════════════════════
@@ -275,12 +266,16 @@ def auditoria_empleado_delete(sender, instance, **kwargs):
 # ══════════════════════════════════════════════════════
 @receiver(post_save, sender=PagoSuscripcion)
 def reactivar_negocio_al_pagar(sender, instance, created, **kwargs):
-    if instance.estado == 'confirmado' and not instance.negocio.activo:
+    """
+    Cuando un PagoSuscripcion queda 'pagado', reactiva el negocio
+    si estaba bloqueado (activo=False).
+    """
+    if instance.estado == 'pagado' and not instance.negocio.activo:
         Negocio.objects.filter(id=instance.negocio.id).update(activo=True)
 
 @receiver(post_save, sender=PagoSuscripcion)
 def auditoria_pago_suscripcion(sender, instance, created, **kwargs):
-    if instance.estado == 'confirmado':
+    if instance.estado == 'pagado':
         _enviar_email_auditoria(
             negocio=instance.negocio,
             accion='Pago de Suscripción Confirmado',
