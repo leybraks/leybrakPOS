@@ -198,6 +198,10 @@ _https = os.environ.get('HTTPS_ENABLED', 'False') == 'True'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 SECURE_SSL_REDIRECT             = _https
+# El healthcheck del deploy y los chequeos internos pegan directo a
+# http://localhost:8000/api/health/ (sin pasar por el proxy, sin X-Forwarded-Proto).
+# Eximimos esa ruta del redirect a HTTPS para que no devuelva 301 y rompa el deploy.
+SECURE_REDIRECT_EXEMPT          = [r'^api/health/?$']
 SESSION_COOKIE_SECURE           = _https
 CSRF_COOKIE_SECURE              = _https
 SECURE_HSTS_SECONDS             = 31536000 if _https else 0
