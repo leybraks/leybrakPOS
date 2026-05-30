@@ -218,6 +218,9 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
         'intentos_pin': '5/minute',
         'login': '5/minute',   # ✅ FIX #8: frena fuerza bruta en endpoints de login
+        # Webhook de MercadoPago: AllowAny pero con reintentos agresivos de MP,
+        # por eso un límite alto en vez de caer en 'anon': 60/hour.
+        'mp_webhook': '300/minute',
     },
 }
 
@@ -297,3 +300,8 @@ MP_CLIENT_SECRET  = os.getenv('MP_CLIENT_SECRET', '')
 MP_REDIRECT_URI   = os.getenv('MP_REDIRECT_URI', 'http://localhost:8000/api/mp/oauth/callback/')
 MP_WEBHOOK_SECRET = os.getenv('MP_WEBHOOK_SECRET', '')
 FRONTEND_URL      = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+
+# ── Cobro de suscripción (cuenta única de Leybrak en MercadoPago) ──────────
+MP_ACCESS_TOKEN   = os.getenv('MP_ACCESS_TOKEN', '')   # TEST-... (sandbox) / APP_USR-... (prod)
+MP_SANDBOX        = os.getenv('MP_SANDBOX', 'True') == 'True'
+BACKEND_URL       = os.getenv('BACKEND_URL', 'http://localhost:8000')

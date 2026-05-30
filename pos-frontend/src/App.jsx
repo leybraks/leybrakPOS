@@ -1,6 +1,6 @@
 import { ToastProvider } from './context/ToastContext';
 import { cerrarSesionGlobal } from '../src/api/api';
-import { verificarSesionEmpleado } from '../src/api/api';
+import { verificarSesionEmpleado, generarPagoSuscripcion } from '../src/api/api';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import LoginView from './views/View_Login';
@@ -34,6 +34,27 @@ const VistaInternaPOS = () => {
   const [sesion, setSesion]           = useState(null);
   const [cargando, setCargando]       = useState(true);
   const [suscripcion, setSuscripcion] = useState(null);
+  const [procesandoPago, setProcesandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState(null);
+
+  // Inicia el pago de la suscripción y redirige a MercadoPago.
+  const handlePagarSuscripcion = async () => {
+    setProcesandoPago(true);
+    setErrorPago(null);
+    try {
+      const res = await generarPagoSuscripcion();   // usa el plan del negocio
+      if (res.data?.init_point) {
+        window.location.assign(res.data.init_point);
+        return;
+      }
+      setErrorPago('No se pudo iniciar el pago.');
+    } catch (e) {
+      const msg = e?.response?.data?.error;
+      setErrorPago(msg || 'No se pudo iniciar el pago. Intenta de nuevo.');
+    } finally {
+      setProcesandoPago(false);
+    }
+  };
 
   const verificarSuscripcion = async () => {
     try {
@@ -184,15 +205,16 @@ const VistaInternaPOS = () => {
             Plan actual: <span className="text-neutral-400">{suscripcion?.plan_nombre ?? 'Sin plan'}</span>
           </p>
         )}
+        {errorPago && (
+          <p className="text-red-400 text-xs font-bold mb-3 max-w-sm">{errorPago}</p>
+        )}
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
           <button
-            onClick={() => {
-              const msg = encodeURIComponent(`Hola, necesito renovar mi suscripción del sistema POS.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`);
-              window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
-            }}
-            className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/20 active:scale-95 transition-all"
+            onClick={handlePagarSuscripcion}
+            disabled={procesandoPago}
+            className="px-8 py-3 rounded-2xl bg-[#ff5a1f] text-white font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/20 active:scale-95 transition-all disabled:opacity-50"
           >
-            Contratar Plan →
+            {procesandoPago ? 'Redirigiendo…' : 'Pagar Suscripción →'}
           </button>
           <button
             onClick={async () => { await cerrarSesionGlobal(); setVista('login'); }}
@@ -216,13 +238,11 @@ const VistaInternaPOS = () => {
             Adquiere un plan para no perder el acceso.
           </span>
           <button
-            onClick={() => {
-              const msg = encodeURIComponent(`Hola, quiero contratar un plan del sistema POS antes de que venza mi prueba.\n\nNegocio ID: ${localStorage.getItem('negocio_id')}`);
-              window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
-            }}
-            className="shrink-0 bg-black text-white px-3 py-1 rounded-lg uppercase tracking-widest hover:bg-neutral-900 transition-all"
+            onClick={handlePagarSuscripcion}
+            disabled={procesandoPago}
+            className="shrink-0 bg-black text-white px-3 py-1 rounded-lg uppercase tracking-widest hover:bg-neutral-900 transition-all disabled:opacity-50"
           >
-            Contratar →
+            {procesandoPago ? 'Redirigiendo…' : 'Pagar →'}
           </button>
         </div>
       )}

@@ -38,11 +38,11 @@ def estado_suscripcion(request):
         })  
  
     # ── 2. Verificar si tiene un pago vigente ─────────────────
-    # Un pago vigente = PagoSuscripcion confirmado en los últimos 31 días
+    # Un pago vigente = PagoSuscripcion pagado en los últimos 31 días
     from ..models import PagoSuscripcion
     ultimo_pago = PagoSuscripcion.objects.filter(
         negocio=negocio,
-        estado='confirmado',
+        estado='pagado',
     ).order_by('-fecha_pago').first()
  
     if ultimo_pago:

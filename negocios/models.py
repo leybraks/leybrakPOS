@@ -1034,9 +1034,12 @@ class PagoSuscripcion(models.Model):
     fecha_pago  = models.DateTimeField(default=timezone.now)
     notas       = models.TextField(blank=True, null=True)
  
-    # Para pagos Culqi: guardar referencia del cargo
+    # ID de la preferencia de Checkout creada en MercadoPago (al generar el pago)
+    preference_id = models.CharField(max_length=100, blank=True, null=True)
+
+    # Referencia del cargo en la pasarela (payment id de MercadoPago al confirmar)
     referencia_externa = models.CharField(max_length=100, blank=True, null=True)
- 
+
     creado_en   = models.DateTimeField(auto_now_add=True)
  
     class Meta:

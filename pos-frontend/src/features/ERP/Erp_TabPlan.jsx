@@ -6,7 +6,7 @@ import {
   Package, Loader2, Sparkles, ArrowRight,
   Clock, Receipt,Crown
 } from 'lucide-react';
-import api from '../../api/api';
+import api, { generarPagoSuscripcion, getEstadoSuscripcion } from '../../api/api';
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -113,6 +113,26 @@ export default function Tab_Plan({ config, setConfig, isDark, colorPrimario }) {
   const [errorHist,      setErrorHist]      = useState(null);
   const [error,          setError]          = useState(null);
   const [seccion,        setSeccion]        = useState('resumen');
+  const [procesandoPago, setProcesandoPago] = useState(false);
+  const [verificandoPago, setVerificandoPago] = useState(false);
+
+  // ── Iniciar pago de suscripción en MercadoPago ───────────
+  const handlePagar = async (planId) => {
+    setProcesandoPago(true);
+    setError(null);
+    try {
+      const res = await generarPagoSuscripcion(planId);
+      if (res.data?.init_point) {
+        window.location.assign(res.data.init_point);   // redirige a MercadoPago
+      } else {
+        setError('No se pudo iniciar el pago. Intenta de nuevo.');
+        setProcesandoPago(false);
+      }
+    } catch {
+      setError('No se pudo iniciar el pago. Intenta de nuevo.');
+      setProcesandoPago(false);
+    }
+  };
 
   // ── Cargar datos del negocio + sedes ─────────────────────
   useEffect(() => {
@@ -178,6 +198,45 @@ export default function Tab_Plan({ config, setConfig, isDark, colorPrimario }) {
     fetchHistorial();
   }, [seccion]);
 
+  // ── Al volver de MercadoPago (?status=success): el webhook confirma
+  //    asíncronamente, así que hacemos polling al estado de suscripción ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('status') !== 'success') return;
+
+    const limpiarUrl = () => {
+      ['status', 'pago', 'collection_status', 'payment_id',
+       'preference_id', 'merchant_order_id'].forEach((k) => params.delete(k));
+      const qs = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    };
+
+    setVerificandoPago(true);
+    let intentos = 0;
+    const intervalo = setInterval(async () => {
+      intentos += 1;
+      try {
+        const res = await getEstadoSuscripcion();
+        if (res.data?.estado === 'activo') {
+          clearInterval(intervalo);
+          setVerificandoPago(false);
+          limpiarUrl();
+          const negocioId = localStorage.getItem('negocio_id');
+          const resPlan = await api.get(`/negocios/${negocioId}/`);
+          setPlanData(resPlan.data);
+          return;
+        }
+      } catch { /* reintenta */ }
+      if (intentos >= 10) {          // ~30s
+        clearInterval(intervalo);
+        setVerificandoPago(false);
+        limpiarUrl();
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalo);
+  }, []);
+
   // ── Estados de carga / error ─────────────────────────────
   if (cargando) return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -205,6 +264,16 @@ export default function Tab_Plan({ config, setConfig, isDark, colorPrimario }) {
   // ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fadeIn">
+
+      {/* ── Verificación de pago al volver de MercadoPago ──── */}
+      {verificandoPago && (
+        <div className="p-4 rounded-2xl border flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
+          <Loader2 size={18} className="animate-spin text-amber-500 shrink-0" />
+          <p className={`text-sm font-bold ${isDark ? 'text-amber-200' : 'text-amber-700'}`}>
+            Verificando tu pago… esto puede tardar unos segundos.
+          </p>
+        </div>
+      )}
 
       {/* ── SUB-NAVEGACIÓN ────────────────────────────────── */}
       <div className={`flex gap-1 p-1 rounded-2xl w-fit ${isDark ? 'bg-[#1a1a1a]' : 'bg-gray-100'}`}>
@@ -518,27 +587,19 @@ export default function Tab_Plan({ config, setConfig, isDark, colorPrimario }) {
 
                     {/* CTA */}
                     <button
-                      disabled={esActual}
+                      disabled={esActual || procesandoPago}
                       className="w-full py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                       style={esActual
                         ? { backgroundColor: isDark ? '#2a2a2a' : '#e5e7eb', color: isDark ? '#555' : '#aaa' }
                         : { backgroundColor: p.color, color: '#fff' }
                       }
-                      onClick={() => {
-                        const negocio = planData?.nombre ?? 'mi negocio';
-                        const actual  = planData?.plan_detalles?.nombre ?? 'sin plan';
-                        const precio  = parseFloat(p.precio_mensual).toFixed(2);
-                        const msg = encodeURIComponent(
-                          `Hola, soy el administrador de *${negocio}*.\n\n` +
-                          `Me interesa contratar el *Plan ${p.nombre}* (S/ ${precio}/mes).\n\n` +
-                          `Actualmente estoy en: ${actual}.\n\n` +
-                          `¿Me pueden ayudar con el proceso?`
-                        );
-                        window.open(`https://wa.me/51976267494?text=${msg}`, '_blank');
-                      }}
+                      onClick={() => handlePagar(p.id)}
                     >
-                      {esActual ? 'Plan actual' : `Contratar ${p.nombre}`}
-                      {!esActual && <ArrowRight size={12} />}
+                      {procesandoPago
+                        ? <><Loader2 size={12} className="animate-spin" /> Redirigiendo…</>
+                        : esActual
+                          ? 'Plan actual'
+                          : <>{`Contratar ${p.nombre}`}<ArrowRight size={12} /></>}
                     </button>
                   </div>
                 );
