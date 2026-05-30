@@ -90,5 +90,5 @@ urlpatterns = [
     # 💳 SUSCRIPCIÓN — Cobro con MercadoPago
     # ==========================================
     path('negocio/suscripcion/generar-pago/', generar_pago_suscripcion, name='generar-pago-suscripcion'),
-    path('negocio/suscripcion/webhook/',      webhook_mercadopago,      name='mp-webhook'),
+    path('mp/webhook/',                        webhook_mercadopago,      name='mp-webhook'),
 ]

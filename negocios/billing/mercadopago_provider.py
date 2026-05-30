@@ -52,7 +52,7 @@ class MercadoPagoProvider(BillingProvider):
                 'currency_id': 'PEN',
             }],
             'external_reference': external_reference,
-            'notification_url': f'{settings.BACKEND_URL}/api/negocio/suscripcion/webhook/',
+            'notification_url': f'{settings.BACKEND_URL}/api/mp/webhook/',
             'back_urls': {
                 'success': f'{settings.FRONTEND_URL}/?status=success',
                 'failure': f'{settings.FRONTEND_URL}/?status=failure',
