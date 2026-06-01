@@ -9,7 +9,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       workbox: {
-        navigateFallbackDenylist: [/^\/api\//, /^\/mp-callback\//],
+        // Rutas que NO son de la SPA: el SW no debe servir index.html aquí,
+        // las deja pasar a nginx (páginas/archivos estáticos reales).
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/mp-callback\//,
+          /^\/descargar/,    // página de descarga del APK
+          /^\/media\//,      // el APK y otros archivos servidos por nginx
+          /^\/legal\.html/,  // página legal estática
+        ],
         runtimeCaching: [],
         skipWaiting: true,      // ← AGREGA
         clientsClaim: true,     // ← AGREGA
