@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Descargar Leybrak POS</title>
+  <meta name="description" content="Descarga la app de Leybrak POS para Android." />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    :root {
+      --naranja: #ff5a1f;
+      --bg: #0a0a0a;
+      --card: #121212;
+      --borde: #232323;
+      --texto: #f5f5f5;
+      --tenue: #9a9a9a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(circle at 50% -10%, #1c1208 0%, var(--bg) 55%);
+      color: var(--texto);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--borde);
+      border-radius: 28px;
+      max-width: 440px;
+      width: 100%;
+      padding: 40px 32px;
+      text-align: center;
+      box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    }
+    .logo {
+      width: 96px; height: 96px;
+      border-radius: 24px;
+      margin: 0 auto 20px;
+      display: block;
+      box-shadow: 0 10px 30px rgba(255,90,31,.25);
+    }
+    h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }
+    .tag { color: var(--tenue); margin-top: 8px; font-size: .95rem; line-height: 1.5; }
+    .version {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--naranja);
+      background: rgba(255,90,31,.1);
+      border: 1px solid rgba(255,90,31,.25);
+      padding: 5px 12px;
+      border-radius: 999px;
+    }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%;
+      margin-top: 28px;
+      padding: 17px;
+      background: var(--naranja);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      text-decoration: none;
+      border-radius: 16px;
+      transition: filter .15s, transform .1s;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: scale(.98); }
+    .btn svg { width: 22px; height: 22px; }
+    .req { margin-top: 14px; font-size: .78rem; color: var(--tenue); }
+    .pasos {
+      margin-top: 32px;
+      text-align: left;
+      border-top: 1px solid var(--borde);
+      padding-top: 24px;
+    }
+    .pasos h2 {
+      font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--tenue); margin-bottom: 16px; font-weight: 700;
+    }
+    .paso { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+    .num {
+      flex-shrink: 0;
+      width: 26px; height: 26px;
+      background: rgba(255,90,31,.12);
+      color: var(--naranja);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: .85rem;
+    }
+    .paso p { font-size: .9rem; line-height: 1.45; color: #d4d4d4; }
+    .paso b { color: var(--texto); }
+    footer { margin-top: 28px; font-size: .75rem; color: #555; }
+    footer a { color: var(--tenue); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/pwa-512x512.png" alt="Leybrak POS" />
+    <h1>Leybrak POS</h1>
+    <p class="tag">El punto de venta de bolsillo. Mesas, caja y validación de pagos Yape/Plin desde tu celular.</p>
+    <span class="version" id="version">Versión 1.0.0</span>
+
+    <a class="btn" href="/media/leybrak.apk" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      Descargar para Android
+    </a>
+    <p class="req">Android 7.0 o superior · ~40 MB</p>
+
+    <section class="pasos">
+      <h2>Cómo instalar</h2>
+      <div class="paso">
+        <span class="num">1</span>
+        <p>Toca <b>Descargar para Android</b> y espera a que baje el archivo <b>.apk</b>.</p>
+      </div>
+      <div class="paso">
+        <span class="num">2</span>
+        <p>Ábrelo. Android te pedirá permitir <b>instalar apps de esta fuente</b> — actívalo (es seguro, es nuestra app oficial).</p>
+      </div>
+      <div class="paso">
+        <span class="num">3</span>
+        <p>Pulsa <b>Instalar</b> y luego <b>Abrir</b>. Inicia sesión con los datos de tu negocio.</p>
+      </div>
+    </section>
+
+    <footer>
+      © <span id="anio"></span> Leybrak · <a href="/legal.html">Términos y privacidad</a>
+    </footer>
+  </main>
+
+  <script>
+    document.getElementById('anio').textContent = new Date().getFullYear();
+    // Versión dinámica opcional: si el backend expone /api/app/version/, la muestra.
+    fetch('/api/app/version/')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.version_ultima) {
+          document.getElementById('version').textContent = 'Versión ' + d.version_ultima;
+        }
+      })
+      .catch(function () {});
+  </script>
+</body>
+</html>
