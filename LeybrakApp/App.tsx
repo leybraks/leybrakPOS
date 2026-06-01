@@ -5,12 +5,17 @@ import EncryptedStorage from 'react-native-encrypted-storage';
 import { getNegocio } from './src/api/api';
 import useAppStore from './src/store/useAppStore';
 import { StatusBar, View, ActivityIndicator,NativeModules } from 'react-native';
+import useActualizacionForzada from './src/hooks/useActualizacionForzada';
+import PantallaActualizacion from './src/screens/PantallaActualizacion';
 
 export default function App() {
   const [sesion, setSesion] = useState<any>(null);
   const [cargando, setCargando] = useState(true); // ← nuevo
   const { setConfiguracionGlobal } = useAppStore();
   const { NotificationModule } = NativeModules;
+
+  // 📱 Forzar actualización si el backend lo indica (antes que todo)
+  const { forzar: forzarActualizacion, info: infoActualizacion } = useActualizacionForzada();
 
 
   // ✅ Verificar sesión guardada al iniciar
@@ -80,6 +85,16 @@ export default function App() {
     };
     cargarConfig();
   }, [sesion]);
+
+  // 📱 Actualización obligatoria: bloquea toda la app (incluso el login)
+  if (forzarActualizacion) {
+    return (
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+        <PantallaActualizacion info={infoActualizacion} />
+      </>
+    );
+  }
 
   // Pantalla de carga inicial
   if (cargando) {
