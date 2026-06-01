@@ -1047,3 +1047,44 @@ class PagoSuscripcion(models.Model):
  
     def __str__(self):
         return f"{self.negocio.nombre} — {self.get_estado_display()} — S/ {self.monto} ({self.periodo or self.fecha_pago.strftime('%b %Y')})"
+
+
+class VersionApp(models.Model):
+    """
+    Control de versiones de la app móvil (Android) para forzar actualizaciones.
+    La app, al abrir, consulta /api/app/version/ y compara su version_code con
+    version_code_minima. Si es menor, muestra la pantalla bloqueante de actualización.
+    Se edita desde el admin de Django: subir el número fuerza el update a todos.
+    """
+    plataforma = models.CharField(max_length=10, default='android', unique=True)
+
+    # Builds con un version_code MENOR a este quedan obligados a actualizar.
+    version_code_minima = models.IntegerField(
+        default=1,
+        help_text="Builds con versionCode menor a este se OBLIGAN a actualizar."
+    )
+    # Solo informativo / para mostrar en la pantalla.
+    version_name_ultima = models.CharField(
+        max_length=20, default='1.0.0',
+        help_text="Nombre de la última versión, ej. 1.0.1 (solo para mostrar)."
+    )
+    apk_url = models.URLField(
+        default='https://pos.leybrak.com/media/leybrak.apk',
+        help_text="URL de descarga del APK más reciente."
+    )
+    notas = models.TextField(
+        blank=True, null=True,
+        help_text="Qué hay de nuevo (se muestra en la pantalla de actualización)."
+    )
+    activa = models.BooleanField(
+        default=True,
+        help_text="Si está desactivado, la app no fuerza ninguna actualización."
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Versión de la App'
+        verbose_name_plural = 'Versiones de la App'
+
+    def __str__(self):
+        return f"{self.plataforma}: mínima={self.version_code_minima} última={self.version_name_ultima}"

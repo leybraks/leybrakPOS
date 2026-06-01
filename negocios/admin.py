@@ -7,8 +7,8 @@ from .models import (
     Empleado, Mesa, Sede, Producto, Orden, DetalleOrden, Pago, 
     ModificadorRapido, GrupoVariacion, OpcionVariacion, PlanSaaS,
     # ✨ IMPORTAMOS TUS NUEVOS MODELOS DE CRM Y MARKETING ✨
-    Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional, 
-    HorarioVisibilidad, ComponenteCombo
+    Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional,
+    HorarioVisibilidad, ComponenteCombo, VersionApp
 )
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline, StackedInline
@@ -156,6 +156,15 @@ class SedeAdmin(ModelAdmin): # ✨ UNFOLD
             'fields': ('enlace_carta_virtual', 'carta_pdf'),
         }),
     )
+
+# ==========================================
+# 📱 6. VERSIÓN DE LA APP MÓVIL (Forzar updates)
+# ==========================================
+@admin.register(VersionApp)
+class VersionAppAdmin(ModelAdmin): # ✨ UNFOLD
+    list_display = ('plataforma', 'version_code_minima', 'version_name_ultima', 'activa', 'actualizado_en')
+    list_editable = ('version_code_minima', 'version_name_ultima', 'activa')
+
 
 @admin.register(ZonaDelivery)
 class ZonaDeliveryAdmin(ModelAdmin): # ✨ UNFOLD

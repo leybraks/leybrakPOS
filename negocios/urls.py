@@ -15,6 +15,7 @@ from negocios.views.publico_views import login_empleado_pin, verificar_sesion_em
 from negocios.views.suscripcion_views import estado_suscripcion
 from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
+from negocios.views.app_version_views import app_version
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
@@ -91,4 +92,9 @@ urlpatterns = [
     # ==========================================
     path('negocio/suscripcion/generar-pago/', generar_pago_suscripcion, name='generar-pago-suscripcion'),
     path('mp/webhook/',                        webhook_mercadopago,      name='mp-webhook'),
+
+    # ==========================================
+    # 📱 APP MÓVIL — Control de versión / forzar update
+    # ==========================================
+    path('app/version/', app_version, name='app-version'),
 ]

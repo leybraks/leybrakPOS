@@ -112,6 +112,10 @@ api.interceptors.response.use(
   }
 );
 
+// ─── Versión de la app (forzar actualización) ────────────────
+// Sin auth: el endpoint es público.
+export const getAppVersion = () => axios.get(`${BASE_URL}/app/version/`);
+
 // ─── Auth ─────────────────────────────────────────────────────
 export const loginMovil = (credentials) =>
   axios.post(`${BASE_URL}/movil/login/`, credentials);
@@ -192,4 +196,13 @@ export const crearModificador      = (data)     => api.post('/modificadores-rapi
 export const actualizarModificador = (id, data) => api.put(`/modificadores-rapidos/${id}/`, data);
 export const eliminarModificador   = (id)       => api.delete(`/modificadores-rapidos/${id}/`);
 export const getOrdenesLlevar = (params) => api.get('/ordenes/', { params: { ...params, tipo: 'llevar', estado: 'preparando' } });
+
+// ─── Inventario ───────────────────────────────────────────────
+export const getCatalogoGlobal      = (params) => api.get('/insumo-base/', { params });
+export const getInsumosSede         = (params) => api.get('/insumo-sede/', { params });
+export const registrarIngresoMasivo = (data)   => api.post('/insumo-sede/ingreso_masivo/', data);
+
+// ─── CRM (clientes) ───────────────────────────────────────────
+export const getClientes = (params) => api.get('/clientes/', { params });
+
 export default api;

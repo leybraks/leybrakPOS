@@ -14,6 +14,9 @@ import DashboardScreen     from '../screens/ERP/DashboardScreen';
 import ConfiguracionScreen from '../screens/ERP/ConfiguracionScreen';
 import PersonalScreen      from '../screens/ERP/PersonalScreen';
 import MenuScreen          from '../screens/ERP/Menu/MenuScreen';
+import InventarioScreen    from '../screens/ERP/InventarioScreen';
+import SedesScreen         from '../screens/ERP/SedesScreen';
+import ClientesScreen      from '../screens/ERP/ClientesScreen';
 import SalonScreen         from '../screens/POS/SalonScreen';
 import useAppStore         from '../store/useAppStore';
 import PosScreen           from '../screens/POS/PosScreen';
@@ -40,28 +43,22 @@ const PlaceholderScreen = ({ titulo, icono }) => (
 );
 
 const SCREENS_META = {
-  dashboard:    { icono: 'bar-chart',  nombre: 'Inicio'       },
-  menu:         { icono: 'cutlery',    nombre: 'Menú'         },
-  personal:     { icono: 'users',      nombre: 'Personal'     },
-  inventario:   { icono: 'cube',       nombre: 'Inventario'   },
-  sedes:        { icono: 'map-marker', nombre: 'Sedes'        },
-  configuracion:{ icono: 'cog',        nombre: 'Ajustes'      },
-  crm:          { icono: 'heart',      nombre: 'CRM'          },
-  bot_wsp:      { icono: 'comments',   nombre: 'Bot WhatsApp' },
-  carta_qr:     { icono: 'qrcode',     nombre: 'Carta QR'     },
-  facturacion:  { icono: 'file-text',  nombre: 'Facturas'     },
+  dashboard:    { icono: 'bar-chart',  nombre: 'Inicio'     },
+  menu:         { icono: 'cutlery',    nombre: 'Menú'       },
+  personal:     { icono: 'users',      nombre: 'Personal'   },
+  inventario:   { icono: 'cube',       nombre: 'Inventario' },
+  sedes:        { icono: 'map-marker', nombre: 'Sedes'      },
+  configuracion:{ icono: 'cog',        nombre: 'Ajustes'    },
+  crm:          { icono: 'heart',      nombre: 'Clientes'   },
 };
 
 const TAB_ITEMS = ['dashboard', 'menu', 'personal'];
 
 const ALL_DRAWER_ITEMS = [
-  { id: 'inventario',    grupo: 'CATÁLOGO',    moduloKey: 'inventario' },
-  { id: 'sedes',         grupo: 'ADMIN',        moduloKey: null         },
-  { id: 'configuracion', grupo: 'ADMIN',        moduloKey: null         },
-  { id: 'crm',           grupo: 'DIGITAL',      moduloKey: 'clientes'   },
-  { id: 'bot_wsp',       grupo: 'DIGITAL',      moduloKey: 'botWsp'     },
-  { id: 'carta_qr',      grupo: 'DIGITAL',      moduloKey: 'cartaQr'    },
-  { id: 'facturacion',   grupo: 'CONTABILIDAD', moduloKey: 'facturacion'},
+  { id: 'inventario',    grupo: 'CATÁLOGO', moduloKey: 'inventario' },
+  { id: 'sedes',         grupo: 'ADMIN',     moduloKey: null         },
+  { id: 'configuracion', grupo: 'ADMIN',     moduloKey: null         },
+  { id: 'crm',           grupo: 'DIGITAL',   moduloKey: 'clientes'   },
 ];
 
 // ─── Drawer ───────────────────────────────────────────────────
@@ -200,12 +197,9 @@ function ERPLayout({ onIrAlPos, onLogout }) {
         {vistaActiva === 'configuracion' && <ConfiguracionScreen />}
         {vistaActiva === 'menu'          && <MenuScreen />}
         {vistaActiva === 'personal'      && <PersonalScreen />}
-        {vistaActiva === 'inventario'    && <PlaceholderScreen titulo="Inventario"   icono="cube"       />}
-        {vistaActiva === 'sedes'         && <PlaceholderScreen titulo="Sedes"        icono="map-marker" />}
-        {vistaActiva === 'crm'           && <PlaceholderScreen titulo="CRM"          icono="heart"      />}
-        {vistaActiva === 'bot_wsp'       && <PlaceholderScreen titulo="Bot WhatsApp" icono="comments"   />}
-        {vistaActiva === 'carta_qr'      && <PlaceholderScreen titulo="Carta QR"     icono="qrcode"     />}
-        {vistaActiva === 'facturacion'   && <PlaceholderScreen titulo="Facturación"  icono="file-text"  />}
+        {vistaActiva === 'inventario'    && <InventarioScreen />}
+        {vistaActiva === 'sedes'         && <SedesScreen />}
+        {vistaActiva === 'crm'           && <ClientesScreen />}
       </View>
 
       {/* Tab Bar */}
