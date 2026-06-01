@@ -1,0 +1,390 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:jar UP-TO-DATE
+
+> Configure project :
+********************************************************************************
+
+WARNING: Setting `newArchEnabled=false` in your `gradle.properties` file is not
+supported anymore since React Native 0.82.
+
+You can remove the line from your `gradle.properties` file.
+
+The application will run with the New Architecture enabled by default.
+
+********************************************************************************
+
+
+> Task :app:externalNativeBuildCleanDebug
+Clean react_codegen_RNVectorIconsSpec-armeabi-v7a, react_codegen_safeareacontext-armeabi-v7a, react_codegen_rnblurview-armeabi-v7a, react_codegen_rnscreens-armeabi-v7a, appmodules-armeabi-v7a, react_codegen_rnasyncstorage-armeabi-v7a
+Clean react_codegen_RNVectorIconsSpec-arm64-v8a, react_codegen_safeareacontext-arm64-v8a, react_codegen_rnblurview-arm64-v8a, react_codegen_rnscreens-arm64-v8a, appmodules-arm64-v8a, react_codegen_rnasyncstorage-arm64-v8a
+Clean react_codegen_RNVectorIconsSpec-x86, react_codegen_safeareacontext-x86, react_codegen_rnblurview-x86, react_codegen_rnscreens-x86, appmodules-x86, react_codegen_rnasyncstorage-x86
+Clean react_codegen_RNVectorIconsSpec-x86_64, react_codegen_safeareacontext-x86_64, react_codegen_rnblurview-x86_64, react_codegen_rnscreens-x86_64, appmodules-x86_64, react_codegen_rnasyncstorage-x86_64
+
+> Task :app:externalNativeBuildCleanDebugOptimized
+> Task :app:externalNativeBuildCleanRelease
+> Task :app:clean
+> Task :react-native-async-storage_async-storage:clean
+> Task :react-native-community_blur:clean
+> Task :react-native-encrypted-storage:clean
+> Task :react-native-safe-area-context:clean
+
+> Task :react-native-screens:externalNativeBuildCleanDebug
+Clean rnscreens-armeabi-v7a
+Clean rnscreens-arm64-v8a
+Clean rnscreens-x86
+Clean rnscreens-x86_64
+
+> Task :react-native-screens:externalNativeBuildCleanRelease
+> Task :react-native-screens:clean
+> Task :react-native-vector-icons:clean
+> Task :app:generateAutolinkingNewArchitectureFiles
+> Task :app:generateAutolinkingPackageList
+> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:generateReactNativeEntryPoint
+> Task :react-native-async-storage_async-storage:generateCodegenSchemaFromJavaScript
+> Task :react-native-async-storage_async-storage:generateCodegenArtifactsFromSchema
+> Task :react-native-async-storage_async-storage:preBuild
+> Task :react-native-community_blur:preBuild UP-TO-DATE
+> Task :react-native-encrypted-storage:preBuild UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript
+> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema
+> Task :react-native-safe-area-context:preBuild
+> Task :react-native-screens:generateCodegenSchemaFromJavaScript
+> Task :react-native-screens:generateCodegenArtifactsFromSchema
+> Task :react-native-screens:preBuild
+> Task :react-native-vector-icons:generateCodegenSchemaFromJavaScript
+> Task :react-native-vector-icons:generateCodegenArtifactsFromSchema
+> Task :react-native-vector-icons:preBuild
+> Task :app:preBuild
+> Task :app:preReleaseBuild
+
+> Task :app:configureCMakeRelWithDebInfo[arm64-v8a]
+[CXX5304] This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+[CXX5304] This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+C/C++: CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/build/generated/autolinking/src/main/jni/Android-autolinking.cmake:10 (add_subdirectory):
+C/C++:   add_subdirectory given source "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS
+C/C++:   MOVIL/LeybrakApp/node_modules/@react-native-community/blur/android/build/generated/source/codegen/jni/"
+C/C++:   which is not an existing directory.
+C/C++: Call Stack (most recent call first):
+C/C++:   C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:94 (include)
+C/C++:   CMakeLists.txt:31 (include)
+C/C++: CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:97 (target_link_libraries):
+C/C++:   Cannot specify link libraries for target "react_codegen_rnblurview" which
+C/C++:   is not built by this project.
+C/C++: Call Stack (most recent call first):
+C/C++:   CMakeLists.txt:31 (include)
+
+> Task :app:configureCMakeRelWithDebInfo[arm64-v8a] FAILED
+
+[Incubating] Problems report is available at: file:///C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS%20MOVIL/LeybrakApp/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:configureCMakeRelWithDebInfo[arm64-v8a]'.
+> [CXX1429] error when building with cmake using C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\node_modules\react-native\ReactAndroid\cmake-utils\default-app-setup\CMakeLists.txt: -- The C compiler identification is Clang 18.0.2
+  -- The CXX compiler identification is Clang 18.0.2
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Users/leybr/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Users/leybr/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Configuring incomplete, errors occurred!
+  See also "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/.cxx/RelWithDebInfo/3y2p1517/arm64-v8a/CMakeFiles/CMakeOutput.log".
+  See also "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/.cxx/RelWithDebInfo/3y2p1517/arm64-v8a/CMakeFiles/CMakeError.log".
+  
+  C++ build system [configure] failed while executing:
+      @echo off
+      "C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\cmake.exe" ^
+        "-HC:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\node_modules\\react-native\\ReactAndroid\\cmake-utils\\default-app-setup" ^
+        "-DCMAKE_SYSTEM_NAME=Android" ^
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON" ^
+        "-DCMAKE_SYSTEM_VERSION=24" ^
+        "-DANDROID_PLATFORM=android-24" ^
+        "-DANDROID_ABI=arm64-v8a" ^
+        "-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a" ^
+        "-DANDROID_NDK=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006" ^
+        "-DCMAKE_ANDROID_NDK=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006" ^
+        "-DCMAKE_TOOLCHAIN_FILE=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006\\build\\cmake\\android.toolchain.cmake" ^
+        "-DCMAKE_MAKE_PROGRAM=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe" ^
+        "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build\\intermediates\\cxx\\RelWithDebInfo\\3y2p1517\\obj\\arm64-v8a" ^
+        "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build\\intermediates\\cxx\\RelWithDebInfo\\3y2p1517\\obj\\arm64-v8a" ^
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo" ^
+        "-DCMAKE_FIND_ROOT_PATH=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\.cxx\\RelWithDebInfo\\3y2p1517\\prefab\\arm64-v8a\\prefab" ^
+        "-BC:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\.cxx\\RelWithDebInfo\\3y2p1517\\arm64-v8a" ^
+        -GNinja ^
+        "-DPROJECT_BUILD_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build" ^
+        "-DPROJECT_ROOT_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android" ^
+        "-DREACT_ANDROID_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\node_modules\\react-native\\ReactAndroid" ^
+        "-DANDROID_STL=c++_shared" ^
+        "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+    from C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app
+  CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/build/generated/autolinking/src/main/jni/Android-autolinking.cmake:10 (add_subdirectory):
+    add_subdirectory given source "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS
+    MOVIL/LeybrakApp/node_modules/@react-native-community/blur/android/build/generated/source/codegen/jni/"
+    which is not an existing directory.
+  Call Stack (most recent call first):
+    C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:94 (include)
+    CMakeLists.txt:31 (include)
+  
+  
+  CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:97 (target_link_libraries):
+    Cannot specify link libraries for target "react_codegen_rnblurview" which
+    is not built by this project.
+  Call Stack (most recent call first):
+    CMakeLists.txt:31 (include) : com.android.ide.common.process.ProcessException: -- The C compiler identification is Clang 18.0.2
+  -- The CXX compiler identification is Clang 18.0.2
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Check for working C compiler: C:/Users/leybr/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe - skipped
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Check for working CXX compiler: C:/Users/leybr/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe - skipped
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Configuring incomplete, errors occurred!
+  See also "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/.cxx/RelWithDebInfo/3y2p1517/arm64-v8a/CMakeFiles/CMakeOutput.log".
+  See also "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/.cxx/RelWithDebInfo/3y2p1517/arm64-v8a/CMakeFiles/CMakeError.log".
+  
+  C++ build system [configure] failed while executing:
+      @echo off
+      "C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\cmake.exe" ^
+        "-HC:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\node_modules\\react-native\\ReactAndroid\\cmake-utils\\default-app-setup" ^
+        "-DCMAKE_SYSTEM_NAME=Android" ^
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON" ^
+        "-DCMAKE_SYSTEM_VERSION=24" ^
+        "-DANDROID_PLATFORM=android-24" ^
+        "-DANDROID_ABI=arm64-v8a" ^
+        "-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a" ^
+        "-DANDROID_NDK=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006" ^
+        "-DCMAKE_ANDROID_NDK=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006" ^
+        "-DCMAKE_TOOLCHAIN_FILE=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006\\build\\cmake\\android.toolchain.cmake" ^
+        "-DCMAKE_MAKE_PROGRAM=C:\\Users\\leybr\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe" ^
+        "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build\\intermediates\\cxx\\RelWithDebInfo\\3y2p1517\\obj\\arm64-v8a" ^
+        "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build\\intermediates\\cxx\\RelWithDebInfo\\3y2p1517\\obj\\arm64-v8a" ^
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo" ^
+        "-DCMAKE_FIND_ROOT_PATH=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\.cxx\\RelWithDebInfo\\3y2p1517\\prefab\\arm64-v8a\\prefab" ^
+        "-BC:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\.cxx\\RelWithDebInfo\\3y2p1517\\arm64-v8a" ^
+        -GNinja ^
+        "-DPROJECT_BUILD_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android\\app\\build" ^
+        "-DPROJECT_ROOT_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\android" ^
+        "-DREACT_ANDROID_DIR=C:\\Users\\leybr\\Desktop\\Leybrak\\APPS\\POS\\POS MOVIL\\LeybrakApp\\node_modules\\react-native\\ReactAndroid" ^
+        "-DANDROID_STL=c++_shared" ^
+        "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+    from C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app
+  CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/android/app/build/generated/autolinking/src/main/jni/Android-autolinking.cmake:10 (add_subdirectory):
+    add_subdirectory given source "C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS
+    MOVIL/LeybrakApp/node_modules/@react-native-community/blur/android/build/generated/source/codegen/jni/"
+    which is not an existing directory.
+  Call Stack (most recent call first):
+    C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:94 (include)
+    CMakeLists.txt:31 (include)
+  
+  
+  CMake Error at C:/Users/leybr/Desktop/Leybrak/APPS/POS/POS MOVIL/LeybrakApp/node_modules/react-native/ReactAndroid/cmake-utils/ReactNative-application.cmake:97 (target_link_libraries):
+    Cannot specify link libraries for target "react_codegen_rnblurview" which
+    is not built by this project.
+  Call Stack (most recent call first):
+    CMakeLists.txt:31 (include)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.execute(ExecuteProcess.kt:288)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt$executeProcess$1.invoke(ExecuteProcess.kt:108)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt$executeProcess$1.invoke(ExecuteProcess.kt:106)
+  	at com.android.build.gradle.internal.cxx.timing.TimingEnvironmentKt.time(TimingEnvironment.kt:32)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.executeProcess(ExecuteProcess.kt:106)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.executeProcess$default(ExecuteProcess.kt:85)
+  	at com.android.build.gradle.tasks.CmakeQueryMetadataGenerator.executeProcess(CmakeFileApiMetadataGenerator.kt:59)
+  	at com.android.build.gradle.tasks.ExternalNativeJsonGenerator$configureOneAbi$1$1$3.invoke(ExternalNativeJsonGenerator.kt:247)
+  	at com.android.build.gradle.tasks.ExternalNativeJsonGenerator$configureOneAbi$1$1$3.invoke(ExternalNativeJsonGenerator.kt:247)
+  	at com.android.build.gradle.internal.cxx.timing.TimingEnvironmentKt.time(TimingEnvironment.kt:32)
+  	at com.android.build.gradle.tasks.ExternalNativeJsonGenerator.configureOneAbi(ExternalNativeJsonGenerator.kt:247)
+  	at com.android.build.gradle.tasks.ExternalNativeJsonGenerator.configure(ExternalNativeJsonGenerator.kt:113)
+  	at com.android.build.gradle.tasks.ExternalNativeBuildJsonTask.doTaskAction(ExternalNativeBuildJsonTask.kt:89)
+  	at com.android.build.gradle.internal.tasks.UnsafeOutputsTask$taskAction$$inlined$recordTaskAction$1.invoke(BaseTask.kt:59)
+  	at com.android.build.gradle.internal.tasks.Blocks.recordSpan(Blocks.java:51)
+  	at com.android.build.gradle.internal.tasks.UnsafeOutputsTask.taskAction(UnsafeOutputsTask.kt:81)
+  	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+  	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+  	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+  	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+  	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+  	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
+  	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+  	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:259)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:29)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:244)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:227)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:210)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:176)
+  	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:110)
+  	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:47)
+  	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:64)
+  	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:61)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+  	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:61)
+  	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:47)
+  	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+  	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+  	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+  	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:51)
+  	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:29)
+  	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:70)
+  	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:40)
+  	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+  	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:62)
+  	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:27)
+  	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+  	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+  	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:39)
+  	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:28)
+  	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+  	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:192)
+  	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:76)
+  	at org.gradle.internal.Either$Right.fold(Either.java:176)
+  	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+  	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:74)
+  	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:49)
+  	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:46)
+  	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:35)
+  	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+  	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+  	at java.base/java.util.Optional.orElseGet(Optional.java:364)
+  	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+  	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+  	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+  	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+  	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:49)
+  	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:27)
+  	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:71)
+  	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:39)
+  	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:63)
+  	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:34)
+  	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+  	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:64)
+  	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:42)
+  	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:77)
+  	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:46)
+  	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:133)
+  	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:59)
+  	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+  	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+  	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+  	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+  	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
+  	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
+  	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+  	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+  	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
+  	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+  	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+  	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+  	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+  	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+  	at java.base/java.util.Optional.orElseGet(Optional.java:364)
+  	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+  	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+  	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+  	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+  	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:44)
+  	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:31)
+  	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
+  	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
+  	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:121)
+  	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:41)
+  	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+  	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+  	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+  	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+  	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+  	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+  	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+  	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+  	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+  	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+  	at org.gradle.execution.plan.DefaultNodeExecutor.executeLocalTaskNode(DefaultNodeExecutor.java:55)
+  	at org.gradle.execution.plan.DefaultNodeExecutor.execute(DefaultNodeExecutor.java:34)
+  	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:355)
+  	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:343)
+  	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:339)
+  	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+  	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:339)
+  	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
+  	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+  	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+  	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+  	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+  	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+  	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+  	at java.base/java.lang.Thread.run(Thread.java:840)
+  Caused by: com.android.ide.common.process.ProcessException: Error while executing process C:\Users\leybr\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe with arguments {-HC:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\node_modules\react-native\ReactAndroid\cmake-utils\default-app-setup -DCMAKE_SYSTEM_NAME=Android -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_SYSTEM_VERSION=24 -DANDROID_PLATFORM=android-24 -DANDROID_ABI=arm64-v8a -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a -DANDROID_NDK=C:\Users\leybr\AppData\Local\Android\Sdk\ndk\27.1.12297006 -DCMAKE_ANDROID_NDK=C:\Users\leybr\AppData\Local\Android\Sdk\ndk\27.1.12297006 -DCMAKE_TOOLCHAIN_FILE=C:\Users\leybr\AppData\Local\Android\Sdk\ndk\27.1.12297006\build\cmake\android.toolchain.cmake -DCMAKE_MAKE_PROGRAM=C:\Users\leybr\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app\build\intermediates\cxx\RelWithDebInfo\3y2p1517\obj\arm64-v8a -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app\build\intermediates\cxx\RelWithDebInfo\3y2p1517\obj\arm64-v8a -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_FIND_ROOT_PATH=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app\.cxx\RelWithDebInfo\3y2p1517\prefab\arm64-v8a\prefab -BC:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app\.cxx\RelWithDebInfo\3y2p1517\arm64-v8a -GNinja -DPROJECT_BUILD_DIR=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android\app\build -DPROJECT_ROOT_DIR=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\android -DREACT_ANDROID_DIR=C:\Users\leybr\Desktop\Leybrak\APPS\POS\POS MOVIL\LeybrakApp\node_modules\react-native\ReactAndroid -DANDROID_STL=c++_shared -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON}
+  	at com.android.build.gradle.internal.process.GradleProcessResult.buildProcessException(GradleProcessResult.java:73)
+  	at com.android.build.gradle.internal.process.GradleProcessResult.assertNormalExitValue(GradleProcessResult.java:48)
+  	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.execute(ExecuteProcess.kt:277)
+  	... 147 more
+  Caused by: org.gradle.process.ProcessExecutionException: Process 'command 'C:\Users\leybr\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe'' finished with non-zero exit value 1
+  	at org.gradle.process.internal.DefaultExecHandle$ExecResultImpl.assertNormalExitValue(DefaultExecHandle.java:454)
+  	at com.android.build.gradle.internal.process.GradleProcessResult.assertNormalExitValue(GradleProcessResult.java:46)
+  	... 148 more
+
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 49s
+34 actionable tasks: 24 executed, 10 up-to-date
+EXIT=1
