@@ -381,33 +381,36 @@ export default function PosView({ mesaId, onVolver, esModoTerminal = false }) {
       {modalCobroAbierto && (
           <ModalCobro
             isOpen={modalCobroAbierto}
-            onClose={() => {
+            onClose={(info) => {
               setModalCobroAbierto(false);
-              notificarEstadoMesa('ocupada', totalMesa);
+              if (info?.pagado) {
+                // Cierre tras un cobro exitoso: limpiamos y volvemos a mesas.
+                vaciarCarrito();
+                setCarritoAbierto(false);
+                onVolver();
+              } else {
+                // Cierre/cancelación sin cobrar: la mesa sigue ocupada.
+                notificarEstadoMesa('ocupada', totalMesa);
+              }
             }}
             total={totalMesa}
             ordenId={ordenActiva?.id ?? null}
             carrito={ordenActiva ? ordenActiva.detalles : []}
-            onCobroExitoso={async (datosCobro) => { // 👈 Ahora recibe { pagos, telefono }
+            onCobroExitoso={async (datosCobro) => { // recibe { pagos, telefono }, devuelve { ordenId }
               try {
-                // 🚀 UNA SOLA LLAMADA AL ENDPOINT
                 const sesionCajaId = localStorage.getItem('sesion_caja_id');
-                
                 await api.post(`/ordenes/${ordenActiva.id}/cobrar_orden/`, {
                   pagos: datosCobro.pagos,
                   telefono: datosCobro.telefono, // ¡El WhatsApp para el CRM!
                   sesion_caja_id: sesionCajaId
                 });
-
-                // Limpiamos pantalla y volvemos a las mesas
-                setModalCobroAbierto(false); 
-                vaciarCarrito(); 
-                setCarritoAbierto(false); 
-                onVolver();
-
+                // El cierre/navegación lo hace onClose (Finalizar/Cerrar); aquí solo
+                // comiteamos y devolvemos el id para poder emitir el comprobante.
+                return { ordenId: ordenActiva.id };
               } catch (error) {
                 console.error(error);
                 toast.error('Error al procesar el pago. Intenta de nuevo.');
+                throw error;
               }
             }}
           />
