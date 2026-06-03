@@ -70,7 +70,8 @@ def construir_payload(comprobante, montos):
         'numero': comprobante.numero,
         'sunat_transaction': 1,           # 1 = Venta interna
         'cliente_tipo_de_documento': comprobante.receptor_tipo_doc,   # '6'/'1'/'-'
-        'cliente_numero_de_documento': comprobante.receptor_num_doc or '',
+        # Nubefact exige un número no vacío incluso para boletas "varios" → '0'.
+        'cliente_numero_de_documento': comprobante.receptor_num_doc or '0',
         'cliente_denominacion': comprobante.receptor_denominacion,
         'cliente_direccion': comprobante.receptor_direccion or '',
         'cliente_email': comprobante.receptor_email or '',
