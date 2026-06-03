@@ -5,10 +5,8 @@ from .nubefact_provider import NubefactProvider
 
 
 def get_provider(negocio):
-    """Demo → credenciales compartidas de settings; Producción → las del negocio."""
-    if negocio.facturacion_entorno == 'produccion':
-        return NubefactProvider(negocio.facturacion_ruta, negocio.facturacion_token)
-    return NubefactProvider(
-        getattr(settings, 'NUBEFACT_DEMO_RUTA', ''),
-        getattr(settings, 'NUBEFACT_DEMO_TOKEN', ''),
-    )
+    """Usa las credenciales que el negocio configuró (sea cuenta demo o producción
+    de Nubefact). Si no tiene, cae a las credenciales demo del sistema (settings)."""
+    ruta = negocio.facturacion_ruta or getattr(settings, 'NUBEFACT_DEMO_RUTA', '')
+    token = negocio.facturacion_token or getattr(settings, 'NUBEFACT_DEMO_TOKEN', '')
+    return NubefactProvider(ruta, token)
