@@ -155,10 +155,6 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const nuevoTotal = totalPagado + monto;
   if (nuevoTotal >= totalEfectivo - 0.01) {
     setPaso('exito');
-    // Facturación automática: comitear el cobro y abrir el comprobante.
-    if (facturacionEmision === 'automatico') {
-      comprometerCobro(nuevos).then((id) => { if (id) setMostrarComprobante(true); }).catch(() => {});
-    }
   } else   {
       const restanteNuevo = totalEfectivo - nuevoTotal;
       toast.success(`Pago de S/ ${monto.toFixed(2)} registrado. Falta: S/ ${restanteNuevo.toFixed(2)}`);
@@ -232,13 +228,21 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     }
   };
 
+  // "Finalizar": comitea y, si hay facturación activa, abre el comprobante.
+  // (El cierre del modal de cobro ocurre al cerrar el comprobante.)
   const finalizarCobro = async () => {
     try { await comprometerCobro(); } catch { return; }   // si falla, no cierra
-    onClose({ pagado: true });   // info para el padre: el cobro se completó
+    if (facturacionEmision !== 'desactivado') {
+      setMostrarComprobante(true);
+    } else {
+      onClose({ pagado: true });
+    }
   };
 
-  const emitirComprobanteFlow = async () => {
-    try { await comprometerCobro(); setMostrarComprobante(true); } catch { /* alertado por el padre */ }
+  // "Cerrar": comitea y cierra, sin comprobante.
+  const cerrarCobro = async () => {
+    try { await comprometerCobro(); } catch { return; }
+    onClose({ pagado: true });
   };
 
   const metodosDisponibles = [
@@ -670,20 +674,14 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             </div>
 
-            {/* Emitir comprobante SUNAT (modo opcional) */}
-            {facturacionEmision === 'opcional' && (
-              <button onClick={emitirComprobanteFlow}
-                className={`w-full mb-3 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border ${isDark ? 'bg-[#111] border-[#222] text-neutral-300' : 'bg-white border-gray-200 text-gray-700'}`}>
-                <FileText size={16} /> Emitir comprobante SUNAT
-              </button>
-            )}
-
             <div className="space-y-3">
-              <button onClick={finalizarCobro} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
-                {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
+              <button onClick={finalizarCobro} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: colorPrimario }}>
+                {facturacionEmision !== 'desactivado'
+                  ? <><FileText size={16} /> Finalizar y emitir comprobante</>
+                  : (telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar')}
               </button>
-              <button onClick={finalizarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
-                Cerrar
+              <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
               </button>
             </div>
           </div>
@@ -692,7 +690,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
       <ModalEmitirComprobante
         isOpen={mostrarComprobante}
-        onClose={() => setMostrarComprobante(false)}
+        onClose={() => { setMostrarComprobante(false); onClose({ pagado: true }); }}
         ordenId={comprobanteOrdenId || ordenId}
         isDark={isDark}
         colorPrimario={colorPrimario}
