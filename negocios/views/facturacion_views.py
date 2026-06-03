@@ -127,7 +127,8 @@ def emitir_comprobante(request, orden_id):
         return Response({'error': 'La orden no tiene ítems facturables.'},
                         status=status.HTTP_400_BAD_REQUEST)
 
-    serie = SERIE_DEFAULT[tipo]
+    serie = (negocio.facturacion_serie_factura if tipo == 'factura'
+             else negocio.facturacion_serie_boleta) or SERIE_DEFAULT[tipo]
 
     with transaction.atomic():
         serie_obj, _ = (SerieComprobante.objects
@@ -138,7 +139,7 @@ def emitir_comprobante(request, orden_id):
         comprobante = Comprobante.objects.create(
             negocio=negocio, sede=orden.sede, orden=orden,
             tipo=tipo, serie=serie, numero=numero,
-            fecha_emision=timezone.now().date(), moneda='PEN',
+            fecha_emision=timezone.localdate(), moneda='PEN',
             emisor_ruc=negocio.ruc, emisor_razon_social=negocio.razon_social,
             receptor_tipo_doc=receptor['tipo_doc'], receptor_num_doc=receptor['num_doc'],
             receptor_denominacion=receptor['denominacion'],
