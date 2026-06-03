@@ -234,7 +234,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
   const finalizarCobro = async () => {
     try { await comprometerCobro(); } catch { return; }   // si falla, no cierra
-    onClose();
+    onClose({ pagado: true });   // info para el padre: el cobro se completó
   };
 
   const emitirComprobanteFlow = async () => {
