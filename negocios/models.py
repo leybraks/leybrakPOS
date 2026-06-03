@@ -123,6 +123,10 @@ class Negocio(models.Model):
         help_text="URL/RUTA de la cuenta Nubefact del negocio (solo producción).")
     facturacion_token = EncryptedCharField(max_length=255, blank=True, null=True,
         help_text="Token de la cuenta Nubefact del negocio (solo producción).")
+    facturacion_serie_boleta  = models.CharField(max_length=4, default='B001',
+        help_text="Serie de boletas registrada en tu cuenta Nubefact (ej. B001, BBB1).")
+    facturacion_serie_factura = models.CharField(max_length=4, default='F001',
+        help_text="Serie de facturas registrada en tu cuenta Nubefact (ej. F001, FFF1).")
 
     def __str__(self):
         return self.nombre

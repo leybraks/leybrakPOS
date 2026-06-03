@@ -47,6 +47,7 @@ class NegocioSerializer(serializers.ModelSerializer):
             # Facturación electrónica (SUNAT / Nubefact)
             'facturacion_emision', 'facturacion_entorno',
             'facturacion_ruta', 'facturacion_token',
+            'facturacion_serie_boleta', 'facturacion_serie_factura',
         ]
         extra_kwargs = {
             # El token no se devuelve en claro; solo se escribe.

@@ -30,6 +30,8 @@ export default function Erp_TabFacturacion() {
   const [entorno, setEntorno]   = useState('demo');
   const [ruta, setRuta]         = useState('');
   const [token, setToken]       = useState('');
+  const [serieBoleta, setSerieBoleta] = useState('B001');
+  const [serieFactura, setSerieFactura] = useState('F001');
   const [ruc, setRuc]           = useState('');
   const [razon, setRazon]       = useState('');
   const [cargando, setCargando] = useState(true);
@@ -62,6 +64,8 @@ export default function Erp_TabFacturacion() {
         setEmision(d.facturacion_emision || 'desactivado');
         setEntorno(d.facturacion_entorno || 'demo');
         setRuta(d.facturacion_ruta || '');
+        setSerieBoleta(d.facturacion_serie_boleta || 'B001');
+        setSerieFactura(d.facturacion_serie_factura || 'F001');
         setRuc(d.ruc || '');
         setRazon(d.razon_social || '');
       } catch {
@@ -74,7 +78,13 @@ export default function Erp_TabFacturacion() {
 
   const guardar = async () => {
     setGuardando(true); setMsg(null);
-    const payload = { facturacion_emision: emision, facturacion_entorno: entorno, facturacion_ruta: ruta };
+    const payload = {
+      facturacion_emision: emision,
+      facturacion_entorno: entorno,
+      facturacion_ruta: ruta,
+      facturacion_serie_boleta: serieBoleta.toUpperCase(),
+      facturacion_serie_factura: serieFactura.toUpperCase(),
+    };
     if (token) payload.facturacion_token = token;   // no sobreescribir si está vacío
     try {
       await actualizarNegocio(negocioId, payload);
@@ -165,7 +175,19 @@ export default function Erp_TabFacturacion() {
                 className={`w-full mt-1 px-4 py-3 rounded-xl border font-medium outline-none ${inp}`} />
             </div>
           </div>
-          <p className={`text-xs mt-4 ${sub}`}>Series: <b>B001</b> (boletas) y <b>F001</b> (facturas), correlativos automáticos.</p>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div>
+              <label className={`text-xs font-bold uppercase ${sub}`}>Serie Boleta</label>
+              <input value={serieBoleta} onChange={e => setSerieBoleta(e.target.value.toUpperCase().slice(0, 4))}
+                placeholder="B001" className={`w-full mt-1 px-4 py-3 rounded-xl border font-bold outline-none ${inp}`} />
+            </div>
+            <div>
+              <label className={`text-xs font-bold uppercase ${sub}`}>Serie Factura</label>
+              <input value={serieFactura} onChange={e => setSerieFactura(e.target.value.toUpperCase().slice(0, 4))}
+                placeholder="F001" className={`w-full mt-1 px-4 py-3 rounded-xl border font-bold outline-none ${inp}`} />
+            </div>
+          </div>
+          <p className={`text-xs mt-2 ${sub}`}>Las series deben coincidir con las registradas en tu cuenta Nubefact. Los correlativos son automáticos.</p>
         </div>
       )}
 
