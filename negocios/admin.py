@@ -8,7 +8,7 @@ from .models import (
     ModificadorRapido, GrupoVariacion, OpcionVariacion, PlanSaaS,
     # ✨ IMPORTAMOS TUS NUEVOS MODELOS DE CRM Y MARKETING ✨
     Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional,
-    HorarioVisibilidad, ComponenteCombo, VersionApp
+    HorarioVisibilidad, ComponenteCombo, VersionApp, Comprobante, SerieComprobante
 )
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline, StackedInline
@@ -164,6 +164,23 @@ class SedeAdmin(ModelAdmin): # ✨ UNFOLD
 class VersionAppAdmin(ModelAdmin): # ✨ UNFOLD
     list_display = ('plataforma', 'version_code_minima', 'version_name_ultima', 'activa', 'actualizado_en')
     list_editable = ('version_code_minima', 'version_name_ultima', 'activa')
+
+
+# ==========================================
+# 🧾 7. FACTURACIÓN ELECTRÓNICA (SUNAT)
+# ==========================================
+@admin.register(Comprobante)
+class ComprobanteAdmin(ModelAdmin): # ✨ UNFOLD
+    list_display = ('tipo', 'serie', 'numero', 'negocio', 'estado_sunat', 'total', 'creado_en')
+    list_filter = ('tipo', 'estado_sunat', 'negocio')
+    search_fields = ('serie', 'numero', 'receptor_num_doc', 'receptor_denominacion')
+    readonly_fields = ('payload_enviado', 'respuesta', 'codigo_hash', 'creado_en')
+
+
+@admin.register(SerieComprobante)
+class SerieComprobanteAdmin(ModelAdmin): # ✨ UNFOLD
+    list_display = ('negocio', 'tipo', 'serie', 'ultimo_numero')
+    list_filter = ('negocio', 'tipo')
 
 
 @admin.register(ZonaDelivery)

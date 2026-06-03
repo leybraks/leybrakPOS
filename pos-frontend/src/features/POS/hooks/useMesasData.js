@@ -30,6 +30,8 @@ export const useMesasData = (sedeActualId, triggerRecarga, setConfiguracionGloba
           setConfiguracionGlobal({
             colorPrimario: data.color_primario || '#ff5a1f',
             temaFondo: data.tema_fondo || 'dark',
+            negocio_id: data.id,
+            facturacion_emision: data.facturacion_emision || 'desactivado',
             modulos: mods,
           });
         }
