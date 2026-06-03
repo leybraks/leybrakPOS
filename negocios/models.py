@@ -101,6 +101,29 @@ class Negocio(models.Model):
         help_text="Configuración visual de la carta digital (fuentes, fondos, colores, estilos)"
     )
 
+    # ==========================================
+    # 🧾 FACTURACIÓN ELECTRÓNICA (SUNAT vía Nubefact)
+    # ==========================================
+    FACTURACION_EMISION_CHOICES = [
+        ('desactivado', 'Desactivado'),
+        ('opcional',    'Opcional (botón al cobrar)'),
+        ('automatico',  'Automático (toda venta)'),
+    ]
+    facturacion_emision = models.CharField(
+        max_length=12, choices=FACTURACION_EMISION_CHOICES, default='desactivado',
+        help_text="Cómo se emiten comprobantes SUNAT al cobrar."
+    )
+    facturacion_entorno = models.CharField(
+        max_length=12,
+        choices=[('demo', 'Demo (pruebas)'), ('produccion', 'Producción')],
+        default='demo',
+        help_text="Qué credenciales de Nubefact usar."
+    )
+    facturacion_ruta  = EncryptedCharField(max_length=255, blank=True, null=True,
+        help_text="URL/RUTA de la cuenta Nubefact del negocio (solo producción).")
+    facturacion_token = EncryptedCharField(max_length=255, blank=True, null=True,
+        help_text="Token de la cuenta Nubefact del negocio (solo producción).")
+
     def __str__(self):
         return self.nombre
 
@@ -1088,3 +1111,90 @@ class VersionApp(models.Model):
 
     def __str__(self):
         return f"{self.plataforma}: mínima={self.version_code_minima} última={self.version_name_ultima}"
+
+
+# ══════════════════════════════════════════════════════════════
+# 🧾 FACTURACIÓN ELECTRÓNICA SUNAT
+# ══════════════════════════════════════════════════════════════
+class SerieComprobante(models.Model):
+    """Correlativos por negocio + tipo + serie (los gestionamos nosotros)."""
+    TIPO_CHOICES = [('factura', 'Factura'), ('boleta', 'Boleta')]
+
+    negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='series_comprobante')
+    tipo    = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    serie   = models.CharField(max_length=4)   # 'F001' / 'B001'
+    ultimo_numero = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('negocio', 'tipo', 'serie')
+
+    def __str__(self):
+        return f"{self.serie} (último: {self.ultimo_numero})"
+
+    def siguiente_numero(self):
+        """Incrementa y devuelve el siguiente correlativo. Usar dentro de una
+        transacción con select_for_update() sobre esta fila para que sea atómico."""
+        self.ultimo_numero += 1
+        self.save(update_fields=['ultimo_numero'])
+        return self.ultimo_numero
+
+
+class Comprobante(models.Model):
+    """Comprobante de pago electrónico (Boleta/Factura) emitido a SUNAT vía PSE/OSE."""
+    TIPO_CHOICES = [('factura', 'Factura'), ('boleta', 'Boleta de venta')]
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('aceptado',  'Aceptado por SUNAT'),
+        ('rechazado', 'Rechazado'),
+        ('anulado',   'Anulado'),
+    ]
+
+    negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='comprobantes')
+    sede    = models.ForeignKey('Sede', on_delete=models.SET_NULL, null=True, blank=True)
+    orden   = models.OneToOneField('Orden', on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='comprobante')
+
+    tipo          = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    serie         = models.CharField(max_length=4)
+    numero        = models.PositiveIntegerField()
+    fecha_emision = models.DateField(default=timezone.now)
+    moneda        = models.CharField(max_length=3, default='PEN')
+
+    # Snapshot EMISOR
+    emisor_ruc          = models.CharField(max_length=11)
+    emisor_razon_social = models.CharField(max_length=255)
+
+    # Snapshot RECEPTOR
+    receptor_tipo_doc     = models.CharField(max_length=1, default='-')   # 6=RUC, 1=DNI, -=varios
+    receptor_num_doc      = models.CharField(max_length=15, blank=True)
+    receptor_denominacion = models.CharField(max_length=255, default='Cliente varios')
+    receptor_direccion    = models.CharField(max_length=255, blank=True)
+    receptor_email        = models.EmailField(blank=True)
+
+    # Montos
+    total_gravada = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_igv     = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total         = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Resultado SUNAT
+    estado_sunat       = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente')
+    aceptado_por_sunat = models.BooleanField(default=False)
+    enlace             = models.URLField(blank=True)
+    enlace_pdf         = models.URLField(blank=True)
+    codigo_hash        = models.CharField(max_length=128, blank=True)
+    sunat_description  = models.TextField(blank=True)
+
+    # Auditoría (crudo, para depurar contra Nubefact)
+    payload_enviado = models.JSONField(default=dict, blank=True)
+    respuesta       = models.JSONField(default=dict, blank=True)
+    creado_en       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        unique_together = ('negocio', 'tipo', 'serie', 'numero')
+        indexes = [
+            models.Index(fields=['negocio', 'estado_sunat']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} {self.serie}-{self.numero} [{self.estado_sunat}]"

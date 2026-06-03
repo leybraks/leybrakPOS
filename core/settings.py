@@ -316,3 +316,8 @@ FRONTEND_URL      = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 MP_ACCESS_TOKEN   = os.getenv('MP_ACCESS_TOKEN', '')   # TEST-... (sandbox) / APP_USR-... (prod)
 MP_SANDBOX        = os.getenv('MP_SANDBOX', 'True') == 'True'
 BACKEND_URL       = os.getenv('BACKEND_URL', 'http://localhost:8000')
+
+# ── Facturación electrónica (Nubefact) — credenciales del entorno DEMO ──────
+# (En producción cada negocio usa su propia ruta/token, guardados encriptados.)
+NUBEFACT_DEMO_RUTA  = os.getenv('NUBEFACT_DEMO_RUTA',  '')
+NUBEFACT_DEMO_TOKEN = os.getenv('NUBEFACT_DEMO_TOKEN', '')

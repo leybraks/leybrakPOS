@@ -336,4 +336,11 @@ export const getEstadoSuscripcion    = () => api.get('/negocio/estado-suscripcio
 export const generarPagoSuscripcion   = (planId) =>
   api.post('/negocio/suscripcion/generar-pago/', planId ? { plan_id: planId } : {});
 
+// ============================================================
+// FACTURACIÓN ELECTRÓNICA (SUNAT)
+// ============================================================
+export const emitirComprobante = (ordenId, payload) => api.post(`/ordenes/${ordenId}/emitir-comprobante/`, payload);
+export const getComprobante    = (ordenId)          => api.get(`/ordenes/${ordenId}/comprobante/`);
+export const consultarRuc      = (ruc)              => api.get(`/negocios/consultar_ruc/${ruc}/`);
+
 export default api;

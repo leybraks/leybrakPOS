@@ -16,6 +16,7 @@ from negocios.views.suscripcion_views import estado_suscripcion
 from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from negocios.views.app_version_views import app_version
+from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
@@ -97,4 +98,10 @@ urlpatterns = [
     # 📱 APP MÓVIL — Control de versión / forzar update
     # ==========================================
     path('app/version/', app_version, name='app-version'),
+
+    # ==========================================
+    # 🧾 FACTURACIÓN ELECTRÓNICA (SUNAT)
+    # ==========================================
+    path('ordenes/<int:orden_id>/emitir-comprobante/', emitir_comprobante, name='emitir-comprobante'),
+    path('ordenes/<int:orden_id>/comprobante/',        obtener_comprobante, name='obtener-comprobante'),
 ]

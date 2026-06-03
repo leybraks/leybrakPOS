@@ -44,7 +44,15 @@ class NegocioSerializer(serializers.ModelSerializer):
             'mod_delivery_activo', 'mod_clientes_activo', 'mod_facturacion_activo',
             'mod_carta_qr_activo', 'mod_bot_wsp_activo', 'mod_ml_activo',
             'color_primario', 'tema_fondo', 'carta_config',
+            # Facturación electrónica (SUNAT / Nubefact)
+            'facturacion_emision', 'facturacion_entorno',
+            'facturacion_ruta', 'facturacion_token',
         ]
+        extra_kwargs = {
+            # El token no se devuelve en claro; solo se escribe.
+            'facturacion_token': {'write_only': True, 'required': False},
+            'facturacion_ruta':  {'required': False},
+        }
 
 class SedeSerializer(serializers.ModelSerializer):
     class Meta:

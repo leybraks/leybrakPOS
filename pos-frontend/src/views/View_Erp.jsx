@@ -10,6 +10,7 @@ import Erp_DashboardCartaQR from '../features/ERP/DashboardCartaQR';
 import Erp_EditorMenu from '../features/ERP/Erp_EditorMenu';
 import Erp_GestionSedes from '../features/ERP/Erp_GestionSedes'; 
 import Erp_Inventario from '../features/ERP/Erp_Inventario';
+import Erp_TabFacturacion from '../features/ERP/Erp_TabFacturacion';
 import Erp_Personal from '../features/ERP/Erp_Personal';
 import Erp_Crm from '../features/ERP/Erp_Crm';
 import Erp_Configuracion from '../features/ERP/Erp_Configuracion';
@@ -287,16 +288,7 @@ export default function ErpDashboard({ onVolverAlPos, rolUsuario }) {
             />
           )}
 
-          {vistaActiva === 'facturacion' && (
-            <div className="animate-fadeIn max-w-4xl mx-auto space-y-6">
-              <div className={`rounded-3xl p-8 text-center border ${tema === 'dark' ? 'bg-[#121212] border-[#222]' : 'bg-white border-gray-200 shadow-sm'}`}>
-                <div className="text-7xl mb-4">🧾</div>
-                <h2 className={`text-2xl font-black mb-2 ${tema === 'dark' ? 'text-white' : 'text-gray-900'}`}>Facturación Electrónica</h2>
-                <p className={`mb-6 ${tema === 'dark' ? 'text-neutral-400' : 'text-gray-600'}`}>Módulo en desarrollo. Próximamente disponible.</p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#ff5a1f]/10 text-[#ff5a1f] text-sm font-bold">🚧 Próximamente</div>
-              </div>
-            </div>
-          )}
+          {vistaActiva === 'facturacion' && <Erp_TabFacturacion />}
 
         </main>
       </div>

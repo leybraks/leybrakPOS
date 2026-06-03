@@ -3,9 +3,10 @@ import usePosStore from '../../store/usePosStore';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/api';
 import { usePagosWS } from '../../features/POS/hooks/usePagosWS';
+import ModalEmitirComprobante from './ModalEmitirComprobante';
 import {
   X, Banknote, Smartphone, CreditCard, CheckCircle2,
-  Users, Receipt, MessageCircle, ArrowLeft, Loader2
+  Users, Receipt, MessageCircle, ArrowLeft, Loader2, FileText
 } from 'lucide-react';
 
 export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExitoso, carrito = [], esVentaRapida = false, ordenId = null }) {
@@ -19,6 +20,10 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   // ─── Flags del negocio ───────────────────────────────────────
   const negocioId                 = config.negocio_id;
   const usaConfirmacionAutomatica = !!(config.confirmacion_automatica);
+  const facturacionEmision        = config.facturacion_emision || 'desactivado';
+
+  // ─── Facturación SUNAT ───────────────────────────────────────
+  const [mostrarComprobante, setMostrarComprobante] = useState(false);
   // ─── Estados principales ─────────────────────────────────────
   const [paso, setPaso]                             = useState('cobro');
   const [tab, setTab]                               = useState('completo');
@@ -145,6 +150,8 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const nuevoTotal = totalPagado + monto;
   if (nuevoTotal >= totalEfectivo - 0.01) {
     setPaso('exito');
+    // Facturación automática: abrir el comprobante al completar el pago.
+    if (facturacionEmision === 'automatico' && ordenId) setMostrarComprobante(true);
   } else   {
       const restanteNuevo = totalEfectivo - nuevoTotal;
       toast.success(`Pago de S/ ${monto.toFixed(2)} registrado. Falta: S/ ${restanteNuevo.toFixed(2)}`);
@@ -584,6 +591,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   // ══════════════════════════════════════════════
   if (paso === 'exito') {
     return (
+      <>
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
           <div className="p-8 text-center">
@@ -631,6 +639,14 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             </div>
 
+            {/* Emitir comprobante SUNAT (modo opcional) */}
+            {facturacionEmision === 'opcional' && ordenId && (
+              <button onClick={() => setMostrarComprobante(true)}
+                className={`w-full mb-3 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border ${isDark ? 'bg-[#111] border-[#222] text-neutral-300' : 'bg-white border-gray-200 text-gray-700'}`}>
+                <FileText size={16} /> Emitir comprobante SUNAT
+              </button>
+            )}
+
             <div className="space-y-3">
               <button onClick={finalizarCobro} className="w-full py-4 rounded-xl font-bold text-white" style={{ backgroundColor: colorPrimario }}>
                 {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
@@ -642,6 +658,15 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
           </div>
         </div>
       </div>
+
+      <ModalEmitirComprobante
+        isOpen={mostrarComprobante}
+        onClose={() => setMostrarComprobante(false)}
+        ordenId={ordenId}
+        isDark={isDark}
+        colorPrimario={colorPrimario}
+      />
+      </>
     );
   }
 
