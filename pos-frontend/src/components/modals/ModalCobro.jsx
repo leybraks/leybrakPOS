@@ -24,6 +24,8 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
   // ─── Facturación SUNAT ───────────────────────────────────────
   const [mostrarComprobante, setMostrarComprobante] = useState(false);
+  const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
+  const cobroComprometidoRef = useRef(false);
   // ─── Estados principales ─────────────────────────────────────
   const [paso, setPaso]                             = useState('cobro');
   const [tab, setTab]                               = useState('completo');
@@ -85,6 +87,9 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       setPreview(null);
       setNotificaciones([]);
       setNotificacionElegida(null);
+      setMostrarComprobante(false);
+      setComprobanteOrdenId(null);
+      cobroComprometidoRef.current = false;
       if (esperaTimeoutRef.current) clearTimeout(esperaTimeoutRef.current);
     }
     return () => {
@@ -150,8 +155,10 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const nuevoTotal = totalPagado + monto;
   if (nuevoTotal >= totalEfectivo - 0.01) {
     setPaso('exito');
-    // Facturación automática: abrir el comprobante al completar el pago.
-    if (facturacionEmision === 'automatico' && ordenId) setMostrarComprobante(true);
+    // Facturación automática: comitear el cobro y abrir el comprobante.
+    if (facturacionEmision === 'automatico') {
+      comprometerCobro(nuevos).then((id) => { if (id) setMostrarComprobante(true); }).catch(() => {});
+    }
   } else   {
       const restanteNuevo = totalEfectivo - nuevoTotal;
       toast.success(`Pago de S/ ${monto.toFixed(2)} registrado. Falta: S/ ${restanteNuevo.toFixed(2)}`);
@@ -206,8 +213,32 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     setPaso('cobro');
   };
 
-  const finalizarCobro = () => {
-    onCobroExitoso({ pagos: pagosAcumulados, telefono: telefonoTicket });
+  // Persiste el cobro UNA sola vez y devuelve el ordenId real (importante para
+  // venta rápida, donde la orden se crea aquí). Idempotente.
+  const comprometerCobro = async (pagosOverride) => {
+    if (cobroComprometidoRef.current) return comprobanteOrdenId;
+    cobroComprometidoRef.current = true;
+    try {
+      const r = await onCobroExitoso({
+        pagos: pagosOverride || pagosAcumulados,
+        telefono: telefonoTicket,
+      });
+      const id = (r && r.ordenId) || ordenId;
+      setComprobanteOrdenId(id);
+      return id;
+    } catch (e) {
+      cobroComprometidoRef.current = false;   // permite reintentar
+      throw e;
+    }
+  };
+
+  const finalizarCobro = async () => {
+    try { await comprometerCobro(); } catch { return; }   // si falla, no cierra
+    onClose();
+  };
+
+  const emitirComprobanteFlow = async () => {
+    try { await comprometerCobro(); setMostrarComprobante(true); } catch { /* alertado por el padre */ }
   };
 
   const metodosDisponibles = [
@@ -640,8 +671,8 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
             </div>
 
             {/* Emitir comprobante SUNAT (modo opcional) */}
-            {facturacionEmision === 'opcional' && ordenId && (
-              <button onClick={() => setMostrarComprobante(true)}
+            {facturacionEmision === 'opcional' && (
+              <button onClick={emitirComprobanteFlow}
                 className={`w-full mb-3 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border ${isDark ? 'bg-[#111] border-[#222] text-neutral-300' : 'bg-white border-gray-200 text-gray-700'}`}>
                 <FileText size={16} /> Emitir comprobante SUNAT
               </button>
@@ -662,7 +693,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       <ModalEmitirComprobante
         isOpen={mostrarComprobante}
         onClose={() => setMostrarComprobante(false)}
-        ordenId={ordenId}
+        ordenId={comprobanteOrdenId || ordenId}
         isDark={isDark}
         colorPrimario={colorPrimario}
       />

@@ -257,16 +257,19 @@ export default function MesasView({ onSeleccionarMesa, onIrAErp, mesaActivaId })
         total={ordenACobrar ? parseFloat(ordenACobrar.total) : 0} 
         carrito={ordenACobrar ? ordenACobrar.detalles.map(d => ({ id: d.producto, nombre: d.nombre, precio: parseFloat(d.precio_unitario), cantidad: d.cantidad || 1 })) : []} 
         esVentaRapida={ordenACobrar?.es_venta_rapida || false}
-        onCobroExitoso={async (pagosRegistrados) => {
+        onCobroExitoso={async (datosCobro) => {
           try {
+            const pagos = datosCobro?.pagos || [];
             let idDeLaOrden = ordenACobrar.id;
             if (idDeLaOrden === 'venta_rapida') {
               const res = await crearOrden({ tipo: 'llevar', estado: 'completado', estado_pago: 'pagado', sede: sedeActualId, detalles: ordenACobrar.detalles || [] });
-              idDeLaOrden = res.data.id; 
+              idDeLaOrden = res.data.id;
             } else { await actualizarOrden(idDeLaOrden, { estado_pago: 'pagado', estado: 'completado' }); }
-            for (const pago of pagosRegistrados) await crearPago({ orden: idDeLaOrden, monto: pago.monto, metodo: pago.metodo });
-            setOrdenACobrar(null); setTriggerRecarga(p => !p); alert("¡Cobro exitoso! 💵✨");
-          } catch { alert("Error al procesar el pago."); }
+            for (const pago of pagos) await crearPago({ orden: idDeLaOrden, monto: pago.monto, metodo: pago.metodo });
+            // El cierre lo hace onClose; aquí comiteamos y devolvemos el id real.
+            setTriggerRecarga(p => !p);
+            return { ordenId: idDeLaOrden };
+          } catch (e) { alert("Error al procesar el pago."); throw e; }
         }}
       />
 

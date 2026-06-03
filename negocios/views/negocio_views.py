@@ -166,6 +166,41 @@ class NegocioViewSet(viewsets.ModelViewSet):
             logger.error(f"Error SUNAT RUC {ruc}: {e}")
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=False, methods=['get'], url_path='consultar_dni/(?P<dni>[0-9]{8})', permission_classes=[IsAuthenticated])
+    def consultar_dni(self, request, dni=None):
+        """Consulta el nombre de una persona por su DNI (RENIEC vía decolecta)."""
+        token = getattr(settings, 'APIS_NET_PE_TOKEN', None)
+        if not token:
+            return Response({'error': 'Token no configurado.'}, status=500)
+        try:
+            response = requests.get(
+                'https://api.decolecta.com/v1/reniec/dni',
+                params={'numero': dni},
+                headers={
+                    'Authorization': f'Bearer {token}',
+                    'Accept': 'application/json',
+                },
+                timeout=8
+            )
+            if response.status_code != 200:
+                return Response({'error': 'DNI no encontrado en RENIEC.'}, status=404)
+
+            data = response.json()
+            nombre = data.get('full_name') or ' '.join(filter(None, [
+                data.get('first_name', ''),
+                data.get('first_last_name', ''),
+                data.get('second_last_name', ''),
+            ])).strip()
+            return Response({
+                'dni':    data.get('document_number', dni),
+                'nombre': nombre,
+            })
+        except requests.Timeout:
+            return Response({'error': 'Timeout.'}, status=504)
+        except Exception as e:
+            logger.error(f"Error RENIEC DNI {dni}: {e}")
+            return Response({'error': str(e)}, status=500)
+
 
 # ============================================================
 # SEDE  (sin cambios)

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Search, X, CheckCircle2, Loader2, Download, AlertTriangle } from 'lucide-react';
-import { emitirComprobante, consultarRuc } from '../../api/api';
+import { emitirComprobante, consultarRuc, consultarDni } from '../../api/api';
 
 /**
  * Modal para emitir un comprobante SUNAT (Boleta/Factura) de una orden pagada.
@@ -33,6 +33,19 @@ export default function ModalEmitirComprobante({ isOpen, onClose, ordenId, isDar
       setRazon(res.data?.razon_social || '');
     } catch {
       setError('No se pudo consultar el RUC.');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const buscarDni = async () => {
+    if (dni.length !== 8) { setError('El DNI debe tener 8 dígitos.'); return; }
+    setBuscando(true); setError(null);
+    try {
+      const res = await consultarDni(dni);
+      setRazon(res.data?.nombre || '');
+    } catch {
+      setError('No se pudo consultar el DNI.');
     } finally {
       setBuscando(false);
     }
@@ -129,12 +142,18 @@ export default function ModalEmitirComprobante({ isOpen, onClose, ordenId, isDar
                   <p className={`text-xs ${sub}`}>Boleta a consumidor final. El DNI es opcional (obligatorio si supera S/700).</p>
                   <div>
                     <label className={`text-xs font-bold uppercase ${sub}`}>DNI (opcional)</label>
-                    <input value={dni} onChange={e => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      placeholder="12345678" className={`w-full mt-1 px-4 py-3 rounded-xl border font-bold outline-none ${inp}`} />
+                    <div className="flex gap-2 mt-1">
+                      <input value={dni} onChange={e => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                        placeholder="12345678" className={`flex-1 px-4 py-3 rounded-xl border font-bold outline-none ${inp}`} />
+                      <button onClick={buscarDni} disabled={buscando}
+                        className={`px-4 rounded-xl font-bold ${isDark ? 'bg-[#1a1a1a] text-neutral-300' : 'bg-gray-100 text-gray-700'}`}>
+                        {buscando ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                      </button>
+                    </div>
                   </div>
                   {dni && (
                     <div>
-                      <label className={`text-xs font-bold uppercase ${sub}`}>Nombre (opcional)</label>
+                      <label className={`text-xs font-bold uppercase ${sub}`}>Nombre</label>
                       <input value={razonSocial} onChange={e => setRazon(e.target.value)}
                         placeholder="Nombre del cliente" className={`w-full mt-1 px-4 py-3 rounded-xl border font-bold outline-none ${inp}`} />
                     </div>

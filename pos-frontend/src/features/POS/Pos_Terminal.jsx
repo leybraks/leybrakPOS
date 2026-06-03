@@ -402,13 +402,15 @@ export default function PosTerminal({ onIrAErp }) {
               });
             }
 
-            setOrdenACobrar(null);
+            // El cierre del modal lo hace onClose (Finalizar/Cerrar). Aquí solo
+            // comiteamos y devolvemos el id real (para emitir el comprobante).
             setTriggerRecarga((p) => !p);
-            alert('¡Venta procesada con éxito! 💵✨');
+            return { ordenId: idOrden };
 
           } catch (error) {
             console.error(error);
             alert('Hubo un error al procesar el pago.');
+            throw error;
           }
         }}
         />
