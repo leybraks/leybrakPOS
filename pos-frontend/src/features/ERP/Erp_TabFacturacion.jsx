@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Save, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { FileText, Save, Loader2, CheckCircle2, AlertTriangle, Download, Receipt } from 'lucide-react';
 import usePosStore from '../../store/usePosStore';
-import { getNegocio, actualizarNegocio } from '../../api/api';
+import { getNegocio, actualizarNegocio, getComprobantes } from '../../api/api';
+
+const fmtFecha = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
+const ESTADO_COLOR = {
+  aceptado:  { bg: 'rgba(16,185,129,0.1)', fg: '#10b981', t: 'Aceptado' },
+  rechazado: { bg: 'rgba(239,68,68,0.1)',  fg: '#ef4444', t: 'Rechazado' },
+  pendiente: { bg: 'rgba(234,179,8,0.1)',  fg: '#eab308', t: 'Pendiente' },
+  anulado:   { bg: 'rgba(107,114,128,0.1)',fg: '#6b7280', t: 'Anulado' },
+};
 
 const MODOS = [
   { id: 'desactivado', titulo: 'Desactivado', desc: 'No se declara nada. El POS funciona solo con el Ticket Digital.' },
@@ -23,8 +35,24 @@ export default function Erp_TabFacturacion() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg]           = useState(null);
+  const [historial, setHistorial] = useState([]);
+  const [cargandoHist, setCargandoHist] = useState(true);
 
   const negocioId = localStorage.getItem('negocio_id');
+
+  const cargarHistorial = async () => {
+    setCargandoHist(true);
+    try {
+      const res = await getComprobantes();
+      setHistorial(res.data?.comprobantes || []);
+    } catch {
+      setHistorial([]);
+    } finally {
+      setCargandoHist(false);
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { cargarHistorial(); }, []);
 
   useEffect(() => {
     (async () => {
@@ -46,11 +74,8 @@ export default function Erp_TabFacturacion() {
 
   const guardar = async () => {
     setGuardando(true); setMsg(null);
-    const payload = { facturacion_emision: emision, facturacion_entorno: entorno };
-    if (entorno === 'produccion') {
-      payload.facturacion_ruta = ruta;
-      if (token) payload.facturacion_token = token;   // no sobreescribir si está vacío
-    }
+    const payload = { facturacion_emision: emision, facturacion_entorno: entorno, facturacion_ruta: ruta };
+    if (token) payload.facturacion_token = token;   // no sobreescribir si está vacío
     try {
       await actualizarNegocio(negocioId, payload);
       setMsg({ tipo: 'ok', texto: 'Configuración guardada.' });
@@ -123,22 +148,23 @@ export default function Erp_TabFacturacion() {
                 style={entorno === id ? { backgroundColor: color } : {}}>{label}</button>
             ))}
           </div>
-          {entorno === 'demo' ? (
-            <p className={`text-xs ${sub}`}>Modo demo: usa las credenciales de prueba del sistema. Los comprobantes <b>no</b> tienen valor legal.</p>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <label className={`text-xs font-bold uppercase ${sub}`}>Ruta / URL de tu cuenta Nubefact</label>
-                <input value={ruta} onChange={e => setRuta(e.target.value)} placeholder="https://api.nubefact.com/api/v1/..."
-                  className={`w-full mt-1 px-4 py-3 rounded-xl border font-medium outline-none ${inp}`} />
-              </div>
-              <div>
-                <label className={`text-xs font-bold uppercase ${sub}`}>Token (déjalo vacío para mantener el actual)</label>
-                <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="••••••••••••"
-                  className={`w-full mt-1 px-4 py-3 rounded-xl border font-medium outline-none ${inp}`} />
-              </div>
+          <p className={`text-xs mb-3 ${entorno === 'demo' ? 'text-amber-500' : sub}`}>
+            {entorno === 'demo'
+              ? 'Modo DEMO: usa una cuenta de prueba de demo.nubefact.com. Los comprobantes NO tienen valor legal.'
+              : 'Producción: comprobantes reales declarados a SUNAT bajo tu RUC.'}
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className={`text-xs font-bold uppercase ${sub}`}>Ruta / URL de tu cuenta Nubefact</label>
+              <input value={ruta} onChange={e => setRuta(e.target.value)} placeholder="https://api.nubefact.com/api/v1/..."
+                className={`w-full mt-1 px-4 py-3 rounded-xl border font-medium outline-none ${inp}`} />
             </div>
-          )}
+            <div>
+              <label className={`text-xs font-bold uppercase ${sub}`}>Token (déjalo vacío para mantener el actual)</label>
+              <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="••••••••••••"
+                className={`w-full mt-1 px-4 py-3 rounded-xl border font-medium outline-none ${inp}`} />
+            </div>
+          </div>
           <p className={`text-xs mt-4 ${sub}`}>Series: <b>B001</b> (boletas) y <b>F001</b> (facturas), correlativos automáticos.</p>
         </div>
       )}
@@ -155,6 +181,42 @@ export default function Erp_TabFacturacion() {
         style={{ backgroundColor: color }}>
         {guardando ? <><Loader2 size={18} className="animate-spin" /> Guardando…</> : <><Save size={18} /> Guardar configuración</>}
       </button>
+
+      {/* ── Historial de comprobantes ── */}
+      <div className={`rounded-3xl p-6 border ${card}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-sm font-black flex items-center gap-2 ${txt}`}><Receipt size={18} style={{ color }} /> Comprobantes emitidos</h3>
+          <button onClick={cargarHistorial} className={`text-xs font-bold ${sub}`}>Actualizar</button>
+        </div>
+
+        {cargandoHist ? (
+          <div className="flex justify-center py-8"><Loader2 className="animate-spin" style={{ color }} size={24} /></div>
+        ) : historial.length === 0 ? (
+          <p className={`text-sm text-center py-8 ${sub}`}>Aún no se ha emitido ningún comprobante.</p>
+        ) : (
+          <div className="space-y-2">
+            {historial.map(c => {
+              const e = ESTADO_COLOR[c.estado_sunat] || ESTADO_COLOR.pendiente;
+              return (
+                <div key={c.id} className={`flex items-center gap-3 p-3 rounded-2xl border ${isDark ? 'border-[#222]' : 'border-gray-100'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-black text-sm ${txt}`}>{c.tipo === 'factura' ? 'Factura' : 'Boleta'} {c.serie}-{c.numero}</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ backgroundColor: e.bg, color: e.fg }}>{e.t}</span>
+                    </div>
+                    <p className={`text-xs truncate ${sub}`}>{c.receptor_denominacion}{c.receptor_num_doc ? ` · ${c.receptor_num_doc}` : ''} · {fmtFecha(c.creado_en)}</p>
+                  </div>
+                  <span className={`font-bold text-sm ${txt}`}>S/ {parseFloat(c.total).toFixed(2)}</span>
+                  {c.enlace_pdf && (
+                    <a href={c.enlace_pdf} target="_blank" rel="noopener noreferrer"
+                      className="p-2 rounded-lg" style={{ backgroundColor: color + '20', color }}><Download size={16} /></a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

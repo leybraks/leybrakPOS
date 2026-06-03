@@ -191,3 +191,30 @@ def obtener_comprobante(request, orden_id):
     if not comp:
         return Response({'comprobante': None}, status=status.HTTP_200_OK)
     return Response(_serializar(comp), status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_comprobantes(request):
+    """Historial de comprobantes del negocio (los más recientes primero)."""
+    from ..models import Comprobante
+
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'error': 'Sin negocio.'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = Comprobante.objects.filter(negocio=negocio)
+    tipo = request.query_params.get('tipo')
+    estado = request.query_params.get('estado')
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+    if estado:
+        qs = qs.filter(estado_sunat=estado)
+
+    comprobantes = [
+        {**_serializar(c),
+         'receptor_denominacion': c.receptor_denominacion,
+         'receptor_num_doc': c.receptor_num_doc}
+        for c in qs[:200]
+    ]
+    return Response({'comprobantes': comprobantes}, status=status.HTTP_200_OK)
