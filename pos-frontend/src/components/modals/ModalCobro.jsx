@@ -245,18 +245,6 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     onClose({ pagado: true });
   };
 
-  // Modo AUTOMÁTICO: toda venta se factura. Al llegar a la pantalla de éxito,
-  // comitea y abre el comprobante solo (sin opción de "finalizar sin comprobante").
-  useEffect(() => {
-    if (paso === 'exito' && facturacionEmision === 'automatico' && !mostrarComprobante) {
-      (async () => {
-        try { await comprometerCobro(); } catch { return; }
-        setMostrarComprobante(true);
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paso]);
-
   const metodosDisponibles = [
     { id: 'efectivo', nombre: 'Efectivo', icono: Banknote,   disponible: true },
     { id: 'yape',     nombre: 'Yape',     icono: Smartphone, disponible: !!(config.yape_numero || config.yape_qr), color: '#6d28d9' },

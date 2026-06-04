@@ -157,7 +157,8 @@ class OrdenViewSet(viewsets.ModelViewSet):
                         notas = {}
 
                 variaciones_dict = notas.get('variaciones', {})
-                opciones_ids_raw = d.get('opciones', [])
+                # Compat: web manda 'opciones', la app móvil 'opciones_seleccionadas'.
+                opciones_ids_raw = d.get('opciones', []) or d.get('opciones_seleccionadas', [])
                 opciones_a_guardar, subtotal_opciones = _procesar_opciones(opciones_ids_raw, variaciones_dict)
                 precio_final_unitario = precio_seguro + subtotal_opciones
 
