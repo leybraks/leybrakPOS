@@ -17,6 +17,7 @@ import MenuScreen          from '../screens/ERP/Menu/MenuScreen';
 import InventarioScreen    from '../screens/ERP/InventarioScreen';
 import SedesScreen         from '../screens/ERP/SedesScreen';
 import ClientesScreen      from '../screens/ERP/ClientesScreen';
+import FacturacionScreen   from '../screens/ERP/FacturacionScreen';
 import SalonScreen         from '../screens/POS/SalonScreen';
 import useAppStore         from '../store/useAppStore';
 import PosScreen           from '../screens/POS/PosScreen';
@@ -50,6 +51,7 @@ const SCREENS_META = {
   sedes:        { icono: 'map-marker', nombre: 'Sedes'      },
   configuracion:{ icono: 'cog',        nombre: 'Ajustes'    },
   crm:          { icono: 'heart',      nombre: 'Clientes'   },
+  facturacion:  { icono: 'file-text',  nombre: 'Facturación'},
 };
 
 const TAB_ITEMS = ['dashboard', 'menu', 'personal'];
@@ -59,6 +61,7 @@ const ALL_DRAWER_ITEMS = [
   { id: 'sedes',         grupo: 'ADMIN',     moduloKey: null         },
   { id: 'configuracion', grupo: 'ADMIN',     moduloKey: null         },
   { id: 'crm',           grupo: 'DIGITAL',   moduloKey: 'clientes'   },
+  { id: 'facturacion',   grupo: 'DIGITAL',   moduloKey: 'facturacion'},
 ];
 
 // ─── Drawer ───────────────────────────────────────────────────
@@ -200,6 +203,7 @@ function ERPLayout({ onIrAlPos, onLogout }) {
         {vistaActiva === 'inventario'    && <InventarioScreen />}
         {vistaActiva === 'sedes'         && <SedesScreen />}
         {vistaActiva === 'crm'           && <ClientesScreen />}
+        {vistaActiva === 'facturacion'   && <FacturacionScreen />}
       </View>
 
       {/* Tab Bar */}

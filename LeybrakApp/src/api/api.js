@@ -208,7 +208,10 @@ export const getClientes = (params) => api.get('/clientes/', { params });
 // ─── Facturación electrónica (SUNAT) ─────────────────────────
 export const emitirComprobante = (ordenId, payload) => api.post(`/ordenes/${ordenId}/emitir-comprobante/`, payload);
 export const getComprobante    = (ordenId)          => api.get(`/ordenes/${ordenId}/comprobante/`);
+export const getComprobantes   = (params)           => api.get('/comprobantes/', { params });
 export const consultarRuc      = (ruc)              => api.get(`/negocios/consultar_ruc/${ruc}/`);
 export const consultarDni      = (dni)              => api.get(`/negocios/consultar_dni/${dni}/`);
+// Patch JSON de la config de facturación (no multipart, a diferencia de actualizarNegocio).
+export const actualizarFacturacion = (id, data)     => api.patch(`/negocios/${id}/`, data);
 
 export default api;
