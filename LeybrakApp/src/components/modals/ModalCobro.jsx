@@ -228,6 +228,18 @@ export default function ModalCobro({
     onClose({ pagado: true });
   };
 
+  // Modo AUTOMÁTICO: toda venta se factura. Al llegar a la pantalla de éxito,
+  // comitea y abre el comprobante solo (sin opción de "finalizar sin comprobante").
+  useEffect(() => {
+    if (paso === 'exito' && facturacionEmision === 'automatico' && !mostrarComprobante) {
+      (async () => {
+        try { await comprometerCobro(); } catch { return; }
+        setMostrarComprobante(true);
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso]);
+
   const metodosDisponibles = [
     { id: 'efectivo', nombre: 'Efectivo', icono: 'money',       color: '#10b981' },
     yapeNumero && { id: 'yape',    nombre: 'Yape',     icono: 'mobile',      color: '#6d28d9' },
@@ -695,15 +707,18 @@ export default function ModalCobro({
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
-        onPress={cerrarCobro}
-        activeOpacity={0.8}
-      >
-        <Text style={[s.btnManualText, { color: t.textSec }]}>
-          {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
-        </Text>
-      </TouchableOpacity>
+      {/* En automático toda venta se factura: no hay salida "sin comprobante". */}
+      {facturacionEmision !== 'automatico' && (
+        <TouchableOpacity
+          style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
+          onPress={cerrarCobro}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.btnManualText, { color: t.textSec }]}>
+            {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 

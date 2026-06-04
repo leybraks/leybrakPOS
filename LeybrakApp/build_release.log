@@ -236,7 +236,6 @@ Done copying assets
 > Task :react-native-vector-icons:prepareReleaseArtProfile UP-TO-DATE
 > Task :app:mergeReleaseArtProfile UP-TO-DATE
 > Task :react-native-safe-area-context:bundleLibRuntimeToJarRelease UP-TO-DATE
-> Task :app:processReleaseManifestForPackage
 > Task :react-native-screens:bundleLibRuntimeToJarRelease UP-TO-DATE
 > Task :react-native-async-storage_async-storage:bundleLibRuntimeToJarRelease UP-TO-DATE
 > Task :react-native-community_blur:bundleLibRuntimeToJarRelease UP-TO-DATE
@@ -370,6 +369,7 @@ Done copying assets
 > Task :react-native-screens:writeReleaseLintModelMetadata UP-TO-DATE
 > Task :react-native-vector-icons:lintVitalAnalyzeRelease UP-TO-DATE
 > Task :react-native-vector-icons:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :app:processReleaseManifestForPackage
 > Task :react-native-async-storage_async-storage:generateReleaseLintVitalModel UP-TO-DATE
 > Task :react-native-community_blur:generateReleaseLintVitalModel UP-TO-DATE
 > Task :react-native-encrypted-storage:generateReleaseLintVitalModel UP-TO-DATE
@@ -399,7 +399,6 @@ Done copying assets
 > Task :react-native-safe-area-context:bundleReleaseAar UP-TO-DATE
 > Task :react-native-safe-area-context:mapReleaseSourceSetPaths UP-TO-DATE
 > Task :react-native-safe-area-context:mergeReleaseResources UP-TO-DATE
-> Task :app:processReleaseResources
 > Task :react-native-safe-area-context:verifyReleaseResources UP-TO-DATE
 > Task :react-native-safe-area-context:assembleRelease UP-TO-DATE
 > Task :react-native-screens:bundleReleaseAar UP-TO-DATE
@@ -412,6 +411,7 @@ Done copying assets
 > Task :react-native-vector-icons:mergeReleaseResources UP-TO-DATE
 > Task :react-native-vector-icons:verifyReleaseResources UP-TO-DATE
 > Task :react-native-vector-icons:assembleRelease UP-TO-DATE
+> Task :app:processReleaseResources
 > Task :app:optimizeReleaseResources
 > Task :app:compileReleaseKotlin
 > Task :app:compileReleaseJavaWithJavac
@@ -437,6 +437,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 47s
+BUILD SUCCESSFUL in 40s
 332 actionable tasks: 37 executed, 295 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

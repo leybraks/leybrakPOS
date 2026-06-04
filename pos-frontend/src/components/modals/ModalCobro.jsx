@@ -245,6 +245,18 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     onClose({ pagado: true });
   };
 
+  // Modo AUTOMÁTICO: toda venta se factura. Al llegar a la pantalla de éxito,
+  // comitea y abre el comprobante solo (sin opción de "finalizar sin comprobante").
+  useEffect(() => {
+    if (paso === 'exito' && facturacionEmision === 'automatico' && !mostrarComprobante) {
+      (async () => {
+        try { await comprometerCobro(); } catch { return; }
+        setMostrarComprobante(true);
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso]);
+
   const metodosDisponibles = [
     { id: 'efectivo', nombre: 'Efectivo', icono: Banknote,   disponible: true },
     { id: 'yape',     nombre: 'Yape',     icono: Smartphone, disponible: !!(config.yape_numero || config.yape_qr), color: '#6d28d9' },
@@ -680,9 +692,12 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   ? <><FileText size={16} /> Finalizar y emitir comprobante</>
                   : (telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar')}
               </button>
-              <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
-                {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
-              </button>
+              {/* En automático toda venta se factura: no hay salida "sin comprobante". */}
+              {facturacionEmision !== 'automatico' && (
+                <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                  {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
+                </button>
+              )}
             </div>
           </div>
         </div>
