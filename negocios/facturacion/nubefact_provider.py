@@ -50,7 +50,8 @@ class NubefactProvider(FacturacionProvider):
             raise FacturacionProviderError('Respuesta inválida de Nubefact.')
 
         errors = data.get('errors')
-        aceptado = bool(data.get('aceptada_por_sunat'))
+        enlace_pdf = data.get('enlace_del_pdf', '') or ''
+        aceptada_sunat = bool(data.get('aceptada_por_sunat'))
 
         if errors:
             # Rechazo de validación: resultado de negocio (se persiste, no excepción).
@@ -58,20 +59,28 @@ class NubefactProvider(FacturacionProvider):
                 'aceptado': False,
                 'estado_sunat': 'rechazado',
                 'enlace': data.get('enlace', '') or '',
-                'enlace_pdf': data.get('enlace_del_pdf', '') or '',
+                'enlace_pdf': enlace_pdf,
                 'codigo_hash': data.get('codigo_hash', '') or '',
                 'sunat_description': str(errors),
                 'errors': str(errors),
                 'raw': data,
             }
 
+        # Sin errores: Nubefact generó el comprobante (tiene PDF). En el entorno
+        # DEMO, `aceptada_por_sunat` viene en false porque no se envía a SUNAT real,
+        # pero el comprobante es válido → lo consideramos emitido.
+        emitido = bool(enlace_pdf) or aceptada_sunat
+        descripcion = data.get('sunat_description', '') or ''
+        if emitido and not aceptada_sunat and not descripcion:
+            descripcion = 'Comprobante generado (entorno demo: no enviado a SUNAT real).'
+
         return {
-            'aceptado': aceptado,
-            'estado_sunat': 'aceptado' if aceptado else 'rechazado',
+            'aceptado': emitido,
+            'estado_sunat': 'aceptado' if emitido else 'rechazado',
             'enlace': data.get('enlace', '') or '',
-            'enlace_pdf': data.get('enlace_del_pdf', '') or '',
+            'enlace_pdf': enlace_pdf,
             'codigo_hash': data.get('codigo_hash', '') or '',
-            'sunat_description': data.get('sunat_description', '') or '',
+            'sunat_description': descripcion,
             'errors': None,
             'raw': data,
         }

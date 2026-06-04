@@ -8,6 +8,7 @@ import EncryptedStorage from 'react-native-encrypted-storage';
 import useAppStore from '../../store/useAppStore';
 import api from '../../api/api';
 import { useYapePlinListener } from '../../hooks/useYapePlinListener';
+import ModalEmitirComprobante from './ModalEmitirComprobante';
 
 export default function ModalCobro({
   visible,
@@ -25,7 +26,8 @@ export default function ModalCobro({
   const plinNumero = configuracionGlobal?.plin_numero || '';
   const confirmacionAutomatica = configuracionGlobal?.confirmacion_automatica || false;
   const yapeQr     = configuracionGlobal?.yape_qr || '';   // ← agregar
-  const plinQr     = configuracionGlobal?.plin_qr || ''; 
+  const plinQr     = configuracionGlobal?.plin_qr || '';
+  const facturacionEmision = configuracionGlobal?.facturacion_emision || 'desactivado';
   const t = {
     bg:       isDark ? '#0a0a0a' : '#ffffff',
     bg2:      isDark ? '#111111' : '#f9fafb',
@@ -50,6 +52,9 @@ export default function ModalCobro({
   const [notificacionElegida, setNotificacionElegida] = useState(null);
   const [preview, setPreview]                     = useState(null);
   const [loadingPreview, setLoadingPreview]       = useState(false);
+  const [mostrarComprobante, setMostrarComprobante] = useState(false);
+  const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
+  const cobroComprometidoRef = useRef(false);
 
   const pasoRef   = useRef(paso);
   const metodoRef = useRef(metodo);
@@ -71,6 +76,9 @@ export default function ModalCobro({
       setPreview(null);
       setNotificaciones([]);
       setNotificacionElegida(null);
+      setMostrarComprobante(false);
+      setComprobanteOrdenId(null);
+      cobroComprometidoRef.current = false;
     }
   }, [visible]);
 
@@ -189,8 +197,35 @@ export default function ModalCobro({
     registrarPago(montoCobro, vuelto);
   };
 
-  const finalizarCobro = () => {
-    onCobroExitoso({ pagos: pagosAcumulados, telefono: telefonoTicket });
+  // Persiste el cobro una sola vez y devuelve el ordenId real. Idempotente.
+  const comprometerCobro = async () => {
+    if (cobroComprometidoRef.current) return comprobanteOrdenId;
+    cobroComprometidoRef.current = true;
+    try {
+      const r = await onCobroExitoso({ pagos: pagosAcumulados, telefono: telefonoTicket });
+      const id = (r && r.ordenId) || ordenId;
+      setComprobanteOrdenId(id);
+      return id;
+    } catch (e) {
+      cobroComprometidoRef.current = false;
+      throw e;
+    }
+  };
+
+  // "Finalizar": comitea y, si hay facturación activa, abre el comprobante.
+  const finalizarCobro = async () => {
+    try { await comprometerCobro(); } catch { return; }
+    if (facturacionEmision !== 'desactivado') {
+      setMostrarComprobante(true);
+    } else {
+      onClose({ pagado: true });
+    }
+  };
+
+  // "Cerrar": comitea y cierra, sin comprobante.
+  const cerrarCobro = async () => {
+    try { await comprometerCobro(); } catch { return; }
+    onClose({ pagado: true });
   };
 
   const metodosDisponibles = [
@@ -654,24 +689,32 @@ export default function ModalCobro({
         activeOpacity={0.8}
       >
         <Text style={s.btnProcesarText}>
-          {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
+          {facturacionEmision !== 'desactivado'
+            ? 'Finalizar y emitir comprobante'
+            : (telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar')}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
-        onPress={finalizarCobro}
+        onPress={cerrarCobro}
         activeOpacity={0.8}
       >
-        <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
+        <Text style={[s.btnManualText, { color: t.textSec }]}>
+          {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
 
+  // En la pantalla de éxito, cerrar tocando fuera/back debe comitear el cobro
+  // (igual que el botón "Cerrar"); fuera de éxito, cierre normal.
+  const cierreSeguro = () => { if (paso === 'exito') { cerrarCobro(); } else { onClose(); } };
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={cierreSeguro}>
       <View style={s.overlay}>
-        <TouchableOpacity style={{ flex: 0.1 }} onPress={onClose} />
+        <TouchableOpacity style={{ flex: 0.1 }} onPress={cierreSeguro} />
         <View style={[s.container, { backgroundColor: t.bg, borderTopColor: t.border }]}>
           <View style={s.handle}>
             <View style={[s.handleBar, { backgroundColor: t.border2 }]} />
@@ -681,6 +724,14 @@ export default function ModalCobro({
           {paso === 'exito' && renderExito()}
         </View>
       </View>
+
+      <ModalEmitirComprobante
+        visible={mostrarComprobante}
+        onClose={() => { setMostrarComprobante(false); onClose({ pagado: true }); }}
+        ordenId={comprobanteOrdenId || ordenId}
+        isDark={isDark}
+        color={color}
+      />
     </Modal>
   );
 }

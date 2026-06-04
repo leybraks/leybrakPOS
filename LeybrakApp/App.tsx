@@ -63,6 +63,7 @@ export default function App() {
           confirmacion_automatica: d.confirmacion_automatica || false,
           device_token:            d.device_token            || null,
           negocio_id:              d.id,
+          facturacion_emision:     d.facturacion_emision     || 'desactivado',
           yape_numero:             d.yape_numero             || '',
           plin_numero:             d.plin_numero             || '',
           yape_qr:                 d.yape_qr                 || null,
