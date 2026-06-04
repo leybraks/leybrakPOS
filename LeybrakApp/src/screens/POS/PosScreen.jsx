@@ -707,14 +707,19 @@ export default function PosScreen({ mesaId, onVolver }) {
       </Modal>
       <ModalCobro
         visible={modalCobroVisible}
-        onClose={() => setModalCobroVisible(false)}
+        onClose={(info) => {
+          setModalCobroVisible(false);
+          if (info?.pagado) onVolver();
+        }}
         total={totalMesa}
         ordenId={ordenActiva?.id}
         carrito={ordenActiva?.detalles || []}
         onCobroExitoso={async ({ pagos, telefono }) => {
+          // Persiste el cobro y devuelve el ordenId real. NO cierra ni navega:
+          // de eso se encarga onClose (tras Finalizar / Cerrar / emitir comprobante).
           try {
             const sesionCajaId = await EncryptedStorage.getItem('sesion_caja_id');
-            
+
             // 1. Filtramos solo los pagos que NO han sido confirmados por Yape/Plin nativo
             const pagosManuales = pagos.filter(p => !p.yaConfirmado);
 
@@ -725,12 +730,11 @@ export default function PosScreen({ mesaId, onVolver }) {
               sesion_caja_id: sesionCajaId,
             });
 
-            // 3. Limpieza de interfaz y regreso al salón
-            setModalCobroVisible(false);
-            onVolver();
+            return { ordenId: ordenActiva.id };
           } catch (err) {
             console.error(err);
             Alert.alert('Error', 'No se pudo registrar los datos del cierre.');
+            throw err; // evita avanzar a comprobante/cierre si el cobro falló
           }
         }}
       />
