@@ -215,6 +215,11 @@ export default function PosScreen({ mesaId, onVolver }) {
         precio_unitario:       item.precio,
         notas_cocina:          item.notas_cocina || '',
         notas_y_modificadores: '',
+        // El backend lee las opciones con keys distintas según el endpoint:
+        //   crearOrden (perform_create) → 'opciones'
+        //   agregar_productos           → 'opciones_seleccionadas'
+        // Mandamos ambas para que el precio de la variación se calcule siempre.
+        opciones:               item.opciones_seleccionadas || [],
         opciones_seleccionadas: item.opciones_seleccionadas || [],
       }));
 

@@ -680,9 +680,12 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
                   ? <><FileText size={16} /> Finalizar y emitir comprobante</>
                   : (telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar')}
               </button>
-              <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
-                {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
-              </button>
+              {/* En automático toda venta se factura: no hay salida "sin comprobante". */}
+              {facturacionEmision !== 'automatico' && (
+                <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                  {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
+                </button>
+              )}
             </div>
           </div>
         </div>
