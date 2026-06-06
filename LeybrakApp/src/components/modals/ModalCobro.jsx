@@ -656,12 +656,16 @@ export default function ModalCobro({
   // PASO: ÉXITO
   // ══════════════════════════════════════════
   const renderExito = () => (
-    <ScrollView contentContainerStyle={[s.body, { alignItems: 'center' }]}>
-      <View style={s.exitoCheck}>
-        <Icon name="check" size={40} color="#fff" />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body}>
+      {/* Cabecera centrada (el resto va full-width para que los botones tengan
+          un área táctil correcta; con alignItems:'center' el hitbox se encogía). */}
+      <View style={{ alignItems: 'center' }}>
+        <View style={s.exitoCheck}>
+          <Icon name="check" size={40} color="#fff" />
+        </View>
+        <Text style={[s.exitoTitulo, { color: t.textPrim }]}>¡Pago Exitoso!</Text>
+        <Text style={[s.exitoSub, { color: t.textSec }]}>El cobro se registró correctamente</Text>
       </View>
-      <Text style={[s.exitoTitulo, { color: t.textPrim }]}>¡Pago Exitoso!</Text>
-      <Text style={[s.exitoSub, { color: t.textSec }]}>El cobro se registró correctamente</Text>
 
       {/* Resumen */}
       <View style={[s.resumenBox, { backgroundColor: t.bg2, borderColor: t.border }]}>
@@ -711,16 +715,18 @@ export default function ModalCobro({
 
       {/* ── Boleta ya emitida: resultado inline ── */}
       {resultadoComp ? (
-        <View style={[s.compResult, { backgroundColor: t.bg2, borderColor: 'rgba(16,185,129,0.3)' }]}>
-          <View style={s.compResultHead}>
-            <Icon name="check-circle" size={18} color="#10b981" />
-            <Text style={[s.compResultTitle, { color: t.textPrim }]}>
-              {resultadoComp.tipo === 'factura' ? 'Factura' : 'Boleta'} {resultadoComp.serie}-{resultadoComp.numero} emitida
-            </Text>
+        <>
+          <View style={[s.ticketBox, { backgroundColor: t.bg2, marginBottom: 12 }]}>
+            <View style={s.compResultHead}>
+              <Icon name="check-circle" size={18} color="#10b981" />
+              <Text style={[s.compResultTitle, { color: t.textPrim }]}>
+                {resultadoComp.tipo === 'factura' ? 'Factura' : 'Boleta'} {resultadoComp.serie}-{resultadoComp.numero} emitida
+              </Text>
+            </View>
           </View>
           {!!resultadoComp.enlace_pdf && (
             <TouchableOpacity
-              style={[s.btnProcesar, { backgroundColor: color, width: '100%', marginTop: 12 }]}
+              style={[s.btnProcesar, { backgroundColor: color, width: '100%', marginBottom: 12 }]}
               onPress={() => Linking.openURL(resultadoComp.enlace_pdf)}
               activeOpacity={0.85}
             >
@@ -729,13 +735,13 @@ export default function ModalCobro({
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg3, width: '100%', marginTop: 10 }]}
+            style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
             onPress={() => onClose({ pagado: true })}
             activeOpacity={0.85}
           >
             <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
           </TouchableOpacity>
-        </View>
+        </>
 
       ) : facturacionEmision === 'desactivado' ? (
         <>
@@ -759,17 +765,28 @@ export default function ModalCobro({
 
       ) : (
         <>
-          {/* Boleta: DNI opcional */}
-          <View style={[s.dniBox, { backgroundColor: t.bg2, borderColor: t.border }]}>
-            <Text style={[s.dniLabel, { color: t.textSec }]}>DNI del cliente — opcional (boleta)</Text>
-            <TextInput
-              style={[s.dniInput, { backgroundColor: t.bg, borderColor: t.border, color: t.textPrim }]}
-              value={dniBoleta}
-              onChangeText={(v) => { setDniBoleta(v.replace(/[^0-9]/g, '').slice(0, 8)); setErrorComp(null); }}
-              placeholder="12345678"
-              placeholderTextColor={t.textMut}
-              keyboardType="number-pad"
-            />
+          {/* Boleta: DNI opcional — mismo formato que el campo de WhatsApp */}
+          <View style={[s.ticketBox, { backgroundColor: t.bg2 }]}>
+            <View style={s.ticketHeader}>
+              <View style={[s.ticketIcono, { backgroundColor: `${color}1a` }]}>
+                <Icon name="id-card-o" size={18} color={color} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[s.ticketTitulo, { color: t.textPrim }]}>DNI del cliente</Text>
+                <Text style={[s.ticketSub, { color: t.textSec }]}>Para la boleta (opcional)</Text>
+              </View>
+            </View>
+            <View style={[s.ticketInput, { backgroundColor: t.bg, borderColor: t.border }]}>
+              <Icon name="user" size={14} color={t.textSec} />
+              <TextInput
+                style={[s.ticketInputField, { color: t.textPrim }]}
+                value={dniBoleta}
+                onChangeText={(v) => { setDniBoleta(v.replace(/[^0-9]/g, '').slice(0, 8)); setErrorComp(null); }}
+                placeholder="12345678"
+                placeholderTextColor={t.textMut}
+                keyboardType="number-pad"
+              />
+            </View>
           </View>
 
           {!!errorComp && (
