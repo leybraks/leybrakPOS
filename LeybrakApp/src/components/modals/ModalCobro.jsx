@@ -566,7 +566,7 @@ export default function ModalCobro({
 
             {/* Modo automático */}
             {confirmacionAutomatica ? (
-              <View style={{ width: '100%' }}>
+              <View style={{ alignSelf: 'stretch' }}>
                 {notificaciones.length === 0 && (
                   <View style={[s.esperandoBox, { backgroundColor: t.bg2, borderColor: t.border }]}>
                     <ActivityIndicator size="small" color={color} style={{ marginRight: 10 }} />
@@ -609,7 +609,7 @@ export default function ModalCobro({
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={{ width: '100%' }}>
+              <View style={{ alignSelf: 'stretch' }}>
                 <View style={s.alertaBox}>
                   <Text style={s.alertaText}>⚠️ Verifica manualmente que el pago haya ingresado</Text>
                 </View>
@@ -656,7 +656,7 @@ export default function ModalCobro({
   // PASO: ÉXITO
   // ══════════════════════════════════════════
   const renderExito = () => (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
       {/* Cabecera centrada (el resto va full-width para que los botones tengan
           un área táctil correcta; con alignItems:'center' el hitbox se encogía). */}
       <View style={{ alignItems: 'center' }}>
@@ -726,7 +726,7 @@ export default function ModalCobro({
           </View>
           {!!resultadoComp.enlace_pdf && (
             <TouchableOpacity
-              style={[s.btnProcesar, { backgroundColor: color, width: '100%', marginBottom: 12 }]}
+              style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 12 }]}
               onPress={() => Linking.openURL(resultadoComp.enlace_pdf)}
               activeOpacity={0.85}
             >
@@ -735,7 +735,7 @@ export default function ModalCobro({
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
+            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch' }]}
             onPress={() => onClose({ pagado: true })}
             activeOpacity={0.85}
           >
@@ -746,7 +746,7 @@ export default function ModalCobro({
       ) : facturacionEmision === 'desactivado' ? (
         <>
           <TouchableOpacity
-            style={[s.btnProcesar, { backgroundColor: color, width: '100%', marginBottom: 12 }]}
+            style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 12 }]}
             onPress={cerrarCobro}
             activeOpacity={0.8}
           >
@@ -755,7 +755,7 @@ export default function ModalCobro({
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, width: '100%' }]}
+            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch' }]}
             onPress={cerrarCobro}
             activeOpacity={0.8}
           >
@@ -797,7 +797,7 @@ export default function ModalCobro({
           )}
 
           <TouchableOpacity
-            style={[s.btnProcesar, { backgroundColor: color, width: '100%', marginBottom: 10 }, emitiendoComp && { opacity: 0.6 }]}
+            style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 10 }, emitiendoComp && { opacity: 0.6 }]}
             onPress={finalizarConBoleta}
             disabled={emitiendoComp}
             activeOpacity={0.8}
@@ -809,7 +809,7 @@ export default function ModalCobro({
 
           {/* Factura con RUC → modal completo */}
           <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, width: '100%', marginBottom: 10 }]}
+            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch', marginBottom: 10 }]}
             onPress={abrirFactura}
             disabled={emitiendoComp}
             activeOpacity={0.8}
@@ -821,7 +821,7 @@ export default function ModalCobro({
           {/* Opcional: salida sin comprobante. Automático: sin escape. */}
           {facturacionEmision === 'opcional' && (
             <TouchableOpacity
-              style={[s.btnManual, { backgroundColor: 'transparent', width: '100%' }]}
+              style={[s.btnManual, { backgroundColor: 'transparent', alignSelf: 'stretch' }]}
               onPress={cerrarCobro}
               disabled={emitiendoComp}
               activeOpacity={0.8}
@@ -880,20 +880,20 @@ const s = StyleSheet.create({
   totalLabel:    { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 },
   totalMonto:    { fontSize: 48, fontWeight: '900', letterSpacing: -1 },
 
-  progresoBox:   { width: '100%', borderBottomWidth: 1, paddingBottom: 12, marginBottom: 12 },
+  progresoBox:   { alignSelf: 'stretch', borderBottomWidth: 1, paddingBottom: 12, marginBottom: 12 },
   progresoLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
-  barBg:         { width: '100%', height: 6, borderRadius: 3, marginBottom: 6 },
+  barBg:         { alignSelf: 'stretch', height: 6, borderRadius: 3, marginBottom: 6 },
   barFill:       { height: 6, borderRadius: 3, backgroundColor: '#10b981' },
   progresoRow:   { flexDirection: 'row', justifyContent: 'space-between' },
   progresoPagado:{ fontSize: 11, fontWeight: '700', color: '#10b981' },
   progresoTotal: { fontSize: 11, fontWeight: '600' },
 
-  previewBox:    { width: '100%', borderTopWidth: 1, paddingTop: 12, marginTop: 8, gap: 4 },
+  previewBox:    { alignSelf: 'stretch', borderTopWidth: 1, paddingTop: 12, marginTop: 8, gap: 4 },
   previewRow:    { flexDirection: 'row', justifyContent: 'space-between' },
   previewLabel:  { fontSize: 12, fontWeight: '600' },
   previewValor:  { fontSize: 12, fontWeight: '700' },
 
-  pagosAcumBox:  { width: '100%', borderTopWidth: 1, paddingTop: 12, marginTop: 8 },
+  pagosAcumBox:  { alignSelf: 'stretch', borderTopWidth: 1, paddingTop: 12, marginTop: 8 },
   pagosAcumLabel:{ fontSize: 10, fontWeight: '700', marginBottom: 8 },
   pagosAcumRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pagoChip:      { backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
@@ -942,14 +942,14 @@ const s = StyleSheet.create({
   btnProcesar:   { borderRadius: 16, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnProcesarText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
 
-  numeroBox:     { borderRadius: 14, padding: 16, marginBottom: 16, width: '100%', alignItems: 'center' },
+  numeroBox:     { borderRadius: 14, padding: 16, marginBottom: 16, alignSelf: 'stretch', alignItems: 'center' },
   numeroLabel:   { fontSize: 11, fontWeight: '600', marginBottom: 4 },
   numeroValor:   { fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
 
   esperandoBox:  { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   esperandoText: { flex: 1, fontSize: 13, fontWeight: '500' },
 
-  notifBtn:      { flexDirection: 'row', borderRadius: 16, padding: 16, marginBottom: 10, width: '100%' },
+  notifBtn:      { flexDirection: 'row', borderRadius: 16, padding: 16, marginBottom: 10, alignSelf: 'stretch' },
   notifNombre:   { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' },
   notifCodigo:   { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 4, marginTop: 2 },
   notifMontoLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
@@ -968,7 +968,7 @@ const s = StyleSheet.create({
   compResultHead:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
   compResultTitle: { fontSize: 14, fontWeight: '800', flex: 1 },
 
-  alertaBox:     { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)', borderRadius: 12, padding: 12, width: '100%', marginBottom: 16 },
+  alertaBox:     { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)', borderRadius: 12, padding: 12, alignSelf: 'stretch', marginBottom: 16 },
   alertaText:    { color: '#f59e0b', fontSize: 12, fontWeight: '600', textAlign: 'center' },
 
   tarjetaIconBox:{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
@@ -979,13 +979,13 @@ const s = StyleSheet.create({
   exitoTitulo:   { fontSize: 28, fontWeight: '900', marginBottom: 4 },
   exitoSub:      { fontSize: 13, marginBottom: 24, textAlign: 'center' },
 
-  resumenBox:    { width: '100%', borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
+  resumenBox:    { alignSelf: 'stretch', borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
   resumenRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 12, borderBottomWidth: 1, borderStyle: 'dashed', marginBottom: 8 },
   resumenRow2:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   resumenLabel:  { fontSize: 13, fontWeight: '600' },
   resumenMonto:  { fontSize: 20, fontWeight: '900' },
 
-  ticketBox:     { width: '100%', borderRadius: 16, padding: 16, marginBottom: 16 },
+  ticketBox:     { alignSelf: 'stretch', borderRadius: 16, padding: 16, marginBottom: 16 },
   ticketHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   ticketIcono:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   ticketTitulo:  { fontSize: 14, fontWeight: '700' },

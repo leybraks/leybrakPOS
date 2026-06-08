@@ -190,12 +190,10 @@ LOG:Done writing sourcemap output
 Copying 19 asset files
 Done copying assets
 
-> Task :app:generateReleaseResValues UP-TO-DATE
+> Task :app:generateReleaseResValues
 > Task :app:mapReleaseSourceSetPaths UP-TO-DATE
 > Task :app:generateReleaseResources UP-TO-DATE
-> Task :app:mergeReleaseResources UP-TO-DATE
-> Task :app:packageReleaseResources UP-TO-DATE
-> Task :app:parseReleaseLocalResources UP-TO-DATE
+> Task :app:packageReleaseResources
 > Task :app:createReleaseCompatibleScreenManifests
 > Task :app:extractDeepLinksRelease UP-TO-DATE
 > Task :react-native-async-storage_async-storage:extractDeepLinksRelease UP-TO-DATE
@@ -210,6 +208,8 @@ Done copying assets
 > Task :react-native-screens:processReleaseManifest UP-TO-DATE
 > Task :react-native-vector-icons:extractDeepLinksRelease UP-TO-DATE
 > Task :react-native-vector-icons:processReleaseManifest UP-TO-DATE
+> Task :app:parseReleaseLocalResources
+> Task :app:mergeReleaseResources
 > Task :app:processReleaseMainManifest
 > Task :app:processReleaseManifest
 > Task :react-native-async-storage_async-storage:compileReleaseLibraryResources UP-TO-DATE
@@ -239,9 +239,9 @@ Done copying assets
 > Task :react-native-screens:bundleLibRuntimeToJarRelease UP-TO-DATE
 > Task :react-native-async-storage_async-storage:bundleLibRuntimeToJarRelease UP-TO-DATE
 > Task :react-native-community_blur:bundleLibRuntimeToJarRelease UP-TO-DATE
-> Task :app:processReleaseManifestForPackage
 > Task :react-native-encrypted-storage:bundleLibRuntimeToJarRelease UP-TO-DATE
 > Task :react-native-vector-icons:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :app:processReleaseManifestForPackage
 > Task :app:mergeReleaseShaders UP-TO-DATE
 > Task :app:compileReleaseShaders NO-SOURCE
 > Task :app:copyReactNativeVectorIconFonts UP-TO-DATE
@@ -409,9 +409,9 @@ Done copying assets
 > Task :react-native-vector-icons:bundleReleaseAar UP-TO-DATE
 > Task :react-native-vector-icons:mapReleaseSourceSetPaths UP-TO-DATE
 > Task :react-native-vector-icons:mergeReleaseResources UP-TO-DATE
-> Task :app:processReleaseResources
 > Task :react-native-vector-icons:verifyReleaseResources UP-TO-DATE
 > Task :react-native-vector-icons:assembleRelease UP-TO-DATE
+> Task :app:processReleaseResources
 > Task :app:optimizeReleaseResources
 > Task :app:compileReleaseKotlin
 > Task :app:compileReleaseJavaWithJavac
@@ -437,6 +437,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 39s
-332 actionable tasks: 37 executed, 295 up-to-date
+BUILD SUCCESSFUL in 1m 7s
+332 actionable tasks: 41 executed, 291 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
