@@ -215,6 +215,13 @@ export const loginPinEmpleado = (payload) =>
 export const verificarSesionEmpleado = () =>
   axios.get(`${API_URL}/empleados/verificar-sesion/`, { withCredentials: true });
 
+// Refresca el JWT del dueño usando la cookie HttpOnly 'refresh_token'.
+// Se usa en el arranque para revivir la sesión del dueño cuando el access token
+// expiró pero el refresh sigue vigente (evita caer al PIN por error). No usa el
+// interceptor (que excluye verificar-sesion para no entrar en bucle de recarga).
+export const refrescarSesion = () =>
+  axios.post(`${API_URL}/token/refresh/`, {}, { withCredentials: true });
+
 // ============================================================
 // CAJA Y LOGIN DE EMPLEADOS
 // ============================================================

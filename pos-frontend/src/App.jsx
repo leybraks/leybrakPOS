@@ -1,6 +1,6 @@
 import { ToastProvider } from './context/ToastContext';
 import { cerrarSesionGlobal } from '../src/api/api';
-import { verificarSesionEmpleado, generarPagoSuscripcion } from '../src/api/api';
+import { verificarSesionEmpleado, generarPagoSuscripcion, refrescarSesion } from '../src/api/api';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import LoginView from './views/View_Login';
@@ -96,8 +96,26 @@ const VistaInternaPOS = () => {
 
       // 2. ¿Hay sesión de dueño activa? (cookie JWT) — tiene prioridad sobre tablet
       try {
-        const res = await api.get('/verificar-sesion/');
-        if (res.data.autenticado) {
+        let res;
+        try {
+          res = await api.get('/verificar-sesion/');
+        } catch (errVerif) {
+          // El access token pudo haber expirado. Si el refresh sigue vigente,
+          // lo revivimos UNA vez y reintentamos (evita caer al PIN siendo dueño).
+          // verificar-sesion está excluido del refresh automático del interceptor
+          // a propósito (para no entrar en bucle de recarga sin sesión).
+          if (errVerif.response?.status === 401) {
+            try {
+              await refrescarSesion();
+              res = await api.get('/verificar-sesion/');
+            } catch {
+              res = null;
+            }
+          } else {
+            throw errVerif;
+          }
+        }
+        if (res?.data?.autenticado) {
           const { rol, negocio_id } = res.data.user;
           const vistaDestino = getRolVista(rol);
           if (!vistaDestino) { setVista('sin_permiso'); return; }
