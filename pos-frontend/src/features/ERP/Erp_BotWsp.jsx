@@ -5,10 +5,9 @@ import { useToast } from '../../context/ToastContext';
 import { 
   Bot, Plug, MessageSquare, CheckCircle, Power, 
   Smartphone, Loader2, QrCode, Check, Timer,
-  Gift, Megaphone, Settings, Clock, ShieldCheck, Bike, Sparkles // 👈 Nuevos íconos
+  Gift, Megaphone, Settings, Clock, ShieldCheck, Bike // 👈 Nuevos íconos
 } from 'lucide-react';
 import Bot_Operaciones from './BotComponents/Bot_Operaciones';
-import Bot_Personalidad from './BotComponents/Bot_Personalidad';
 import Bot_QrModal from './BotComponents/Bot_QrModal';
 export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosReales = []}) {
   const toast = useToast();
@@ -308,7 +307,6 @@ export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosRe
       <div className={`flex gap-8 border-b overflow-x-auto custom-scrollbar ${isDark ? 'border-[#222]' : 'border-gray-200'}`}>
         {[
           { id: 'conexion', label: 'Conexión WhatsApp', icon: Plug },
-          { id: 'personalidad', label: 'Personalidad', icon: Sparkles },
           { id: 'reglas', label: 'Comportamiento', icon: Settings },
           { id: 'marketing', label: 'Marketing y Difusión', icon: Megaphone },
         ].map(tab => {
@@ -454,10 +452,6 @@ export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosRe
       )}
       
       
-      {tabActiva === 'personalidad' && (
-        <Bot_Personalidad isDark={isDark} colorPrimario={colorPrimario} />
-      )}
-
       {tabActiva === 'marketing' && <div className="p-10 text-center font-bold text-neutral-500">Módulo de Marketing en construcción... 📢</div>}
       {/* ========== MODAL DEL QR (MODULARIZADO) ========== */}
       <Bot_QrModal 
