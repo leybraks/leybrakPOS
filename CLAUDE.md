@@ -82,6 +82,25 @@ de consumo por WhatsApp, sin valor legal) es **otra cosa** y ya existía aparte.
 - **DEMO de Nubefact NO envía a SUNAT real** → `aceptada_por_sunat` vuelve `false` aunque todo
   salga bien; el provider lo trata como éxito si hay PDF y no hay `errors`.
 
+## Bot de WhatsApp — personalización e historias (n8n)
+
+El bot conversacional vive en **n8n** (`silvadata.me/n8n/...`): Evolution API manda los mensajes
+al webhook de n8n y n8n arma el prompt del LLM consultando `GET /api/negocios/info_bot/?instancia=...`.
+
+- **Personalidad configurable** (mig. `0069`): campos en `Negocio` → `bot_nombre`,
+  `bot_personalidad`, `bot_emojis`, `bot_instrucciones`. `info_bot` los devuelve en el objeto
+  `persona`; **n8n debe inyectarlos en el system prompt** (cambio manual de una vez en el workflow).
+  UI: ERP → Asistente Virtual → tab **Comportamiento** → tarjeta "Personalización" (`Bot_Personalidad.jsx`).
+- **Historias programadas** (mig. `0070`, modelo `HistoriaProgramada`): el dueño sube imagen +
+  texto + fecha (tab **Marketing**, `Bot_Marketing.jsx`); un **cron de n8n** publica los estados:
+  1. `GET /api/bot/historias-pendientes/` (header `X-Bot-Token` = `BOT_API_TOKEN` o fallback
+     `EVO_GLOBAL_KEY`) → devuelve pendientes vencidas con `instancia`, `imagen` (URL absoluta) y `texto`.
+  2. Por cada una: `POST {EVO_API_URL}/message/sendStatus/{instancia}` (Evolution API, header
+     `apikey`) con `{type:'image', content:<imagen>, caption:<texto>, allContacts:true}`.
+  3. `POST /api/bot/historias-marcar/` con `{id, resultado:'publicada'|'error', error?}`.
+  Endpoints en `negocios/views/historia_views.py`. CRUD web: `GET/POST /api/historias/` (multipart)
+  y `POST /api/historias/<id>/cancelar/`.
+
 ## ⚠️ Gotchas (errores que ya costaron tiempo)
 
 1. **`PagoSuscripcion.estado` canónico es `'pagado'`** — NO `'confirmado'`. El `'confirmado'`

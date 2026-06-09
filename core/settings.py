@@ -270,6 +270,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 EVO_API_URL = os.environ.get('EVO_API_URL', 'https://api.leybrak.com')
 EVO_GLOBAL_KEY = os.environ.get('EVO_GLOBAL_KEY', 'BravaSuperSecret2026')
 APIS_NET_PE_TOKEN = os.environ.get('APIS_NET_PE_TOKEN', '')
+# Token compartido para los endpoints del cron de n8n (historias programadas).
+# Si no se define, los views usan EVO_GLOBAL_KEY como fallback.
+BOT_API_TOKEN = os.environ.get('BOT_API_TOKEN', '')
 
 # settings.py
 # Reemplaza las últimas líneas de email por esto:

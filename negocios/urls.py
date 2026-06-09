@@ -17,6 +17,7 @@ from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from negocios.views.app_version_views import app_version
 from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes
+from negocios.views.historia_views import historias, cancelar_historia, historias_pendientes_bot, marcar_historia_bot
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
@@ -105,4 +106,13 @@ urlpatterns = [
     path('ordenes/<int:orden_id>/emitir-comprobante/', emitir_comprobante, name='emitir-comprobante'),
     path('ordenes/<int:orden_id>/comprobante/',        obtener_comprobante, name='obtener-comprobante'),
     path('comprobantes/',                              listar_comprobantes, name='listar-comprobantes'),
+
+    # ==========================================
+    # 📲 HISTORIAS PROGRAMADAS (Bot WhatsApp)
+    # ==========================================
+    path('historias/',                          historias,                name='historias'),
+    path('historias/<int:historia_id>/cancelar/', cancelar_historia,      name='cancelar-historia'),
+    # Consumidos por el cron de n8n (token X-Bot-Token):
+    path('bot/historias-pendientes/',           historias_pendientes_bot, name='historias-pendientes-bot'),
+    path('bot/historias-marcar/',               marcar_historia_bot,      name='marcar-historia-bot'),
 ]

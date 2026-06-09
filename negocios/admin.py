@@ -8,7 +8,8 @@ from .models import (
     ModificadorRapido, GrupoVariacion, OpcionVariacion, PlanSaaS,
     # ✨ IMPORTAMOS TUS NUEVOS MODELOS DE CRM Y MARKETING ✨
     Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional,
-    HorarioVisibilidad, ComponenteCombo, VersionApp, Comprobante, SerieComprobante
+    HorarioVisibilidad, ComponenteCombo, VersionApp, Comprobante, SerieComprobante,
+    HistoriaProgramada
 )
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline, StackedInline
@@ -191,3 +192,12 @@ class ZonaDeliveryAdmin(ModelAdmin): # ✨ UNFOLD
     list_filter = ('sede', 'activa')
     # Eliminamos distritos_cobertura de la búsqueda si ya no lo usas
     search_fields = ('nombre',)
+
+# ==========================================
+# 📲 8. HISTORIAS PROGRAMADAS (Bot WhatsApp)
+# ==========================================
+@admin.register(HistoriaProgramada)
+class HistoriaProgramadaAdmin(ModelAdmin):  # ✨ UNFOLD
+    list_display = ('sede', 'fecha_programada', 'estado', 'publicada_en', 'creado_en')
+    list_filter = ('estado', 'sede')
+    search_fields = ('texto',)
