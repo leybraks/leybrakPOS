@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, Alert, Image, Linking,
+  StyleSheet, ScrollView, ActivityIndicator, Alert, Image, Linking, Keyboard,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import useAppStore from '../../store/useAppStore';
 import api, { emitirComprobante } from '../../api/api';
@@ -234,6 +235,7 @@ export default function ModalCobro({
       setErrorComp('El DNI debe tener 8 dígitos (o déjalo vacío).');
       return;
     }
+    Keyboard.dismiss();   // cierra el teclado: si queda "abierto" se come los toques de los botones del resultado
     let id;
     try { id = await comprometerCobro(); } catch { return; }
     setErrorComp(null); setEmitiendoComp(true);
@@ -656,116 +658,65 @@ export default function ModalCobro({
   // PASO: ÉXITO
   // ══════════════════════════════════════════
   const renderExito = () => (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
-      {/* Cabecera centrada (el resto va full-width para que los botones tengan
-          un área táctil correcta; con alignItems:'center' el hitbox se encogía). */}
-      <View style={{ alignItems: 'center' }}>
-        <View style={s.exitoCheck}>
-          <Icon name="check" size={40} color="#fff" />
+    <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+        {/* Cabecera centrada */}
+        <View style={{ alignItems: 'center' }}>
+          <View style={s.exitoCheck}>
+            <Icon name="check" size={40} color="#fff" />
+          </View>
+          <Text style={[s.exitoTitulo, { color: t.textPrim }]}>¡Pago Exitoso!</Text>
+          <Text style={[s.exitoSub, { color: t.textSec }]}>El cobro se registró correctamente</Text>
         </View>
-        <Text style={[s.exitoTitulo, { color: t.textPrim }]}>¡Pago Exitoso!</Text>
-        <Text style={[s.exitoSub, { color: t.textSec }]}>El cobro se registró correctamente</Text>
-      </View>
 
-      {/* Resumen */}
-      <View style={[s.resumenBox, { backgroundColor: t.bg2, borderColor: t.border }]}>
-        <View style={[s.resumenRow, { borderBottomColor: t.border }]}>
-          <Text style={[s.resumenLabel, { color: t.textSec }]}>Total</Text>
-          <Text style={[s.resumenMonto, { color: t.textPrim }]}>S/ {total.toFixed(2)}</Text>
-        </View>
-        {pagosAcumulados.map((p, i) => (
-          <View key={i} style={s.resumenRow2}>
-            <Text style={[s.resumenLabel, { color: t.textSec, textTransform: 'capitalize' }]}>{p.metodo}</Text>
-            <Text style={[{ fontSize: 14, fontWeight: '700', color: t.textPrim }]}>S/ {p.monto.toFixed(2)}</Text>
+        {/* Resumen */}
+        <View style={[s.resumenBox, { backgroundColor: t.bg2, borderColor: t.border }]}>
+          <View style={[s.resumenRow, { borderBottomColor: t.border }]}>
+            <Text style={[s.resumenLabel, { color: t.textSec }]}>Total</Text>
+            <Text style={[s.resumenMonto, { color: t.textPrim }]}>S/ {total.toFixed(2)}</Text>
           </View>
-        ))}
-        {pagosAcumulados.some(p => p.vuelto > 0) && (
-          <View style={[s.resumenRow2, { borderTopWidth: 1, borderTopColor: t.border, marginTop: 8, paddingTop: 8 }]}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Vuelto entregado</Text>
-            <Text style={{ fontSize: 16, fontWeight: '900', color: '#10b981' }}>
-              S/ {pagosAcumulados.reduce((s, p) => s + (p.vuelto || 0), 0).toFixed(2)}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Ticket WhatsApp */}
-      <View style={[s.ticketBox, { backgroundColor: t.bg2 }]}>
-        <View style={s.ticketHeader}>
-          <View style={[s.ticketIcono, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-            <Icon name="whatsapp" size={20} color="#10b981" />
-          </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[s.ticketTitulo, { color: t.textPrim }]}>Ticket Digital</Text>
-            <Text style={[s.ticketSub, { color: t.textSec }]}>Enviar por WhatsApp (opcional)</Text>
-          </View>
-        </View>
-        <View style={[s.ticketInput, { backgroundColor: t.bg, borderColor: t.border }]}>
-          <Text style={[s.ticketPrefijo, { color: t.textSec }]}>🇵🇪 +51</Text>
-          <TextInput
-            style={[s.ticketInputField, { color: t.textPrim }]}
-            value={telefonoTicket}
-            onChangeText={setTelefonoTicket}
-            placeholder="999 000 000"
-            placeholderTextColor={t.textMut}
-            keyboardType="phone-pad"
-          />
-        </View>
-      </View>
-
-      {/* ── Boleta ya emitida: resultado inline ── */}
-      {resultadoComp ? (
-        <>
-          <View style={[s.ticketBox, { backgroundColor: t.bg2, marginBottom: 12 }]}>
-            <View style={s.compResultHead}>
-              <Icon name="check-circle" size={18} color="#10b981" />
-              <Text style={[s.compResultTitle, { color: t.textPrim }]}>
-                {resultadoComp.tipo === 'factura' ? 'Factura' : 'Boleta'} {resultadoComp.serie}-{resultadoComp.numero} emitida
+          {pagosAcumulados.map((p, i) => (
+            <View key={i} style={s.resumenRow2}>
+              <Text style={[s.resumenLabel, { color: t.textSec, textTransform: 'capitalize' }]}>{p.metodo}</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '700', color: t.textPrim }]}>S/ {p.monto.toFixed(2)}</Text>
+            </View>
+          ))}
+          {pagosAcumulados.some(p => p.vuelto > 0) && (
+            <View style={[s.resumenRow2, { borderTopWidth: 1, borderTopColor: t.border, marginTop: 8, paddingTop: 8 }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Vuelto entregado</Text>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: '#10b981' }}>
+                S/ {pagosAcumulados.reduce((s, p) => s + (p.vuelto || 0), 0).toFixed(2)}
               </Text>
             </View>
-          </View>
-          {!!resultadoComp.enlace_pdf && (
-            <TouchableOpacity
-              style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 12 }]}
-              onPress={() => Linking.openURL(resultadoComp.enlace_pdf)}
-              activeOpacity={0.85}
-            >
-              <Icon name="download" size={15} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={s.btnProcesarText}>Ver / Descargar PDF</Text>
-            </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch' }]}
-            onPress={() => onClose({ pagado: true })}
-            activeOpacity={0.85}
-          >
-            <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
-          </TouchableOpacity>
-        </>
+        </View>
 
-      ) : facturacionEmision === 'desactivado' ? (
-        <>
-          <TouchableOpacity
-            style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 12 }]}
-            onPress={cerrarCobro}
-            activeOpacity={0.8}
-          >
-            <Text style={s.btnProcesarText}>
-              {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch' }]}
-            onPress={cerrarCobro}
-            activeOpacity={0.8}
-          >
-            <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
-          </TouchableOpacity>
-        </>
+        {/* Ticket WhatsApp */}
+        <View style={[s.ticketBox, { backgroundColor: t.bg2 }]}>
+          <View style={s.ticketHeader}>
+            <View style={[s.ticketIcono, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+              <Icon name="whatsapp" size={20} color="#10b981" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[s.ticketTitulo, { color: t.textPrim }]}>Ticket Digital</Text>
+              <Text style={[s.ticketSub, { color: t.textSec }]}>Enviar por WhatsApp (opcional)</Text>
+            </View>
+          </View>
+          <View style={[s.ticketInput, { backgroundColor: t.bg, borderColor: t.border }]}>
+            <Text style={[s.ticketPrefijo, { color: t.textSec }]}>🇵🇪 +51</Text>
+            <TextInput
+              style={[s.ticketInputField, { color: t.textPrim }]}
+              value={telefonoTicket}
+              onChangeText={setTelefonoTicket}
+              placeholder="999 000 000"
+              placeholderTextColor={t.textMut}
+              keyboardType="phone-pad"
+            />
+          </View>
+        </View>
 
-      ) : (
-        <>
-          {/* Boleta: DNI opcional — mismo formato que el campo de WhatsApp */}
+        {/* DNI opcional (boleta) — solo opcional/automatico y antes de emitir */}
+        {facturacionEmision !== 'desactivado' && !resultadoComp && (
           <View style={[s.ticketBox, { backgroundColor: t.bg2 }]}>
             <View style={s.ticketHeader}>
               <View style={[s.ticketIcono, { backgroundColor: `${color}1a` }]}>
@@ -788,50 +739,114 @@ export default function ModalCobro({
               />
             </View>
           </View>
+        )}
 
-          {!!errorComp && (
-            <View style={s.compError}>
-              <Icon name="exclamation-triangle" size={13} color="#ef4444" />
-              <Text style={s.compErrorText}>{errorComp}</Text>
+        {/* Banner: boleta ya emitida */}
+        {resultadoComp && (
+          <View style={[s.ticketBox, { backgroundColor: t.bg2 }]}>
+            <View style={s.compResultHead}>
+              <Icon name="check-circle" size={18} color="#10b981" />
+              <Text style={[s.compResultTitle, { color: t.textPrim }]}>
+                {resultadoComp.tipo === 'factura' ? 'Factura' : 'Boleta'} {resultadoComp.serie}-{resultadoComp.numero} emitida
+              </Text>
             </View>
-          )}
+          </View>
+        )}
+      </ScrollView>
 
-          <TouchableOpacity
-            style={[s.btnProcesar, { backgroundColor: color, alignSelf: 'stretch', marginBottom: 10 }, emitiendoComp && { opacity: 0.6 }]}
-            onPress={finalizarConBoleta}
-            disabled={emitiendoComp}
-            activeOpacity={0.8}
-          >
-            {emitiendoComp
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={s.btnProcesarText}>Finalizar y emitir boleta</Text>}
-          </TouchableOpacity>
+      {/* ── FOOTER (fuera del ScrollView) — botones con hitbox correcto ──
+          Replica el patrón de renderCobro: dentro de un ScrollView el área
+          táctil de los botones se encogía al tamaño del texto; en un footer no. */}
+      <View style={[s.footer, { backgroundColor: t.bg, borderTopColor: t.border }]}>
+        {!!errorComp && !resultadoComp && (
+          <View style={[s.compError, { marginTop: 0, marginBottom: 12 }]}>
+            <Icon name="exclamation-triangle" size={13} color="#ef4444" />
+            <Text style={s.compErrorText}>{errorComp}</Text>
+          </View>
+        )}
 
-          {/* Factura con RUC → modal completo */}
-          <TouchableOpacity
-            style={[s.btnManual, { backgroundColor: t.bg2, alignSelf: 'stretch', marginBottom: 10 }]}
-            onPress={abrirFactura}
-            disabled={emitiendoComp}
-            activeOpacity={0.8}
-          >
-            <Icon name="building" size={13} color={t.textSec} style={{ marginRight: 8 }} />
-            <Text style={[s.btnManualText, { color: t.textSec }]}>¿Necesita factura con RUC?</Text>
-          </TouchableOpacity>
-
-          {/* Opcional: salida sin comprobante. Automático: sin escape. */}
-          {facturacionEmision === 'opcional' && (
+        {resultadoComp ? (
+          <>
+            {!!resultadoComp.enlace_pdf && (
+              <TouchableOpacity
+                key="comp-pdf"
+                style={[s.btnProcesar, { backgroundColor: color, marginBottom: 10 }]}
+                onPress={() => Linking.openURL(resultadoComp.enlace_pdf)}
+                activeOpacity={0.85}
+              >
+                <Icon name="download" size={15} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={s.btnProcesarText}>Ver / Descargar PDF</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={[s.btnManual, { backgroundColor: 'transparent', alignSelf: 'stretch' }]}
+              key="comp-cerrar"
+              style={[s.btnManual, { backgroundColor: t.bg2 }]}
+              onPress={() => onClose({ pagado: true })}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
+            </TouchableOpacity>
+          </>
+
+        ) : facturacionEmision === 'desactivado' ? (
+          <>
+            <TouchableOpacity
+              style={[s.btnProcesar, { backgroundColor: color, marginBottom: 10 }]}
               onPress={cerrarCobro}
+              activeOpacity={0.8}
+            >
+              <Text style={s.btnProcesarText}>
+                {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.btnManual, { backgroundColor: t.bg2 }]}
+              onPress={cerrarCobro}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.btnManualText, { color: t.textSec }]}>Cerrar</Text>
+            </TouchableOpacity>
+          </>
+
+        ) : (
+          <>
+            <TouchableOpacity
+              key="emitir-boleta"
+              style={[s.btnProcesar, { backgroundColor: color, marginBottom: 10 }, emitiendoComp && { opacity: 0.6 }]}
+              onPress={finalizarConBoleta}
               disabled={emitiendoComp}
               activeOpacity={0.8}
             >
-              <Text style={[s.btnManualText, { color: t.textMut }]}>Finalizar sin comprobante</Text>
+              {emitiendoComp
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnProcesarText}>Finalizar y emitir boleta</Text>}
             </TouchableOpacity>
-          )}
-        </>
-      )}
-    </ScrollView>
+
+            <TouchableOpacity
+              key="factura-ruc"
+              style={[s.btnManual, { backgroundColor: t.bg2, marginBottom: facturacionEmision === 'opcional' ? 10 : 0 }]}
+              onPress={abrirFactura}
+              disabled={emitiendoComp}
+              activeOpacity={0.8}
+            >
+              <Icon name="building" size={13} color={t.textSec} style={{ marginRight: 8 }} />
+              <Text style={[s.btnManualText, { color: t.textSec }]}>¿Necesita factura con RUC?</Text>
+            </TouchableOpacity>
+
+            {facturacionEmision === 'opcional' && (
+              <TouchableOpacity
+                style={[s.btnManual, { backgroundColor: 'transparent' }]}
+                onPress={cerrarCobro}
+                disabled={emitiendoComp}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.btnManualText, { color: t.textMut }]}>Finalizar sin comprobante</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+    </View>
   );
 
   // En la pantalla de éxito, cerrar tocando fuera/back debe comitear el cobro
@@ -840,17 +855,23 @@ export default function ModalCobro({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={cierreSeguro}>
-      <View style={s.overlay}>
-        <TouchableOpacity style={{ flex: 0.1 }} onPress={cierreSeguro} />
-        <View style={[s.container, { backgroundColor: t.bg, borderTopColor: t.border }]}>
-          <View style={s.handle}>
-            <View style={[s.handleBar, { backgroundColor: t.border2 }]} />
-          </View>
-          {paso === 'cobro' && renderCobro()}
-          {paso === 'qr'    && renderQR()}
-          {paso === 'exito' && renderExito()}
+      {/* SafeAreaProvider local: un Modal es una ventana aparte en Android, y con
+          edge-to-edge (RN 0.85) el contenido se dibuja bajo la barra de gestos.
+          SafeAreaView edges=['bottom'] reserva ese inset para que el último botón
+          ("Cerrar") no quede bajo la barra del sistema, que se comía los toques. */}
+      <SafeAreaProvider>
+        <View style={s.overlay}>
+          <TouchableOpacity style={{ flex: 0.1 }} onPress={cierreSeguro} />
+          <SafeAreaView edges={['bottom']} style={[s.container, { backgroundColor: t.bg, borderTopColor: t.border }]}>
+            <View style={s.handle}>
+              <View style={[s.handleBar, { backgroundColor: t.border2 }]} />
+            </View>
+            {paso === 'cobro' && renderCobro()}
+            {paso === 'qr'    && renderQR()}
+            {paso === 'exito' && renderExito()}
+          </SafeAreaView>
         </View>
-      </View>
+      </SafeAreaProvider>
 
       <ModalEmitirComprobante
         visible={mostrarComprobante}
@@ -939,7 +960,7 @@ const s = StyleSheet.create({
   vueltoMonto:   { fontSize: 32, fontWeight: '900', color: '#10b981' },
 
   footer:        { padding: 16, borderTopWidth: 1 },
-  btnProcesar:   { borderRadius: 16, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btnProcesar:   { borderRadius: 16, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', alignSelf: 'stretch' },
   btnProcesarText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
 
   numeroBox:     { borderRadius: 14, padding: 16, marginBottom: 16, alignSelf: 'stretch', alignItems: 'center' },
@@ -955,7 +976,7 @@ const s = StyleSheet.create({
   notifMontoLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
   notifMonto:    { color: '#fff', fontSize: 28, fontWeight: '900' },
 
-  btnManual:     { borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginTop: 8 },
+  btnManual:     { borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginTop: 8, alignSelf: 'stretch' },
   btnManualText: { fontSize: 13, fontWeight: '600' },
 
   // Emisión inline de boleta en la pantalla de éxito

@@ -1,4 +1,11 @@
 # ========================
+# 0. BINARIOS PESADOS (APK release) — NO van al repo
+# ========================
+# Los APK firmados se guardan en /apk/ (fuera del control de versiones).
+/apk/
+*.apk
+
+# ========================
 # 1. IGNORAR COSAS DE DJANGO (Backend)
 # ========================
 __pycache__/

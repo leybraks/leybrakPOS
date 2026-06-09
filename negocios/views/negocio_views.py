@@ -263,16 +263,24 @@ class SedeViewSet(viewsets.ModelViewSet):
         str_cierre = sede.hora_cierre.strftime('%H:%M') if sede.hora_cierre else 'No definido'
         dias_texto = ", ".join(dias_atencion) if dias_atencion else "ninguno"
 
+        negocio = sede.negocio
         return Response({
             'sede_id':       sede.id,
-            'negocio_id':    sede.negocio.id,
+            'negocio_id':    negocio.id,
             'nombre_sede':   sede.nombre,
-            'nombre_negocio': sede.negocio.nombre,
+            'nombre_negocio': negocio.nombre,
             # 👇 EL CEREBRO DEL BOT 👇
             'esta_abierto':  esta_abierto,
             'hora_apertura': str_apertura,
             'hora_cierre':   str_cierre,
-            'mensaje_fuera_horario': f"¡Hola! Ahora mismo estamos cerrados 😴. Nuestro horario es de {str_apertura} a {str_cierre} los días {dias_texto}."
+            'mensaje_fuera_horario': f"¡Hola! Ahora mismo estamos cerrados 😴. Nuestro horario es de {str_apertura} a {str_cierre} los días {dias_texto}.",
+            # 🤖 PERSONALIDAD CONFIGURABLE (la inyecta n8n en el prompt del LLM)
+            'persona': {
+                'nombre':        negocio.bot_nombre or '',
+                'personalidad':  negocio.bot_personalidad or '',
+                'emojis':        negocio.bot_emojis or '',
+                'instrucciones': negocio.bot_instrucciones or '',
+            },
         })
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

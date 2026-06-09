@@ -128,6 +128,27 @@ class Negocio(models.Model):
     facturacion_serie_factura = models.CharField(max_length=4, default='F001',
         help_text="Serie de facturas registrada en tu cuenta Nubefact (ej. F001, FFF1).")
 
+    # ==========================================
+    # 🤖 PERSONALIDAD DEL BOT DE WHATSAPP
+    # (la consume n8n vía /negocios/info_bot/ para armar el prompt del LLM)
+    # ==========================================
+    bot_nombre = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text="Nombre del asistente, ej. 'Bravito'. Vacío = sin nombre propio."
+    )
+    bot_personalidad = models.TextField(
+        blank=True, default='',
+        help_text="Cómo habla el bot: tono, trato (tú/usted), jerga, qué tan formal o divertido."
+    )
+    bot_emojis = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Emojis que puede usar (ej. 🍔🔥😋) o 'ninguno' para que no use."
+    )
+    bot_instrucciones = models.TextField(
+        blank=True, default='',
+        help_text="Reglas/instrucciones extra para el bot (ej. 'Siempre ofrece el combo del día')."
+    )
+
     def __str__(self):
         return self.nombre
 
