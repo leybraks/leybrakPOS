@@ -988,6 +988,40 @@ class PromocionBot(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.sede.nombre})"
     
+class HistoriaProgramada(models.Model):
+    """
+    Historia (estado de WhatsApp) programada para publicarse automáticamente.
+    El dueño la crea desde la web (imagen + texto + fecha/hora). Un cron en n8n
+    consulta las pendientes vencidas vía /api/bot/historias-pendientes/ y las
+    publica con la Evolution API (sendStatus) usando la instancia de la sede.
+    """
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('publicada', 'Publicada'),
+        ('error',     'Error'),
+        ('cancelada', 'Cancelada'),
+    ]
+
+    sede = models.ForeignKey('Sede', on_delete=models.CASCADE, related_name='historias_programadas',
+                             help_text="Sede cuya línea de WhatsApp publica la historia.")
+    imagen = models.ImageField(upload_to='historias/', help_text="Imagen de la historia.")
+    texto = models.TextField(blank=True, default='', help_text="Texto/caption de la historia (opcional).")
+    fecha_programada = models.DateTimeField(help_text="Cuándo debe publicarse.")
+
+    estado = models.CharField(max_length=12, choices=ESTADOS, default='pendiente')
+    publicada_en = models.DateTimeField(null=True, blank=True)
+    error_msg = models.TextField(blank=True, default='')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_programada']
+        verbose_name = 'Historia programada'
+        verbose_name_plural = 'Historias programadas'
+
+    def __str__(self):
+        return f"Historia {self.sede.nombre} — {self.fecha_programada:%d/%m %H:%M} ({self.get_estado_display()})"
+
+
 class SolicitudCambio(models.Model):
     ESTADOS = [('pendiente', 'Esperando Cocina'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
     ACCIONES = [('cancelar', 'Cancelar Orden'), ('agregar', 'Agregar Producto'), ('nota', 'Cambiar Nota')]

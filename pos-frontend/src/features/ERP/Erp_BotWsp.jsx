@@ -8,6 +8,7 @@ import {
   Gift, Megaphone, Settings, Clock, ShieldCheck, Bike // 👈 Nuevos íconos
 } from 'lucide-react';
 import Bot_Operaciones from './BotComponents/Bot_Operaciones';
+import Bot_Marketing from './BotComponents/Bot_Marketing';
 import Bot_QrModal from './BotComponents/Bot_QrModal';
 export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosReales = []}) {
   const toast = useToast();
@@ -452,7 +453,9 @@ export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosRe
       )}
       
       
-      {tabActiva === 'marketing' && <div className="p-10 text-center font-bold text-neutral-500">Módulo de Marketing en construcción... 📢</div>}
+      {tabActiva === 'marketing' && (
+        <Bot_Marketing sedesReales={sedesVisibles} isDark={isDark} colorPrimario={colorPrimario} />
+      )}
       {/* ========== MODAL DEL QR (MODULARIZADO) ========== */}
       <Bot_QrModal 
         qrModal={qrModal}
