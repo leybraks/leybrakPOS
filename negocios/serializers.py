@@ -48,6 +48,8 @@ class NegocioSerializer(serializers.ModelSerializer):
             'facturacion_emision', 'facturacion_entorno',
             'facturacion_ruta', 'facturacion_token',
             'facturacion_serie_boleta', 'facturacion_serie_factura',
+            # Personalidad del bot de WhatsApp
+            'bot_nombre', 'bot_personalidad', 'bot_emojis', 'bot_instrucciones',
         ]
         extra_kwargs = {
             # El token no se devuelve en claro; solo se escribe.
