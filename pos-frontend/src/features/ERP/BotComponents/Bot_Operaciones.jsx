@@ -1,5 +1,6 @@
 import React from 'react';
-import { Settings, ShieldCheck, Clock, MessageSquare, ExternalLink, Flame } from 'lucide-react';
+import { Settings, ShieldCheck, Clock, ExternalLink, Flame } from 'lucide-react';
+import Bot_Personalidad from './Bot_Personalidad';
 
 export default function Bot_Operaciones({ 
   operaciones, 
@@ -111,13 +112,7 @@ export default function Bot_Operaciones({
       </div>
 
       {/* 🎨 COLUMNA 2: PERSONALIZACIÓN DEL BOT */}
-      <div className={`rounded-[2rem] p-6 border flex flex-col items-center justify-center text-center ${isDark ? 'bg-[#111] border-[#2a2a2a]' : 'bg-white border-gray-200 shadow-sm'}`}>
-        <MessageSquare size={48} className={isDark ? 'text-[#333]' : 'text-gray-200'} strokeWidth={1} />
-        <h3 className={`text-xl font-black mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Personalización</h3>
-        <p className={`text-sm max-w-sm ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>
-          Próximamente: Aquí podrás configurar el tono del bot (formal o amigable), agregar respuestas automáticas (FAQs) y detalles de personalidad.
-        </p>
-      </div>
+      <Bot_Personalidad isDark={isDark} colorPrimario={colorPrimario} />
 
     </div>
   );
