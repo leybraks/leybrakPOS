@@ -1,9 +1,10 @@
 import math
 import logging
+import requests
 
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -78,6 +79,112 @@ def calcular_distancia_km(lat1, lon1, lat2, lon2):
     a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def geocodificar_bot(request):
+    """
+    Convierte una dirección de TEXTO en coordenadas (lat/lng) para el bot, así el
+    cliente no tiene que mandar su ubicación GPS. Usa Nominatim (OpenStreetMap).
+    Params: direccion (texto) + sede_id (opcional, sesga la búsqueda cerca del local).
+    """
+    direccion = (request.query_params.get('direccion') or '').strip()
+    if not direccion:
+        return Response({'encontrado': False, 'motivo': 'Falta la dirección.'}, status=400)
+
+    params = {
+        'q': direccion, 'format': 'json', 'limit': 1, 'countrycodes': 'pe',
+    }
+    sede_id = request.query_params.get('sede_id')
+    sede = Sede.objects.filter(id=sede_id).first() if sede_id else None
+    if sede and sede.latitud and sede.longitud:
+        d = 0.25  # caja de ~25 km alrededor del local para priorizar resultados cercanos
+        params['viewbox'] = f"{sede.longitud - d},{sede.latitud + d},{sede.longitud + d},{sede.latitud - d}"
+
+    try:
+        r = requests.get(
+            'https://nominatim.openstreetmap.org/search', params=params,
+            headers={'User-Agent': 'LeybrakPOS/1.0 (delivery geocoding)'}, timeout=8,
+        )
+        data = r.json()
+    except Exception as e:
+        logger.error('Geocoding error: %s', e)
+        return Response({'encontrado': False, 'motivo': 'No se pudo geocodificar ahora.'})
+
+    if not data:
+        return Response({
+            'encontrado': False,
+            'motivo': 'No encontramos esa dirección. Pide que la escriba con más detalle (calle, número, distrito) o que comparta su ubicación de WhatsApp.',
+        })
+
+    res = data[0]
+    return Response({
+        'encontrado': True,
+        'latitud': float(res['lat']),
+        'longitud': float(res['lon']),
+        'direccion_formateada': res.get('display_name', direccion),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_canjes(request):
+    """Historial de canjes de puntos del negocio (para el módulo de Fidelización)."""
+    from ..models import CanjePuntos
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'canjes': []})
+    qs = CanjePuntos.objects.filter(negocio=negocio).select_related('cliente')[:100]
+    return Response({'canjes': [
+        {
+            'id': c.id, 'puntos': c.puntos, 'valor_soles': float(c.valor_soles),
+            'cliente': c.cliente.nombre if c.cliente else None,
+            'telefono': c.cliente.telefono if c.cliente else '',
+            'creado_en': c.creado_en.isoformat(),
+        }
+        for c in qs
+    ]})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def registrar_feedback_bot(request):
+    """
+    El bot guarda el feedback/reseña del cliente para que el dueño lo revise.
+    Body: { telefono, calificacion (1-5, opcional), comentario, orden_id (opcional) }
+    """
+    from ..models import FeedbackCliente, Orden
+
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'error': 'Sin negocio asociado.'}, status=403)
+
+    telefono = (request.data.get('telefono') or '').strip()
+    comentario = (request.data.get('comentario') or '').strip()
+    cal = request.data.get('calificacion')
+    try:
+        cal = int(cal) if cal not in (None, '') else None
+        if cal is not None and not (1 <= cal <= 5):
+            cal = None
+    except (TypeError, ValueError):
+        cal = None
+
+    if not comentario and cal is None:
+        return Response({'error': 'Falta una calificación (1-5) o un comentario.'}, status=400)
+
+    cliente = (Cliente.objects.filter(negocio=negocio, telefono__icontains=telefono[-9:]).first()
+               if telefono else None)
+    orden = None
+    orden_id = request.data.get('orden_id')
+    if orden_id:
+        orden = Orden.objects.filter(id=orden_id, sede__negocio=negocio).first()
+
+    FeedbackCliente.objects.create(
+        negocio=negocio, cliente=cliente, telefono=telefono,
+        orden=orden, calificacion=cal, comentario=comentario,
+    )
+    return Response({'ok': True, 'mensaje': '¡Gracias por tu opinión! La registramos.'})
 
 
 class ZonaDeliveryViewSet(viewsets.ModelViewSet):

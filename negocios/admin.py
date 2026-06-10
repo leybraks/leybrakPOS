@@ -9,7 +9,7 @@ from .models import (
     # ✨ IMPORTAMOS TUS NUEVOS MODELOS DE CRM Y MARKETING ✨
     Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional,
     HorarioVisibilidad, ComponenteCombo, VersionApp, Comprobante, SerieComprobante,
-    HistoriaProgramada
+    HistoriaProgramada, FeedbackCliente, CanjePuntos
 )
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline, StackedInline
@@ -201,3 +201,24 @@ class HistoriaProgramadaAdmin(ModelAdmin):  # ✨ UNFOLD
     list_display = ('sede', 'fecha_programada', 'estado', 'publicada_en', 'creado_en')
     list_filter = ('estado', 'sede')
     search_fields = ('texto',)
+
+
+# ==========================================
+# 💬 9. FEEDBACK DE CLIENTES (Bot WhatsApp)
+# ==========================================
+@admin.register(FeedbackCliente)
+class FeedbackClienteAdmin(ModelAdmin):  # ✨ UNFOLD
+    list_display = ('creado_en', 'calificacion', 'telefono', 'cliente', 'orden', 'visto')
+    list_filter = ('visto', 'calificacion', 'negocio')
+    list_editable = ('visto',)
+    search_fields = ('telefono', 'comentario')
+
+
+# ==========================================
+# 🎁 10. CANJES DE PUNTOS (Fidelización)
+# ==========================================
+@admin.register(CanjePuntos)
+class CanjePuntosAdmin(ModelAdmin):  # ✨ UNFOLD
+    list_display = ('creado_en', 'cliente', 'puntos', 'valor_soles', 'negocio')
+    list_filter = ('negocio',)
+    search_fields = ('cliente__nombre', 'cliente__telefono')

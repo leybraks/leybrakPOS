@@ -152,6 +152,24 @@ class Negocio(models.Model):
     bot_personalidad = models.TextField(blank=True, default='', help_text="Nota de personalidad extra (opcional).")
     bot_instrucciones = models.TextField(blank=True, default='', help_text="(Legado) Instrucciones libres.")
 
+    # ==========================================
+    # 🎁 PROGRAMA DE PUNTOS / FIDELIZACIÓN (configurable por negocio)
+    # ==========================================
+    puntos_activo = models.BooleanField(
+        default=False, help_text="¿El negocio usa sistema de puntos? Controla si el bot los menciona y permite canjear."
+    )
+    puntos_por_sol = models.DecimalField(
+        max_digits=6, decimal_places=2, default=1,
+        help_text="Puntos que gana el cliente por cada S/1 gastado (ej. 1 = 1 punto por sol)."
+    )
+    puntos_canje_minimo = models.IntegerField(
+        default=100, help_text="Puntos mínimos para poder canjear."
+    )
+    puntos_valor_soles = models.DecimalField(
+        max_digits=6, decimal_places=2, default=0.10,
+        help_text="Valor en S/ de cada punto al canjear (ej. 0.10 → 100 pts = S/10 de descuento)."
+    )
+
     def __str__(self):
         return self.nombre
 
@@ -1044,6 +1062,48 @@ class HistoriaProgramada(models.Model):
 
     def __str__(self):
         return f"Historia {self.sede.nombre} — {self.fecha_programada:%d/%m %H:%M} ({self.get_estado_display()})"
+
+
+class FeedbackCliente(models.Model):
+    """
+    Reseña/feedback que el cliente deja por WhatsApp (vía el bot) sobre su pedido
+    o experiencia. El dueño lo revisa para mejorar.
+    """
+    negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='feedbacks')
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedbacks')
+    telefono = models.CharField(max_length=20, blank=True, default='')
+    orden = models.ForeignKey('Orden', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedbacks')
+    calificacion = models.IntegerField(null=True, blank=True, help_text="1 a 5 estrellas (opcional).")
+    comentario = models.TextField(blank=True, default='')
+    visto = models.BooleanField(default=False, help_text="¿El dueño ya lo revisó?")
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = 'Feedback de cliente'
+        verbose_name_plural = 'Feedbacks de clientes'
+
+    def __str__(self):
+        estrellas = f"{self.calificacion}★ " if self.calificacion else ""
+        return f"{estrellas}{self.telefono or (self.cliente.nombre if self.cliente else 'Anónimo')}"
+
+
+class CanjePuntos(models.Model):
+    """Registro de un canje de puntos por descuento (historial de fidelización)."""
+    negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='canjes_puntos')
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='canjes')
+    orden = models.ForeignKey('Orden', on_delete=models.SET_NULL, null=True, blank=True, related_name='canjes')
+    puntos = models.IntegerField(help_text="Puntos canjeados.")
+    valor_soles = models.DecimalField(max_digits=8, decimal_places=2, help_text="Descuento en S/ otorgado.")
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = 'Canje de puntos'
+        verbose_name_plural = 'Canjes de puntos'
+
+    def __str__(self):
+        return f"{self.puntos} pts → S/ {self.valor_soles} ({self.cliente.nombre if self.cliente else self.negocio.nombre})"
 
 
 class SolicitudCambio(models.Model):
