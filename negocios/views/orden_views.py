@@ -22,7 +22,7 @@ from ..models import (
     Producto, OpcionVariacion, Cliente, SolicitudCambio, SesionCaja, RegistroAuditoria, Sede
 )
 from ..serializers import OrdenSerializer, DetalleOrdenSerializer, PagoSerializer
-from django.db.models import Sum
+from django.db.models import Sum, Count
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +329,35 @@ class OrdenViewSet(viewsets.ModelViewSet):
             transaction.savepoint_rollback(sid)
 
         return Response(resultado)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def pedido_habitual_bot(self, request):
+        """
+        Devuelve los productos que el cliente pide más seguido (su 'pedido de siempre'),
+        para que el bot le sugiera repetir. Param: telefono.
+        """
+        negocio = getattr(request.user, 'negocio', None)
+        telefono = (request.query_params.get('telefono') or '').strip()
+        if negocio is None or not telefono:
+            return Response({'tiene_historial': False})
+
+        sufijo = telefono[-9:]
+        frecuentes = (DetalleOrden.objects
+                      .filter(orden__sede__negocio=negocio, orden__cliente_telefono__icontains=sufijo)
+                      .exclude(orden__estado='cancelado')
+                      .values('producto_id', 'producto__nombre')
+                      .annotate(veces=Count('id'), total_cant=Sum('cantidad'))
+                      .order_by('-veces', '-total_cant')[:5])
+        if not frecuentes:
+            return Response({'tiene_historial': False})
+
+        return Response({
+            'tiene_historial': True,
+            'productos_frecuentes': [
+                {'producto': f['producto_id'], 'nombre': f['producto__nombre'], 'veces': f['veces']}
+                for f in frecuentes
+            ],
+        })
 
     @action(detail=True, methods=['post'])
     def agregar_productos(self, request, pk=None):

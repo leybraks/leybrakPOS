@@ -1,8 +1,10 @@
 import logging
 import os
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .helpers import es_valor_nulo, get_empleado_desde_header
@@ -103,6 +105,32 @@ class ProductoViewSet(viewsets.ModelViewSet):
             return queryset.filter(negocio=self.request.user.negocio)
 
         return queryset.none()
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def buscar_bot(self, request):
+        """
+        Busca productos DISPONIBLES por palabra clave (nombre o categoría) para el bot.
+        Así el bot no recibe todo el menú y filtra él — el backend devuelve lo que coincide.
+        Params: q (texto a buscar). Devuelve hasta 25 productos con precio.
+        """
+        negocio = getattr(request.user, 'negocio', None)
+        if negocio is None:
+            return Response({'productos': []})
+        q = (request.query_params.get('q') or '').strip()
+        qs = Producto.objects.filter(negocio=negocio, disponible=True, activo=True).select_related('categoria')
+        if q:
+            qs = qs.filter(Q(nombre__icontains=q) | Q(categoria__nombre__icontains=q))
+        qs = qs.order_by('-destacar_como_promocion', 'nombre')[:25]
+        return Response({'productos': [
+            {
+                'id': p.id,
+                'nombre': p.nombre,
+                'precio_desde': float(p.precio_base),
+                'categoria': p.categoria.nombre if p.categoria else None,
+                'tiene_variaciones': p.tiene_variaciones,
+            }
+            for p in qs
+        ]})
 
     @action(detail=True, methods=['post'])
     def configurar_receta(self, request, pk=None):

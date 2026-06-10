@@ -20,6 +20,38 @@ from ..serializers import NegocioSerializer, PagoSuscripcionSerializer, PlanSaaS
 logger = logging.getLogger(__name__)
 
 
+# Presets de tono → texto estructurado que se inyecta en el prompt del bot.
+TONO_TEXTOS = {
+    'amable':    'Sé cálido, cercano y empático; trata al cliente con afecto.',
+    'directo':   'Ve al grano, sin rodeos; respuestas cortas y claras.',
+    'rapido':    'Responde rápido y eficiente; prioriza cerrar el pedido.',
+    'divertido': 'Usa humor ligero y un tono juguetón, sin exagerar.',
+    'formal':    'Mantén un trato respetuoso y profesional, trata de usted.',
+    'vendedor':  'Sugiere combos, extras y promociones de forma natural.',
+}
+
+
+def _construir_persona(negocio):
+    """Compone el objeto `persona` para el bot a partir de los presets + texto libre."""
+    tonos = [t for t in (negocio.bot_tono or []) if t in TONO_TEXTOS]
+    partes = [TONO_TEXTOS[t] for t in tonos]
+    if negocio.bot_personalidad:
+        partes.append(negocio.bot_personalidad.strip())
+    personalidad = ' '.join(partes).strip()
+
+    reglas = [str(r).strip() for r in (negocio.bot_reglas or []) if str(r).strip()]
+    if negocio.bot_instrucciones:
+        reglas.append(negocio.bot_instrucciones.strip())
+    instrucciones = '\n'.join(f'- {r}' for r in reglas)
+
+    return {
+        'nombre':        negocio.bot_nombre or '',
+        'personalidad':  personalidad,
+        'emojis':        negocio.bot_emojis or '',
+        'instrucciones': instrucciones,
+    }
+
+
 # ============================================================
 # NEGOCIO
 # ============================================================
@@ -264,6 +296,13 @@ class SedeViewSet(viewsets.ModelViewSet):
         dias_texto = ", ".join(dias_atencion) if dias_atencion else "ninguno"
 
         negocio = sede.negocio
+
+        # 🍳 Estado de la cocina: ¿saturada? (para que el bot avise demoras)
+        from ..models import Orden
+        pedidos_en_cocina = Orden.objects.filter(sede=sede, estado='preparando').count()
+        max_cocina = sede.bot_max_pedidos_pendientes or 0
+        cocina_saturada = bool(max_cocina) and pedidos_en_cocina >= max_cocina
+
         return Response({
             'sede_id':       sede.id,
             'negocio_id':    negocio.id,
@@ -274,13 +313,15 @@ class SedeViewSet(viewsets.ModelViewSet):
             'hora_apertura': str_apertura,
             'hora_cierre':   str_cierre,
             'mensaje_fuera_horario': f"¡Hola! Ahora mismo estamos cerrados 😴. Nuestro horario es de {str_apertura} a {str_cierre} los días {dias_texto}.",
-            # 🤖 PERSONALIDAD CONFIGURABLE (la inyecta n8n en el prompt del LLM)
-            'persona': {
-                'nombre':        negocio.bot_nombre or '',
-                'personalidad':  negocio.bot_personalidad or '',
-                'emojis':        negocio.bot_emojis or '',
-                'instrucciones': negocio.bot_instrucciones or '',
-            },
+            # ⚙️ Comportamiento configurable (la sede lo controla, n8n lo respeta)
+            'puntos_activos':     sede.bot_puntos_activos,
+            'ingreso_automatico': sede.bot_ingreso_automatico,
+            'pedidos_en_cocina':  pedidos_en_cocina,
+            'max_pedidos_cocina': max_cocina,
+            'cocina_saturada':    cocina_saturada,
+            # 🤖 PERSONALIDAD CONFIGURABLE (la inyecta n8n en el prompt del LLM).
+            # El backend compone el texto estructurado desde los presets de tono + reglas.
+            'persona': _construir_persona(negocio),
         })
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
