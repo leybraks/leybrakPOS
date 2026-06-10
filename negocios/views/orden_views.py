@@ -19,7 +19,8 @@ from .helpers import es_valor_nulo, get_empleado_desde_header, get_empleado_veri
 from ..services import aplicar_reglas_negocio, calcular_preview_happy_hours
 from ..models import (
     Orden, DetalleOrden, DetalleOrdenOpcion, Pago,
-    Producto, OpcionVariacion, Cliente, SolicitudCambio, SesionCaja, RegistroAuditoria, Sede
+    Producto, OpcionVariacion, Cliente, SolicitudCambio, SesionCaja, RegistroAuditoria, Sede,
+    CanjePuntos
 )
 from ..serializers import OrdenSerializer, DetalleOrdenSerializer, PagoSerializer
 from django.db.models import Sum, Count
