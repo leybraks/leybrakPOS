@@ -4,10 +4,11 @@
 
 import re
 from decimal import Decimal
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from asgiref.sync import async_to_sync
@@ -244,3 +245,74 @@ def confirmar_pago_yape(request):
     orden.save(update_fields=['estado_pago'])
 
     return Response({'ok': True, 'orden_id': orden.id}, status=status.HTTP_200_OK)
+
+# ============================================================
+# ENDPOINT: El BOT valida un pago Yape/Plin contra la notificación REAL
+# (en vez de confiar solo en la captura que lee Gemini)
+# ============================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def validar_pago_bot(request):
+    """
+    Cruza el pago que dice el cliente contra la NotificacionPago real capturada por
+    la app Android del negocio. Si hay una notificación válida (no usada, < 5 min) que
+    coincide en monto (y código si se manda), la consume y confirma. Determinístico:
+    le saca a la IA la decisión sobre el dinero.
+
+    Body: { "monto": 25.0, "codigo": "847" (opcional, Yape), "tipo": "yape"|"plin" (opcional) }
+    Respuesta: { validado: bool, ... } | { validado:false, listener_inactivo:true } si el
+    negocio no usa la app (ahí el bot cae a validar por captura).
+    """
+    from ..models import NotificacionPago
+
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'validado': False, 'motivo': 'Sin negocio asociado.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    # Sin app/listener activo no hay validación automática → el bot usa la captura.
+    if not negocio.device_token or not negocio.confirmacion_automatica:
+        return Response({
+            'validado': False,
+            'listener_inactivo': True,
+            'motivo': 'Validación automática no disponible para este negocio.',
+        })
+
+    try:
+        monto = Decimal(str(request.data.get('monto')))
+    except Exception:
+        return Response({'validado': False, 'motivo': 'Monto inválido.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    codigo = str(request.data.get('codigo') or '').strip()
+    tipo = str(request.data.get('tipo') or '').upper()
+
+    limite = timezone.now() - timedelta(minutes=5)
+    qs = NotificacionPago.objects.filter(
+        negocio=negocio, usado=False, fecha_recepcion__gte=limite, monto=monto,
+    )
+    if tipo in ('YAPE', 'PLIN'):
+        qs = qs.filter(tipo=tipo)
+    if codigo:
+        qs = qs.filter(codigo_seguridad=codigo)
+
+    notif = qs.order_by('-fecha_recepcion').first()
+    if not notif:
+        return Response({
+            'validado': False,
+            'motivo': f'No encontramos un pago de S/ {monto} en los últimos 5 minutos. '
+                      f'Pide la captura de nuevo o verifica el monto exacto.',
+        })
+
+    # Consumimos la notificación para que no se reutilice en otro pedido.
+    notif.usado = True
+    notif.save(update_fields=['usado'])
+
+    return Response({
+        'validado': True,
+        'nombre_cliente': notif.nombre_cliente,
+        'monto': str(notif.monto),
+        'tipo': notif.tipo,
+        'notificacion_id': notif.id,
+    })

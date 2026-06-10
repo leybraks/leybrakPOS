@@ -13,7 +13,7 @@ from negocios.views.marketing_views import (
 from negocios.views.negocio_views import PagoSuscripcionViewSet, PlanSaaSViewSet
 from negocios.views.publico_views import login_empleado_pin, verificar_sesion_empleado
 from negocios.views.suscripcion_views import estado_suscripcion
-from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape
+from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape, validar_pago_bot
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from negocios.views.app_version_views import app_version
 from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes
@@ -88,6 +88,7 @@ urlpatterns = [
     # ==========================================
     path('yape/notificacion/',  recibir_notificacion_yape, name='yape-notificacion'),
     path('yape/confirmar/',     confirmar_pago_yape,       name='yape-confirmar'),
+    path('bot/validar-pago/',   validar_pago_bot,          name='bot-validar-pago'),
 
     # ==========================================
     # 💳 SUSCRIPCIÓN — Cobro con MercadoPago
