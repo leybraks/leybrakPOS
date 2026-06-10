@@ -996,17 +996,34 @@ class HistoriaProgramada(models.Model):
     publica con la Evolution API (sendStatus) usando la instancia de la sede.
     """
     ESTADOS = [
-        ('pendiente', 'Pendiente'),
+        ('pendiente', 'Pendiente / Activa'),
         ('publicada', 'Publicada'),
         ('error',     'Error'),
         ('cancelada', 'Cancelada'),
+        ('finalizada', 'Finalizada'),   # recurrente cuyo rango ya terminó
+    ]
+    FRECUENCIAS = [
+        ('unica',   'Una vez'),
+        ('diaria',  'Todos los días'),
+        ('semanal', 'Días de la semana'),
     ]
 
     sede = models.ForeignKey('Sede', on_delete=models.CASCADE, related_name='historias_programadas',
                              help_text="Sede cuya línea de WhatsApp publica la historia.")
     imagen = models.ImageField(upload_to='historias/', help_text="Imagen de la historia.")
     texto = models.TextField(blank=True, default='', help_text="Texto/caption de la historia (opcional).")
-    fecha_programada = models.DateTimeField(help_text="Cuándo debe publicarse.")
+
+    frecuencia = models.CharField(max_length=10, choices=FRECUENCIAS, default='unica')
+    # 'unica': se usa fecha_programada (fecha+hora exacta).
+    fecha_programada = models.DateTimeField(null=True, blank=True, help_text="Cuándo publicar (solo 'una vez').")
+    # Recurrentes ('diaria'/'semanal'):
+    hora = models.TimeField(null=True, blank=True, help_text="Hora del día a publicar (recurrentes).")
+    dias_semana = models.JSONField(default=list, blank=True,
+                                   help_text="Días para 'semanal': lista 0=Lun … 6=Dom.")
+    fecha_inicio = models.DateField(null=True, blank=True, help_text="Desde qué día se repite (opcional).")
+    fecha_fin = models.DateField(null=True, blank=True, help_text="Hasta qué día se repite (opcional, vacío=indefinido).")
+    ultima_publicacion_dia = models.DateField(null=True, blank=True,
+                                              help_text="Último día que se publicó (anti-duplicado).")
 
     estado = models.CharField(max_length=12, choices=ESTADOS, default='pendiente')
     publicada_en = models.DateTimeField(null=True, blank=True)
