@@ -28,6 +28,29 @@ from django.db.models import Sum, Count
 logger = logging.getLogger(__name__)
 
 
+def _calcular_descuento_puntos(negocio, cliente, puntos_solicitados):
+    """
+    Valida un canje de puntos. Devuelve (puntos_a_usar, descuento_soles, error).
+    No descuenta nada: solo calcula. La deducción se hace al crear la orden.
+    """
+    from decimal import Decimal as _D
+    if not getattr(negocio, 'puntos_activo', False) or not cliente:
+        return 0, _D('0'), None
+    try:
+        p = int(puntos_solicitados or 0)
+    except (TypeError, ValueError):
+        return 0, _D('0'), 'Puntos inválidos.'
+    if p <= 0:
+        return 0, _D('0'), None
+    saldo = cliente.puntos_acumulados or 0
+    if p < negocio.puntos_canje_minimo:
+        return 0, _D('0'), f'El mínimo para canjear es {negocio.puntos_canje_minimo} puntos.'
+    if p > saldo:
+        return 0, _D('0'), f'El cliente solo tiene {saldo} puntos.'
+    descuento = (_D(p) * negocio.puntos_valor_soles).quantize(_D('0.01'))
+    return p, descuento, None
+
+
 def _procesar_opciones(opciones_ids_raw, variaciones_dict):
     opciones_ids = list(opciones_ids_raw)
     for grupo_id, ids in variaciones_dict.items():
