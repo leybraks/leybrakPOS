@@ -4,9 +4,11 @@ import requests
 
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from django.conf import settings
 
 from ..models import Cliente, ZonaDelivery, ReglaNegocio, Sede
 from ..serializers import ClienteSerializer, ZonaDeliverySerializer, ReglaNegocioSerializer
@@ -125,6 +127,59 @@ def geocodificar_bot(request):
         'longitud': float(res['lon']),
         'direccion_formateada': res.get('display_name', direccion),
     })
+
+
+def _url_absoluta(imagen, request):
+    if not imagen:
+        return ''
+    base = getattr(settings, 'BACKEND_URL', '') or ''
+    if base:
+        return base.rstrip('/') + imagen.url
+    return request.build_absolute_uri(imagen.url) if request else imagen.url
+
+
+def _serializar_sticker(s, request):
+    return {
+        'id': s.id,
+        'contexto': s.contexto,
+        'contexto_label': s.get_contexto_display(),
+        'imagen': _url_absoluta(s.imagen, request),
+        'activo': s.activo,
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def stickers_view(request):
+    """GET: lista los stickers del negocio. POST: sube uno nuevo (multipart: imagen + contexto)."""
+    from ..models import BotSticker
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'error': 'Sin negocio asociado.'}, status=403)
+
+    if request.method == 'GET':
+        qs = BotSticker.objects.filter(negocio=negocio)
+        return Response({'stickers': [_serializar_sticker(s, request) for s in qs]})
+
+    imagen = request.FILES.get('imagen')
+    contexto = request.data.get('contexto') or 'general'
+    if not imagen:
+        return Response({'error': 'Falta la imagen del sticker.'}, status=400)
+    s = BotSticker.objects.create(negocio=negocio, imagen=imagen, contexto=contexto)
+    return Response(_serializar_sticker(s, request), status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def eliminar_sticker(request, sticker_id):
+    from ..models import BotSticker
+    negocio = getattr(request.user, 'negocio', None)
+    s = BotSticker.objects.filter(id=sticker_id, negocio=negocio).first() if negocio else None
+    if not s:
+        return Response({'error': 'Sticker no encontrado.'}, status=404)
+    s.delete()
+    return Response({'ok': True})
 
 
 @api_view(['GET'])

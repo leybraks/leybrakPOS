@@ -9,7 +9,7 @@ from .models import (
     # ✨ IMPORTAMOS TUS NUEVOS MODELOS DE CRM Y MARKETING ✨
     Cliente, ZonaDelivery, ReglaNegocio, CuponPromocional,
     HorarioVisibilidad, ComponenteCombo, VersionApp, Comprobante, SerieComprobante,
-    HistoriaProgramada, FeedbackCliente, CanjePuntos
+    HistoriaProgramada, FeedbackCliente, CanjePuntos, BotSticker
 )
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline, StackedInline
@@ -222,3 +222,13 @@ class CanjePuntosAdmin(ModelAdmin):  # ✨ UNFOLD
     list_display = ('creado_en', 'cliente', 'puntos', 'valor_soles', 'negocio')
     list_filter = ('negocio',)
     search_fields = ('cliente__nombre', 'cliente__telefono')
+
+
+# ==========================================
+# 🎟️ 11. STICKERS DEL BOT
+# ==========================================
+@admin.register(BotSticker)
+class BotStickerAdmin(ModelAdmin):  # ✨ UNFOLD
+    list_display = ('contexto', 'negocio', 'activo', 'creado_en')
+    list_filter = ('contexto', 'activo', 'negocio')
+    list_editable = ('activo',)

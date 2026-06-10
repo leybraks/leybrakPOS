@@ -205,6 +205,23 @@ class OrdenViewSet(viewsets.ModelViewSet):
                 nuevo_total += precio_final_unitario * int(d['cantidad'])
 
             aplicar_reglas_negocio(orden)
+
+            # 🎁 Canje de puntos (lo manda el bot): descuenta del saldo, registra y baja el total.
+            puntos_canje = self.request.data.get('puntos_a_canjear')
+            if puntos_canje:
+                tel = (orden.cliente_telefono or '').strip()
+                cliente_p = (Cliente.objects.filter(
+                    negocio=orden.sede.negocio, telefono__icontains=tel[-9:]).first() if tel else None)
+                p_uso, desc_p, err_p = _calcular_descuento_puntos(orden.sede.negocio, cliente_p, puntos_canje)
+                if p_uso > 0 and not err_p:
+                    cliente_p.puntos_acumulados = (cliente_p.puntos_acumulados or 0) - p_uso
+                    cliente_p.save(update_fields=['puntos_acumulados'])
+                    CanjePuntos.objects.create(
+                        negocio=orden.sede.negocio, cliente=cliente_p, orden=orden,
+                        puntos=p_uso, valor_soles=desc_p)
+                    orden.descuento_total = (orden.descuento_total or Decimal('0')) + desc_p
+                    orden.total = max(orden.total - desc_p, Decimal('0.00'))
+
             orden.save()
 
         orden_data = self.get_serializer(orden).data
@@ -331,6 +348,14 @@ class OrdenViewSet(viewsets.ModelViewSet):
             orden.refresh_from_db()
             aplicar_reglas_negocio(orden, metodo_pago=metodo)
 
+            # 🎁 Previsualización del canje de puntos (no descuenta; eso es al crear la orden)
+            telefono = (request.data.get('telefono') or '').strip()
+            cliente = (Cliente.objects.filter(negocio=sede.negocio, telefono__icontains=telefono[-9:]).first()
+                       if telefono else None)
+            p_uso, desc_puntos, err_puntos = _calcular_descuento_puntos(
+                sede.negocio, cliente, request.data.get('puntos_a_canjear'))
+            total_final = max(orden.total - desc_puntos, Decimal('0.00'))
+
             resumen = f"Subtotal: S/ {orden.subtotal:.2f}"
             if orden.descuento_total:
                 resumen += f" | Descuento: -S/ {orden.descuento_total:.2f}"
@@ -338,17 +363,23 @@ class OrdenViewSet(viewsets.ModelViewSet):
                 resumen += f" | Recargo: +S/ {orden.recargo_total:.2f}"
             if orden.costo_envio:
                 resumen += f" | Envío: +S/ {orden.costo_envio:.2f}"
-            resumen += f" | TOTAL A PAGAR: S/ {orden.total:.2f}"
+            if desc_puntos:
+                resumen += f" | Canje {p_uso} pts: -S/ {desc_puntos:.2f}"
+            resumen += f" | TOTAL A PAGAR: S/ {total_final:.2f}"
 
             resultado = {
                 'subtotal': float(orden.subtotal),
                 'descuento_total': float(orden.descuento_total),
                 'recargo_total': float(orden.recargo_total),
                 'costo_envio': float(orden.costo_envio),
-                'total': float(orden.total),
+                'descuento_puntos': float(desc_puntos),
+                'puntos_canjeados': p_uso,
+                'total': float(total_final),
                 'lineas': lineas,
                 'resumen': resumen,
             }
+            if err_puntos:
+                resultado['aviso_puntos'] = err_puntos
         finally:
             transaction.savepoint_rollback(sid)
 
@@ -599,8 +630,10 @@ class OrdenViewSet(viewsets.ModelViewSet):
                         cliente.total_gastado    = Decimal(str(cliente.total_gastado)) + Decimal(str(orden.total))
                         cliente.ultima_compra    = timezone.now()
 
-                        puntos_ganados = int(Decimal(str(orden.total)) // 10)
-                        cliente.puntos_acumulados += puntos_ganados
+                        # Puntos: gana según la config del programa (puntos por sol), solo si está activo.
+                        if orden.sede.negocio.puntos_activo:
+                            puntos_ganados = int(Decimal(str(orden.total)) * orden.sede.negocio.puntos_por_sol)
+                            cliente.puntos_acumulados += puntos_ganados
 
                         tags_actuales = cliente.tags if isinstance(cliente.tags, list) else []
 

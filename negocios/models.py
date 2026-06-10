@@ -1088,6 +1088,31 @@ class FeedbackCliente(models.Model):
         return f"{estrellas}{self.telefono or (self.cliente.nombre if self.cliente else 'Anónimo')}"
 
 
+class BotSticker(models.Model):
+    """Sticker que el bot puede enviar por WhatsApp en cierto contexto de la conversación."""
+    CONTEXTOS = [
+        ('saludo',            'Saludo / bienvenida'),
+        ('pedido_confirmado', 'Pedido enviado a cocina'),
+        ('delivery_camino',   'Delivery en camino'),
+        ('agradecimiento',    'Agradecimiento'),
+        ('despedida',         'Despedida'),
+        ('general',           'General / comodín'),
+    ]
+    negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='stickers')
+    imagen = models.ImageField(upload_to='stickers/', help_text="Imagen del sticker (idealmente cuadrada / webp).")
+    contexto = models.CharField(max_length=20, choices=CONTEXTOS, default='general')
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['contexto', '-creado_en']
+        verbose_name = 'Sticker del bot'
+        verbose_name_plural = 'Stickers del bot'
+
+    def __str__(self):
+        return f"{self.get_contexto_display()} — {self.negocio.nombre}"
+
+
 class CanjePuntos(models.Model):
     """Registro de un canje de puntos por descuento (historial de fidelización)."""
     negocio = models.ForeignKey('Negocio', on_delete=models.CASCADE, related_name='canjes_puntos')

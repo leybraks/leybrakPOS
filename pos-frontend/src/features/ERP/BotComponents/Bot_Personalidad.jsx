@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Save, Loader2, Plus, X, Sparkles } from 'lucide-react';
+import { MessageSquare, Save, Loader2, Plus, X, Sparkles, ImagePlus, Trash2, Smile } from 'lucide-react';
 import api from '../../../api/api';
 import { useToast } from '../../../context/ToastContext';
+
+const STICKER_CTX = [
+  { k: 'saludo', l: 'Saludo' },
+  { k: 'pedido_confirmado', l: 'Pedido a cocina' },
+  { k: 'delivery_camino', l: 'Delivery en camino' },
+  { k: 'agradecimiento', l: 'Agradecimiento' },
+  { k: 'despedida', l: 'Despedida' },
+  { k: 'general', l: 'General' },
+];
 
 const TONOS = [
   { k: 'amable',    l: 'Amable',    e: '🤗' },
@@ -32,6 +41,13 @@ export default function Bot_Personalidad({ isDark, colorPrimario }) {
   const [nuevaRegla, setNuevaRegla] = useState('');
   const [cargando, setCargando]   = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [stickers, setStickers]   = useState([]);
+  const [ctxSticker, setCtxSticker] = useState('saludo');
+  const [subiendo, setSubiendo]   = useState(false);
+
+  const cargarStickers = async () => {
+    try { const r = await api.get('/stickers/'); setStickers(r.data?.stickers || []); } catch { /* noop */ }
+  };
 
   useEffect(() => {
     (async () => {
@@ -41,10 +57,32 @@ export default function Bot_Personalidad({ isDark, colorPrimario }) {
         setTono(Array.isArray(d.bot_tono) ? d.bot_tono : []);
         setEmojis(Array.from(d.bot_emojis || ''));
         setReglas(Array.isArray(d.bot_reglas) ? d.bot_reglas : []);
+        await cargarStickers();
       } catch { toast.error('No se pudo cargar la personalización.'); }
       finally { setCargando(false); }
     })();
   }, [negocioId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const subirSticker = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 3 * 1024 * 1024) { toast.warning('El sticker no debe superar 3 MB.'); return; }
+    setSubiendo(true);
+    try {
+      const fd = new FormData();
+      fd.append('imagen', f);
+      fd.append('contexto', ctxSticker);
+      await api.post('/stickers/', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Sticker subido.');
+      cargarStickers();
+    } catch { toast.error('No se pudo subir el sticker.'); }
+    finally { setSubiendo(false); e.target.value = ''; }
+  };
+
+  const borrarSticker = async (id) => {
+    try { await api.delete(`/stickers/${id}/`); cargarStickers(); }
+    catch { toast.error('No se pudo eliminar.'); }
+  };
 
   const toggleTono  = (k) => setTono(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k]);
   const toggleEmoji = (e) => setEmojis(p => p.includes(e) ? p.filter(x => x !== e) : [...p, e]);
@@ -178,6 +216,46 @@ export default function Bot_Personalidad({ isDark, colorPrimario }) {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Stickers */}
+        <div>
+          <label className={`text-[10px] font-black uppercase tracking-widest block mb-2 ${lbl}`}>
+            Stickers <span className="normal-case font-medium">(el bot los manda según el momento)</span>
+          </label>
+          <div className={`p-3 rounded-2xl border ${isDark ? 'border-[#333] bg-[#0a0a0a]' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex gap-2 mb-3">
+              <select value={ctxSticker} onChange={(e) => setCtxSticker(e.target.value)}
+                className={`flex-1 px-3 py-2 rounded-xl border text-sm font-bold outline-none ${inp}`}>
+                {STICKER_CTX.map(c => <option key={c.k} value={c.k}>{c.l}</option>)}
+              </select>
+              <label className="px-4 rounded-xl text-white font-black flex items-center gap-1.5 cursor-pointer text-sm"
+                style={{ backgroundColor: colorPrimario, opacity: subiendo ? 0.6 : 1 }}>
+                {subiendo ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
+                Subir
+                <input type="file" accept="image/*" className="hidden" onChange={subirSticker} disabled={subiendo} />
+              </label>
+            </div>
+            {stickers.length === 0 ? (
+              <p className={`text-[11px] text-center py-3 ${sub}`}>Sin stickers. Sube uno y elige cuándo lo usa el bot.</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {stickers.map(s => (
+                  <div key={s.id} className="relative group">
+                    <img src={s.imagen} alt="" className={`w-full aspect-square object-contain rounded-xl ${isDark ? 'bg-[#161616]' : 'bg-white'} border ${isDark ? 'border-[#222]' : 'border-gray-100'}`} />
+                    <span className="absolute bottom-0 inset-x-0 text-[8px] font-black text-center text-white bg-black/60 rounded-b-xl py-0.5 truncate px-1">
+                      {STICKER_CTX.find(c => c.k === s.contexto)?.l || s.contexto}
+                    </span>
+                    <button onClick={() => borrarSticker(s.id)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className={`text-[11px] mt-1.5 ${sub}`}>Ideal: imágenes cuadradas (Evolution las convierte a sticker).</p>
         </div>
 
         <button onClick={guardar} disabled={guardando}

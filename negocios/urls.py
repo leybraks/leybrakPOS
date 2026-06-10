@@ -18,7 +18,7 @@ from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, w
 from negocios.views.app_version_views import app_version
 from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes
 from negocios.views.historia_views import historias, cancelar_historia, historias_pendientes_bot, marcar_historia_bot
-from negocios.views.cliente_views import geocodificar_bot, registrar_feedback_bot, listar_canjes
+from negocios.views.cliente_views import geocodificar_bot, registrar_feedback_bot, listar_canjes, stickers_view, eliminar_sticker
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
 from . import views
 
@@ -93,6 +93,8 @@ urlpatterns = [
     path('bot/geocodificar/',   geocodificar_bot,          name='bot-geocodificar'),
     path('bot/feedback/',       registrar_feedback_bot,    name='bot-feedback'),
     path('canjes-puntos/',      listar_canjes,             name='listar-canjes'),
+    path('stickers/',           stickers_view,             name='stickers'),
+    path('stickers/<int:sticker_id>/', eliminar_sticker,   name='eliminar-sticker'),
 
     # ==========================================
     # 💳 SUSCRIPCIÓN — Cobro con MercadoPago
