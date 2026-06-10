@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Bot_Operaciones from './BotComponents/Bot_Operaciones';
 import Bot_Marketing from './BotComponents/Bot_Marketing';
+import Bot_Delivery from './BotComponents/Bot_Delivery';
 import Bot_QrModal from './BotComponents/Bot_QrModal';
 export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosReales = []}) {
   const toast = useToast();
@@ -309,6 +310,7 @@ export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosRe
         {[
           { id: 'conexion', label: 'Conexión WhatsApp', icon: Plug },
           { id: 'reglas', label: 'Comportamiento', icon: Settings },
+          { id: 'delivery', label: 'Zonas de Delivery', icon: Bike },
           { id: 'marketing', label: 'Marketing y Difusión', icon: Megaphone },
         ].map(tab => {
           const Icon = tab.icon;
@@ -453,6 +455,14 @@ export default function Erp_BotWsp({ sedesReales = [], onRefrescar , productosRe
       )}
       
       
+      {tabActiva === 'delivery' && (
+        <Bot_Delivery
+          sede={sedesVisibles.find(s => String(s.id) === String(sedeActivaId)) || sedesVisibles[0]}
+          isDark={isDark}
+          colorPrimario={colorPrimario}
+        />
+      )}
+
       {tabActiva === 'marketing' && (
         <Bot_Marketing sedesReales={sedesVisibles} isDark={isDark} colorPrimario={colorPrimario} />
       )}

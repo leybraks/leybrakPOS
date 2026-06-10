@@ -80,14 +80,43 @@ def calcular_distancia_km(lat1, lon1, lat2, lon2):
     return R * c
 
 
-class ZonaDeliveryViewSet(viewsets.ReadOnlyModelViewSet):
+class ZonaDeliveryViewSet(viewsets.ModelViewSet):
     serializer_class = ZonaDeliverySerializer
 
+    def get_permissions(self):
+        # Lecturas y cotización quedan abiertas (las usa el bot y la carta pública);
+        # crear/editar/borrar exige sesión del dueño.
+        if self.action in ('list', 'retrieve', 'cotizar'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
+        user = self.request.user
         sede_id = self.request.query_params.get('sede_id')
+        # Dueño autenticado → todas SUS zonas (incluidas inactivas, para gestionarlas).
+        if user and user.is_authenticated and getattr(user, 'negocio', None):
+            qs = ZonaDelivery.objects.filter(sede__negocio=user.negocio)
+        else:
+            # Lectura pública → solo activas.
+            qs = ZonaDelivery.objects.filter(activa=True)
         if sede_id:
-            return ZonaDelivery.objects.filter(sede_id=sede_id, activa=True)
-        return ZonaDelivery.objects.filter(activa=True)
+            qs = qs.filter(sede_id=sede_id)
+        return qs.order_by('radio_max_km')
+
+    def _validar_sede_del_negocio(self, serializer):
+        sede = serializer.validated_data.get('sede')
+        negocio = getattr(self.request.user, 'negocio', None)
+        if sede and negocio and sede.negocio_id != negocio.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('La sede no pertenece a tu negocio.')
+
+    def perform_create(self, serializer):
+        self._validar_sede_del_negocio(serializer)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._validar_sede_del_negocio(serializer)
+        serializer.save()
 
     @action(detail=False, methods=['get'])
     def cotizar(self, request):
