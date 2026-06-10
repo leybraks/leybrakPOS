@@ -130,7 +130,7 @@ export default function Bot_Delivery({ sede, isDark, colorPrimario }) {
 
         {/* Mapa con anillos */}
         <div className="rounded-2xl overflow-hidden border mb-4" style={{ borderColor: isDark ? '#222' : '#e5e7eb', height: 280, isolation: 'isolate' }}>
-          <MapContainer center={[lat, lng]} zoom={14} className="h-full w-full" key={`${sedeId}-${lat}-${lng}`}>
+          <MapContainer center={[lat, lng]} zoom={14} className="h-full w-full" attributionControl={false} key={`${sedeId}-${lat}-${lng}`}>
             <TileLayer
               url={isDark
                 ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
