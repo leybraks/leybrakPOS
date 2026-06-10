@@ -220,6 +220,116 @@ class OrdenViewSet(viewsets.ModelViewSet):
                     {"type": "orden_llevar_actualizada", "accion": accion, "orden": orden_data}
                 )
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def cotizar_bot(self, request):
+        """
+        Calcula el total REAL de un pedido (subtotal + happy hours + reglas de negocio
+        + recargos/descuentos por método y tipo + envío) SIN crear la orden.
+        Lo usa el bot de WhatsApp para cotizarle al cliente EXACTAMENTE lo que se cobrará,
+        en vez de que la IA sume precios por su cuenta (y se equivoque con las reglas).
+        Body: { sede, tipo, metodo_pago_esperado, costo_envio, detalles:[{producto,cantidad,opciones}] }
+        """
+        sede_id = request.data.get('sede')
+        tipo = request.data.get('tipo') or 'salon'
+        metodo = request.data.get('metodo_pago_esperado') or ''
+        try:
+            costo_envio = Decimal(str(request.data.get('costo_envio') or 0))
+        except Exception:
+            costo_envio = Decimal('0')
+        detalles_data = request.data.get('detalles') or []
+
+        negocio = getattr(request.user, 'negocio', None)
+        filtro = {'id': sede_id}
+        if negocio:
+            filtro['negocio'] = negocio
+        sede = Sede.objects.filter(**filtro).first()
+        if not sede:
+            return Response({'error': 'Sede no encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not detalles_data:
+            return Response({'error': 'No hay productos para cotizar.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 🛵 Si es delivery y mandan coordenadas, el BACKEND calcula el envío desde la zona
+        # (la IA no decide el costo; solo pasa lat/lng de la ubicación del cliente).
+        lat = request.data.get('latitud')
+        lon = request.data.get('longitud')
+        if tipo == 'delivery' and lat not in (None, '') and lon not in (None, '') and sede.latitud and sede.longitud:
+            from .cliente_views import calcular_distancia_km
+            from ..models import ZonaDelivery
+            try:
+                dist = calcular_distancia_km(float(sede.latitud), float(sede.longitud), float(lat), float(lon)) * 1.5
+                zona = (ZonaDelivery.objects
+                        .filter(sede=sede, activa=True, radio_max_km__gte=dist)
+                        .order_by('radio_max_km').first())
+                if zona:
+                    costo_envio = Decimal(str(zona.costo_envio))
+                else:
+                    return Response({
+                        'error': f'Fuera de cobertura (a ~{round(dist, 1)} km). Un humano validará el envío.',
+                        'fuera_de_rango': True,
+                    }, status=status.HTTP_200_OK)
+            except (TypeError, ValueError):
+                pass
+
+        # Creamos la orden y sus detalles en un savepoint y lo revertimos:
+        # así reutilizamos EXACTAMENTE la misma lógica de precios que al cobrar,
+        # sin persistir nada (no hay señales post_save en Orden/DetalleOrden).
+        sid = transaction.savepoint()
+        try:
+            orden = Orden.objects.create(
+                sede=sede, tipo=tipo, estado='preparando',
+                metodo_pago_esperado=metodo, costo_envio=costo_envio,
+            )
+            lineas = []
+            for d in detalles_data:
+                try:
+                    producto = Producto.objects.get(id=d.get('producto'))
+                except Producto.DoesNotExist:
+                    continue
+                cantidad = int(d.get('cantidad') or 1)
+                opciones_raw = d.get('opciones') or d.get('opciones_seleccionadas') or []
+                opciones_a_guardar, subtotal_opciones = _procesar_opciones(opciones_raw, {})
+                precio_unit = producto.precio_base + subtotal_opciones
+                det = DetalleOrden.objects.create(
+                    orden=orden, producto=producto, cantidad=cantidad, precio_unitario=precio_unit,
+                )
+                for opc in opciones_a_guardar:
+                    DetalleOrdenOpcion.objects.create(
+                        detalle_orden=det, opcion_variacion=opc,
+                        precio_adicional_aplicado=opc.precio_adicional,
+                    )
+                lineas.append({
+                    'producto': producto.nombre,
+                    'cantidad': cantidad,
+                    'precio_unitario': float(precio_unit),
+                    'total_linea': float(precio_unit * cantidad),
+                })
+
+            orden.refresh_from_db()
+            aplicar_reglas_negocio(orden, metodo_pago=metodo)
+
+            resumen = f"Subtotal: S/ {orden.subtotal:.2f}"
+            if orden.descuento_total:
+                resumen += f" | Descuento: -S/ {orden.descuento_total:.2f}"
+            if orden.recargo_total:
+                resumen += f" | Recargo: +S/ {orden.recargo_total:.2f}"
+            if orden.costo_envio:
+                resumen += f" | Envío: +S/ {orden.costo_envio:.2f}"
+            resumen += f" | TOTAL A PAGAR: S/ {orden.total:.2f}"
+
+            resultado = {
+                'subtotal': float(orden.subtotal),
+                'descuento_total': float(orden.descuento_total),
+                'recargo_total': float(orden.recargo_total),
+                'costo_envio': float(orden.costo_envio),
+                'total': float(orden.total),
+                'lineas': lineas,
+                'resumen': resumen,
+            }
+        finally:
+            transaction.savepoint_rollback(sid)
+
+        return Response(resultado)
+
     @action(detail=True, methods=['post'])
     def agregar_productos(self, request, pk=None):
         orden = self.get_object()
