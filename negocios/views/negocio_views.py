@@ -297,6 +297,14 @@ class SedeViewSet(viewsets.ModelViewSet):
 
         negocio = sede.negocio
 
+        # 🎟️ Stickers configurados (uno por contexto, los activos)
+        from ..models import BotSticker
+        _base = getattr(settings, 'BACKEND_URL', '') or ''
+        stickers = {}
+        for st in BotSticker.objects.filter(negocio=negocio, activo=True):
+            if st.contexto not in stickers and st.imagen:
+                stickers[st.contexto] = (_base.rstrip('/') + st.imagen.url) if _base else request.build_absolute_uri(st.imagen.url)
+
         # 🍳 Estado de la cocina: ¿saturada? (para que el bot avise demoras)
         from ..models import Orden
         pedidos_en_cocina = Orden.objects.filter(sede=sede, estado='preparando').count()
@@ -313,12 +321,16 @@ class SedeViewSet(viewsets.ModelViewSet):
             'hora_apertura': str_apertura,
             'hora_cierre':   str_cierre,
             'mensaje_fuera_horario': f"¡Hola! Ahora mismo estamos cerrados 😴. Nuestro horario es de {str_apertura} a {str_cierre} los días {dias_texto}.",
-            # ⚙️ Comportamiento configurable (la sede lo controla, n8n lo respeta)
-            'puntos_activos':     sede.bot_puntos_activos,
+            # ⚙️ Comportamiento configurable (n8n lo respeta)
+            # Puntos: se controla a nivel NEGOCIO (módulo Fidelización → Puntos y Canje).
+            'puntos_activos':     negocio.puntos_activo,
+            'puntos_valor_soles': float(negocio.puntos_valor_soles),
+            'puntos_canje_minimo': negocio.puntos_canje_minimo,
             'ingreso_automatico': sede.bot_ingreso_automatico,
             'pedidos_en_cocina':  pedidos_en_cocina,
             'max_pedidos_cocina': max_cocina,
             'cocina_saturada':    cocina_saturada,
+            'stickers':           stickers,
             # 🤖 PERSONALIDAD CONFIGURABLE (la inyecta n8n en el prompt del LLM).
             # El backend compone el texto estructurado desde los presets de tono + reglas.
             'persona': _construir_persona(negocio),

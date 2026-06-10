@@ -51,6 +51,8 @@ class NegocioSerializer(serializers.ModelSerializer):
             # Personalidad del bot de WhatsApp
             'bot_nombre', 'bot_tono', 'bot_emojis', 'bot_reglas',
             'bot_personalidad', 'bot_instrucciones',
+            # Programa de puntos / fidelización
+            'puntos_activo', 'puntos_por_sol', 'puntos_canje_minimo', 'puntos_valor_soles',
         ]
         extra_kwargs = {
             # El token no se devuelve en claro; solo se escribe.

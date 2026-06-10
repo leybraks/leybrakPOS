@@ -78,27 +78,7 @@ export default function Bot_Operaciones({
               </span>
             </div>
           </div>
-          {/* 🌟 MÓDULO: SISTEMA DE PUNTOS */}
-            <div className={`rounded-[2rem] p-6 border ${isDark ? 'bg-[#111] border-[#2a2a2a]' : 'bg-white border-gray-200 shadow-sm'}`}>
-                <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-yellow-500/20 text-yellow-500">
-                    {/* Usa el icono Star de lucide-react si lo tienes */}
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                    </div>
-                    <div>
-                    <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Mención de Puntos</h3>
-                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-gray-500'}`}>¿El bot avisa sobre el saldo de puntos?</p>
-                    </div>
-                </div>
-                <button 
-                    onClick={() => setOperaciones({...operaciones, puntosActivos: !operaciones.puntosActivos})} 
-                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${operaciones.puntosActivos ? 'bg-yellow-500' : 'bg-neutral-500'}`}
-                >
-                    <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${operaciones.puntosActivos ? 'translate-x-7' : 'translate-x-1'}`} />
-                </button>
-                </div>
-            </div>
+          {/* 🌟 Los puntos ahora se configuran en Fidelización (CRM) → Puntos y Canje */}
           {/* Botón de Guardar */}
           <button 
             onClick={manejarGuardarOperaciones}

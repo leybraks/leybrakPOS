@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Percent, BadgeDollarSign, ShoppingBag, X } from 'lucide-react';
 import Crm_CombosPromociones from './CRM/Crm_CombosPomociones';
 import Crm_Cumpleanos from './CRM/Crm_Cumpleaños'; // Ajusta la ruta si es necesario
+import Crm_Puntos from './CRM/Crm_Puntos';
 import api from '../../api/api'; // Asegúrate de tener tu instancia de Axios configurada
 export default function Erp_Crm({ config, sedesReales = [], productosReales = [], categoriasReales = [] }) {
   const isDark = config.temaFondo === 'dark';
@@ -65,6 +66,7 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
       <div className={`flex gap-8 border-b overflow-x-auto custom-scrollbar ${isDark ? 'border-[#222]' : 'border-gray-200'}`}>
         {[
           { id: 'clientes', label: 'Base de Datos (CRM)' },
+          { id: 'puntos', label: 'Puntos y Canje' },
           { id: 'cumpleanos', label: 'Motor de Cumpleaños' },
           { id: 'promociones', label: 'Combos y Promociones' },
         ].map(tab => (
@@ -140,8 +142,11 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
       {/* ========================================== */}
       {/* 🎂 PESTAÑA 2: MOTOR CUMPLEAÑERO GLOBAL */}
       {/* ========================================== */}
+      {tabActiva === 'puntos' && (
+        <Crm_Puntos isDark={isDark} colorPrimario={colorPrimario} />
+      )}
       {tabActiva === 'cumpleanos' && (
-        <Crm_Cumpleanos 
+        <Crm_Cumpleanos
           isDark={isDark}
           colorPrimario={colorPrimario}
           sedeActivaId={sedeActivaId}
