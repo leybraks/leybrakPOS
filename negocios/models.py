@@ -136,18 +136,21 @@ class Negocio(models.Model):
         max_length=50, blank=True, default='',
         help_text="Nombre del asistente, ej. 'Bravito'. Vacío = sin nombre propio."
     )
-    bot_personalidad = models.TextField(
-        blank=True, default='',
-        help_text="Cómo habla el bot: tono, trato (tú/usted), jerga, qué tan formal o divertido."
+    bot_tono = models.JSONField(
+        default=list, blank=True,
+        help_text="Presets de tono elegidos, ej. ['amable','rapido']."
     )
     bot_emojis = models.CharField(
         max_length=255, blank=True, default='',
-        help_text="Emojis que puede usar (ej. 🍔🔥😋) o 'ninguno' para que no use."
+        help_text="Emojis que puede usar (ej. 🍔🔥😋). Vacío = pocos/ninguno."
     )
-    bot_instrucciones = models.TextField(
-        blank=True, default='',
-        help_text="Reglas/instrucciones extra para el bot (ej. 'Siempre ofrece el combo del día')."
+    bot_reglas = models.JSONField(
+        default=list, blank=True,
+        help_text="Lista de reglas, ej. ['Siempre ofrece el combo del día', 'Nunca prometas descuentos']."
     )
+    # Texto libre opcional (compatibilidad / personalización avanzada)
+    bot_personalidad = models.TextField(blank=True, default='', help_text="Nota de personalidad extra (opcional).")
+    bot_instrucciones = models.TextField(blank=True, default='', help_text="(Legado) Instrucciones libres.")
 
     def __str__(self):
         return self.nombre
@@ -186,6 +189,10 @@ class Sede(models.Model):
     )
 
     bot_puntos_activos = models.BooleanField(default=True, help_text="¿El bot gestiona y menciona los puntos?")
+    bot_ingreso_automatico = models.BooleanField(
+        default=True,
+        help_text="¿Los pedidos del bot pasan directo a cocina ('preparando')? Si está OFF, quedan 'pendiente' para revisión humana."
+    )
     bot_max_pedidos_pendientes = models.IntegerField(
         default=20,
         help_text="Límite de pedidos en preparación antes de activar el Modo Cocina Colapsada"

@@ -49,7 +49,8 @@ class NegocioSerializer(serializers.ModelSerializer):
             'facturacion_ruta', 'facturacion_token',
             'facturacion_serie_boleta', 'facturacion_serie_factura',
             # Personalidad del bot de WhatsApp
-            'bot_nombre', 'bot_personalidad', 'bot_emojis', 'bot_instrucciones',
+            'bot_nombre', 'bot_tono', 'bot_emojis', 'bot_reglas',
+            'bot_personalidad', 'bot_instrucciones',
         ]
         extra_kwargs = {
             # El token no se devuelve en claro; solo se escribe.
@@ -64,7 +65,7 @@ class SedeSerializer(serializers.ModelSerializer):
             'id', 'negocio', 'nombre', 'direccion', 'activo', 'columnas_salon',
             'latitud', 'longitud', 'whatsapp_instancia', 'whatsapp_numero',
             'enlace_carta_virtual', 'carta_pdf', 'hora_apertura', 'hora_cierre',
-            'dias_atencion', 'bot_puntos_activos', 'bot_max_pedidos_pendientes',
+            'dias_atencion', 'bot_puntos_activos', 'bot_ingreso_automatico', 'bot_max_pedidos_pendientes',
             'bot_cumple_activo', 'bot_cumple_tipo', 'bot_cumple_valor',
             'bot_cumple_minimo', 'bot_cumple_productos',
         ]
