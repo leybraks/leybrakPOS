@@ -3,6 +3,7 @@
 # ============================================================
 
 import re
+import unicodedata
 from decimal import Decimal
 from datetime import timedelta
 
@@ -64,11 +65,34 @@ def _parsear_notificacion(texto: str) -> dict | None:
     }
 
 
+def _sin_acentos(texto: str) -> str:
+    """Quita tildes/diacríticos para comparar ('Pérez' == 'Perez')."""
+    return ''.join(c for c in unicodedata.normalize('NFD', texto)
+                   if unicodedata.category(c) != 'Mn')
+
+
 def _normalizar_nombre(texto: str) -> str:
-    """Limpia un nombre para comparación: minúsculas, sin asterisco, sin espacios extra."""
+    """Limpia un nombre para comparación: minúsculas, sin tildes, sin asterisco, sin espacios extra."""
     if not texto:
         return ''
-    return ' '.join(texto.lower().replace('*', '').split())
+    return ' '.join(_sin_acentos(texto.lower()).replace('*', '').split())
+
+
+def _clave_nombre(nombre: str) -> str:
+    """
+    Clave de match unificada Yape/Plin: primer nombre + primera letra del primer
+    apellido, normalizado. Así ambos formatos colapsan a la misma clave:
+      Yape  'Marco Per*'  -> 'marco p'
+      Plin  'MARCO PEREZ' -> 'marco p'
+      (un solo nombre)    -> 'marco'
+    """
+    norm = _normalizar_nombre(nombre)
+    if not norm:
+        return ''
+    partes = norm.split()
+    if len(partes) == 1:
+        return partes[0]
+    return f"{partes[0]} {partes[1][0]}"
 
 
 def _nombres_coinciden(nombre_pos: str, nombre_notificacion: str) -> bool:
@@ -286,23 +310,36 @@ def validar_pago_bot(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     codigo = str(request.data.get('codigo') or '').strip()
+    nombre_in = str(request.data.get('nombre') or '').strip()
     tipo = str(request.data.get('tipo') or '').upper()
 
     limite = timezone.now() - timedelta(minutes=5)
     qs = NotificacionPago.objects.filter(
         negocio=negocio, usado=False, fecha_recepcion__gte=limite, monto=monto,
-    )
+    ).order_by('-fecha_recepcion')
     if tipo in ('YAPE', 'PLIN'):
         qs = qs.filter(tipo=tipo)
-    if codigo:
+    if codigo:   # Yape: si llega el código de 3 dígitos, afina aún más (opcional).
         qs = qs.filter(codigo_seguridad=codigo)
 
-    notif = qs.order_by('-fecha_recepcion').first()
+    # Match unificado Yape/Plin por NOMBRE (primer nombre + 1ra letra del apellido):
+    # ese dato viene en ambas notificaciones. El código de 3 dígitos es opcional
+    # (solo Yape) y se aplicó arriba como filtro extra si estaba presente.
+    clave = _clave_nombre(nombre_in)
+    if clave:
+        notif = next((n for n in qs if _clave_nombre(n.nombre_cliente) == clave), None)
+    else:
+        # Sin nombre: solo aceptamos si hay UNA notificación por ese monto, para no
+        # confirmar el pago equivocado cuando hay varios del mismo importe.
+        candidatos = list(qs[:2])
+        notif = candidatos[0] if len(candidatos) == 1 else None
+
     if not notif:
         return Response({
             'validado': False,
-            'motivo': f'No encontramos un pago de S/ {monto} en los últimos 5 minutos. '
-                      f'Pide la captura de nuevo o verifica el monto exacto.',
+            'motivo': f'No encontramos un pago de S/ {monto} a nombre de '
+                      f'"{nombre_in or "—"}" en los últimos 5 minutos. '
+                      f'Verifica el monto y el nombre exactos.',
         })
 
     # Consumimos la notificación para que no se reutilice en otro pedido.
