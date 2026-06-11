@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Percent, BadgeDollarSign, ShoppingBag, X } from 'lucide-react';
 import Crm_CombosPromociones from './CRM/Crm_CombosPomociones';
 import Crm_Cumpleanos from './CRM/Crm_Cumpleaños'; // Ajusta la ruta si es necesario
@@ -13,6 +13,50 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
   
   // Selector de Sede para configurar la promo
   const [sedeActivaId, setSedeActivaId] = useState(sedesReales[0]?.id || '');
+
+  // 📒 Base de Datos (CRM) — clientes reales del negocio
+  const [clientes, setClientes] = useState([]);
+  const [cargandoClientes, setCargandoClientes] = useState(true);
+  const [busqueda, setBusqueda] = useState('');
+
+  useEffect(() => {
+    let activo = true;
+    (async () => {
+      try {
+        const res = await api.get('/clientes/');
+        if (!activo) return;
+        const lista = res.data?.results || res.data || [];
+        setClientes(Array.isArray(lista) ? lista : []);
+      } catch (e) {
+        console.error('Error cargando clientes:', e);
+      } finally {
+        if (activo) setCargandoClientes(false);
+      }
+    })();
+    return () => { activo = false; };
+  }, []);
+
+  const tiempoRelativo = (fecha) => {
+    if (!fecha) return 'Nunca';
+    const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000);
+    if (dias <= 0) return 'Hoy';
+    if (dias === 1) return 'Ayer';
+    return `Hace ${dias} días`;
+  };
+
+  const clientesFiltrados = clientes.filter(c => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return true;
+    return (c.telefono || '').toLowerCase().includes(q) ||
+           (c.nombre || '').toLowerCase().includes(q);
+  });
+
+  const abrirChat = (telefono) => {
+    const num = (telefono || '').replace(/\D/g, '');
+    if (!num) return;
+    const conPais = num.length === 9 ? `51${num}` : num;
+    window.open(`https://wa.me/${conPais}`, '_blank');
+  };
 
   // Estado para el Motor Cumpleañero (Cargado de la sede activa)
   const sedeActual = sedesReales.find(s => String(s.id) === String(sedeActivaId)) || {};
@@ -91,7 +135,7 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
             <div className="w-full min-w-0">
               <h3 className="text-2xl md:text-3xl font-black text-white mb-1">Generador de Campañas</h3>
               <p className="text-green-100 text-sm">
-                Tienes <strong className="text-white">342</strong> clientes. Lanza una promoción por WhatsApp.
+                Tienes <strong className="text-white">{cargandoClientes ? '…' : clientes.length}</strong> {clientes.length === 1 ? 'cliente' : 'clientes'}. Lanza una promoción por WhatsApp.
               </p>
             </div>
             <button className="w-full md:w-auto bg-white text-green-600 px-6 py-3 rounded-xl font-black shadow-lg shrink-0 flex items-center justify-center gap-2 hover:bg-green-50 transition-colors">
@@ -102,9 +146,15 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
           <div className={`rounded-3xl flex flex-col w-full min-w-0 relative overflow-hidden border ${isDark ? 'bg-[#111] border-[#222]' : 'bg-white border-gray-200 shadow-sm'}`}>
             <div className={`p-4 border-b flex flex-col sm:flex-row justify-between gap-3 ${isDark ? 'border-[#222]' : 'border-gray-200'}`}>
               <h4 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Directorio</h4>
-              <input type="text" placeholder="Buscar por número..." className={`w-full sm:w-64 px-4 py-2 rounded-lg outline-none focus:ring-2 text-sm ${isDark ? 'bg-[#1a1a1a] border-[#333] text-white focus:ring-[#ff5a1f]' : 'bg-gray-100 border-gray-300 text-gray-800 focus:ring-[#ff5a1f]'}`} />
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por nombre o número..."
+                className={`w-full sm:w-64 px-4 py-2 rounded-lg outline-none focus:ring-2 text-sm ${isDark ? 'bg-[#1a1a1a] border-[#333] text-white focus:ring-[#ff5a1f]' : 'bg-gray-100 border-gray-300 text-gray-800 focus:ring-[#ff5a1f]'}`}
+              />
             </div>
-            
+
             <div className="w-full overflow-x-auto min-w-0">
               <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
                 <thead className={`text-[10px] uppercase tracking-widest ${isDark ? 'bg-[#1a1a1a] text-neutral-500' : 'bg-gray-100 text-gray-500'}`}>
@@ -112,26 +162,43 @@ export default function Erp_Crm({ config, sedesReales = [], productosReales = []
                     <th className="px-5 py-4 font-black">Cliente</th>
                     <th className="px-5 py-4 font-black">WhatsApp</th>
                     <th className="px-5 py-4 font-black text-center">Visitas</th>
+                    <th className="px-5 py-4 font-black text-center">Puntos</th>
                     <th className="px-5 py-4 font-black">Última Visita</th>
                     <th className="px-5 py-4 font-black text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDark ? 'text-neutral-300 divide-[#222]' : 'text-gray-700 divide-gray-200'}`}>
-                  {[
-                    { n: 'Carlos Gutiérrez', w: '987 654 321', v: 12, u: 'Hace 2 días' },
-                    { n: 'Ana Mendoza', w: '912 345 678', v: 3, u: 'Hace 45 días' },
-                  ].map((c, i) => (
-                    <tr key={i} className={`transition-colors ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-gray-50'}`}>
-                      <td className="px-5 py-4 font-bold flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isDark ? 'bg-[#222] text-[#ff5a1f]' : 'bg-gray-200 text-gray-700'}`}>{c.n.charAt(0)}</div>
-                        <span className={isDark ? 'text-white' : 'text-gray-800'}>{c.n}</span>
-                      </td>
-                      <td className="px-5 py-4 font-mono">{c.w}</td>
-                      <td className="px-5 py-4 font-bold text-green-500 text-center">{c.v}</td>
-                      <td className="px-5 py-4 text-xs"><span className={c.u.includes('45') ? 'text-red-400 font-bold bg-red-500/10 px-2 py-1 rounded' : ''}>{c.u}</span></td>
-                      <td className="px-5 py-4 text-center"><button className="px-4 py-2 rounded-lg font-bold text-xs transition-colors bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white">Chat</button></td>
-                    </tr>
-                  ))}
+                  {cargandoClientes ? (
+                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm opacity-60">Cargando clientes…</td></tr>
+                  ) : clientesFiltrados.length === 0 ? (
+                    <tr><td colSpan={6} className="px-5 py-10 text-center text-sm opacity-60">
+                      {clientes.length === 0 ? 'Aún no hay clientes registrados. Se crean al cobrar con un número de WhatsApp.' : 'Sin resultados para tu búsqueda.'}
+                    </td></tr>
+                  ) : (
+                    clientesFiltrados.map((c) => {
+                      const nombre = c.nombre || 'Cliente';
+                      const dias = c.ultima_compra ? Math.floor((Date.now() - new Date(c.ultima_compra).getTime()) / 86400000) : null;
+                      const inactivo = dias !== null && dias >= 30;
+                      return (
+                        <tr key={c.id} className={`transition-colors ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-gray-50'}`}>
+                          <td className="px-5 py-4 font-bold flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isDark ? 'bg-[#222] text-[#ff5a1f]' : 'bg-gray-200 text-gray-700'}`}>{nombre.charAt(0).toUpperCase()}</div>
+                            <span className={isDark ? 'text-white' : 'text-gray-800'}>{nombre}</span>
+                            {Array.isArray(c.tags) && c.tags.includes('VIP') && (
+                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500">VIP</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 font-mono">{c.telefono || '—'}</td>
+                          <td className="px-5 py-4 font-bold text-green-500 text-center">{c.cantidad_pedidos ?? 0}</td>
+                          <td className="px-5 py-4 font-bold text-center">{c.puntos_acumulados ?? 0}</td>
+                          <td className="px-5 py-4 text-xs"><span className={inactivo ? 'text-red-400 font-bold bg-red-500/10 px-2 py-1 rounded' : ''}>{tiempoRelativo(c.ultima_compra)}</span></td>
+                          <td className="px-5 py-4 text-center">
+                            <button onClick={() => abrirChat(c.telefono)} className="px-4 py-2 rounded-lg font-bold text-xs transition-colors bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white">Chat</button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
