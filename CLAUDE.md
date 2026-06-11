@@ -158,6 +158,12 @@ controla que el **bot** mencione/permita **canjear** (no la acumulación).
 
 ## ⚠️ Gotchas (errores que ya costaron tiempo)
 
+0. **Web — `setConfiguracionGlobal` HACE MERGE, no replace** (`usePosStore.js`). Hay varios
+   setters parciales (`useTerminalData`, `useMesasData`, `useErpDashboard`, `View_Kds`) que
+   comparten `configuracionGlobal`. Si replacearan, el del ERP (que no traía `facturacion_emision`)
+   borraba ese campo y el POS se comportaba como `desactivado` (no salían los botones de boleta).
+   Por eso el setter hace `{...state, ...nueva}`. Al agregar un setter, incluí los campos que
+   necesitás o confiá en el merge — pero NO vuelvas a poner replace.
 1. **`PagoSuscripcion.estado` canónico es `'pagado'`** — NO `'confirmado'`. El `'confirmado'`
    pertenece al modelo `Pago` (pagos del POS) y es correcto ahí; no lo toques.
 2. **HTTPS detrás de Cloudflare/NPM:** el TLS termina en el proxy; el backend recibe HTTP.

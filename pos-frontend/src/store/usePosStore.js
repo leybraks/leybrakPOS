@@ -14,13 +14,17 @@ const usePosStore = create((set, get) => ({
     confirmacion_automatica: false,
     device_token: null,
     negocio_id: null,
+    facturacion_emision: 'desactivado',
     modulos: {
       salon: true, cocina: false, delivery: false, inventario: false,
       clientes: false, facturacion: false, cartaQr: false, botWsp: false, machineLearning: false
     }
   },
 
-  setConfiguracionGlobal: (nuevaConfig) => set({ configuracionGlobal: nuevaConfig }),
+  // Merge (no replace): así un setter parcial (p.ej. el dashboard del ERP) no borra
+  // campos que ya cargó otro (p.ej. facturacion_emision del POS). Ver gotcha facturación.
+  setConfiguracionGlobal: (nuevaConfig) =>
+    set((state) => ({ configuracionGlobal: { ...state.configuracionGlobal, ...nuevaConfig } })),
 
   // ==========================================
   // 🛒 1. ESTADO DE OPERACIÓN
