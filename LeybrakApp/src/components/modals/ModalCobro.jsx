@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import useAppStore from '../../store/useAppStore';
-import api, { emitirComprobante } from '../../api/api';
+import api, { emitirComprobante, enviarTicketWhatsapp } from '../../api/api';
 import { useYapePlinListener } from '../../hooks/useYapePlinListener';
 import ModalEmitirComprobante from './ModalEmitirComprobante';
 
@@ -57,6 +57,7 @@ export default function ModalCobro({
   const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
   const cobroComprometidoRef = useRef(false);
   const autoEmitRef = useRef(false);   // evita doble emisión en modo automático
+  const ticketEnviadoRef = useRef(false);   // evita doble envío del ticket por WhatsApp
   // Emisión inline de boleta desde la pantalla de éxito
   const [dniBoleta, setDniBoleta]         = useState('');
   const [emitiendoComp, setEmitiendoComp] = useState(false);
@@ -87,6 +88,7 @@ export default function ModalCobro({
       setComprobanteOrdenId(null);
       cobroComprometidoRef.current = false;
       autoEmitRef.current = false;
+      ticketEnviadoRef.current = false;
       setDniBoleta('');
       setEmitiendoComp(false);
       setResultadoComp(null);
@@ -224,9 +226,20 @@ export default function ModalCobro({
     }
   };
 
+  // Dispara el envío del ticket por WhatsApp (una sola vez). El backend decide
+  // si manda el PDF de la boleta o un recibo de texto, según exista comprobante.
+  const dispararTicket = async (id) => {
+    const tel = telefonoTicket.trim();
+    if (!tel || ticketEnviadoRef.current) return;
+    ticketEnviadoRef.current = true;
+    try { await enviarTicketWhatsapp(id, tel); } catch (_) { /* fire-and-forget */ }
+  };
+
   // "Cerrar" / "Finalizar sin comprobante": comitea y cierra, sin emitir.
   const cerrarCobro = async () => {
-    try { await comprometerCobro(); } catch { return; }
+    let id;
+    try { id = await comprometerCobro(); } catch { return; }
+    await dispararTicket(id);   // sin comprobante → recibo de texto
     onClose({ pagado: true });
   };
 
@@ -245,6 +258,7 @@ export default function ModalCobro({
       const receptor = dniBoleta ? { num_doc: dniBoleta } : {};
       const r = await emitirComprobante(id, { tipo: 'boleta', receptor });
       setResultadoComp(r.data);
+      dispararTicket(id);   // ya hay comprobante → manda el PDF por WhatsApp
     } catch (e) {
       setErrorComp(e?.response?.data?.error || 'No se pudo emitir la boleta.');
     } finally {
@@ -888,7 +902,11 @@ export default function ModalCobro({
 
       <ModalEmitirComprobante
         visible={mostrarComprobante}
-        onClose={() => { setMostrarComprobante(false); onClose({ pagado: true }); }}
+        onClose={() => {
+          setMostrarComprobante(false);
+          dispararTicket(comprobanteOrdenId || ordenId);   // factura emitida → PDF por WhatsApp
+          onClose({ pagado: true });
+        }}
         ordenId={comprobanteOrdenId || ordenId}
         isDark={isDark}
         color={color}

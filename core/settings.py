@@ -279,6 +279,11 @@ BOT_API_TOKEN = os.environ.get('BOT_API_TOKEN', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image-preview')
 
+# 🧾 Envío del ticket/boleta por WhatsApp al finalizar el cobro.
+# El backend dispara este webhook de n8n y n8n envía vía Evolution API
+# (así no hay que salir de la app). Si está vacío, el envío se omite sin error.
+N8N_TICKET_WEBHOOK_URL = os.environ.get('N8N_TICKET_WEBHOOK_URL', '')
+
 # settings.py
 # Reemplaza las últimas líneas de email por esto:
 EMAIL_BACKEND     = 'django.core.mail.backends.smtp.EmailBackend'

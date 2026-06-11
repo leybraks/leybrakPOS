@@ -179,6 +179,47 @@ def emitir_comprobante(request, orden_id):
     return Response(_serializar(comprobante), status=status.HTTP_201_CREATED)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def enviar_ticket_whatsapp_view(request, orden_id):
+    """
+    Envía el ticket por WhatsApp al número indicado, vía webhook de n8n.
+    Si la orden ya tiene comprobante con PDF → manda el documento; si no →
+    manda un recibo de texto del consumo. Fire-and-forget: no rompe el cobro.
+    """
+    from ..models import Orden, Comprobante
+    from ..whatsapp_ticket import enviar_ticket_whatsapp
+
+    negocio = getattr(request.user, 'negocio', None)
+    if negocio is None:
+        return Response({'error': 'Sin negocio.'}, status=status.HTTP_403_FORBIDDEN)
+
+    telefono = (request.data.get('telefono') or '').strip()
+    if not telefono:
+        return Response({'error': 'Falta el teléfono.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    orden = (Orden.objects
+             .filter(id=orden_id, sede__negocio=negocio)
+             .select_related('sede', 'sede__negocio')
+             .prefetch_related('detalles__producto')
+             .first())
+    if not orden:
+        return Response({'error': 'Orden no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    comprobante = (Comprobante.objects
+                   .filter(orden=orden, estado_sunat__in=['pendiente', 'aceptado'])
+                   .first())
+
+    enviado = enviar_ticket_whatsapp(orden, telefono, comprobante=comprobante)
+    if not enviado:
+        # No es un error de UX: puede faltar la config (instancia/webhook).
+        return Response({'enviado': False, 'motivo': 'WhatsApp no configurado o datos incompletos.'},
+                        status=status.HTTP_200_OK)
+    return Response(
+        {'enviado': True, 'tipo': 'documento' if (comprobante and comprobante.enlace_pdf) else 'texto'},
+        status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def obtener_comprobante(request, orden_id):

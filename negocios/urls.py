@@ -16,7 +16,7 @@ from negocios.views.suscripcion_views import estado_suscripcion
 from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_pago_yape, validar_pago_bot
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from negocios.views.app_version_views import app_version
-from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes
+from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes, enviar_ticket_whatsapp_view
 from negocios.views.historia_views import historias, cancelar_historia, historias_pendientes_bot, marcar_historia_bot
 from negocios.views.cliente_views import geocodificar_bot, registrar_feedback_bot, listar_canjes, stickers_view, eliminar_sticker
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
@@ -112,6 +112,7 @@ urlpatterns = [
     # ==========================================
     path('ordenes/<int:orden_id>/emitir-comprobante/', emitir_comprobante, name='emitir-comprobante'),
     path('ordenes/<int:orden_id>/comprobante/',        obtener_comprobante, name='obtener-comprobante'),
+    path('ordenes/<int:orden_id>/enviar-ticket/',      enviar_ticket_whatsapp_view, name='enviar-ticket-whatsapp'),
     path('comprobantes/',                              listar_comprobantes, name='listar-comprobantes'),
 
     # ==========================================
