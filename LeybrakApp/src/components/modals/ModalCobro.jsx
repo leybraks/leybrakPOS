@@ -56,7 +56,6 @@ export default function ModalCobro({
   const [mostrarComprobante, setMostrarComprobante] = useState(false);
   const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
   const cobroComprometidoRef = useRef(false);
-  const autoEmitRef = useRef(false);   // evita doble emisión en modo automático
   const ticketEnviadoRef = useRef(false);   // evita doble envío del ticket por WhatsApp
   // Emisión inline de boleta desde la pantalla de éxito
   const [dniBoleta, setDniBoleta]         = useState('');
@@ -87,7 +86,6 @@ export default function ModalCobro({
       setMostrarComprobante(false);
       setComprobanteOrdenId(null);
       cobroComprometidoRef.current = false;
-      autoEmitRef.current = false;
       ticketEnviadoRef.current = false;
       setDniBoleta('');
       setEmitiendoComp(false);
@@ -271,15 +269,6 @@ export default function ModalCobro({
     try { await comprometerCobro(); } catch { return; }
     setMostrarComprobante(true);
   };
-
-  // Modo AUTOMÁTICO: al llegar a la pantalla de éxito, emite la boleta sola
-  // (sin DNI). El dueño no decide nada; sólo ve el resultado y cierra.
-  useEffect(() => {
-    if (paso === 'exito' && facturacionEmision === 'automatico' && !autoEmitRef.current) {
-      autoEmitRef.current = true;
-      finalizarConBoleta();
-    }
-  }, [paso, facturacionEmision]);
 
   const metodosDisponibles = [
     { id: 'efectivo', nombre: 'Efectivo', icono: 'money',       color: '#10b981' },

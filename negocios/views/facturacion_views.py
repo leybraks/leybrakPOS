@@ -159,17 +159,19 @@ def emitir_comprobante(request, orden_id):
         comprobante.sunat_description = str(e)
         comprobante.save(update_fields=['estado_sunat', 'sunat_description'])
         logger.error('Facturación: fallo del proveedor: %s', e)
+        # 4xx (no 5xx): Cloudflare enmascara los 5xx con su propia página de error
+        # y el cajero nunca vería el motivo real. Con 400 el mensaje llega al front.
         return Response({'error': str(e), 'comprobante': _serializar(comprobante)},
-                        status=status.HTTP_502_BAD_GATEWAY)
+                        status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         # Cualquier otro error (config Nubefact incompleta, red, parseo de respuesta…)
-        # NO debe caer en un 500 mudo: devolvemos el motivo para que el cajero lo vea.
+        # NO debe caer en un 500/502 mudo: devolvemos el motivo para que el cajero lo vea.
         comprobante.estado_sunat = 'rechazado'
         comprobante.sunat_description = f'Error inesperado: {e}'
         comprobante.save(update_fields=['estado_sunat', 'sunat_description'])
         logger.error('Facturación: error inesperado al emitir: %s', e, exc_info=True)
         return Response({'error': f'No se pudo emitir: {e}', 'comprobante': _serializar(comprobante)},
-                        status=status.HTTP_502_BAD_GATEWAY)
+                        status=status.HTTP_400_BAD_REQUEST)
 
     comprobante.estado_sunat = res['estado_sunat']
     comprobante.aceptado_por_sunat = res['aceptado']

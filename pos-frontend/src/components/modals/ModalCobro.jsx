@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import usePosStore from '../../store/usePosStore';
 import { useToast } from '../../context/ToastContext';
-import api, { enviarTicketWhatsapp } from '../../api/api';
+import api, { enviarTicketWhatsapp, emitirComprobante } from '../../api/api';
 import { usePagosWS } from '../../features/POS/hooks/usePagosWS';
 import ModalEmitirComprobante from './ModalEmitirComprobante';
 import {
   X, Banknote, Smartphone, CreditCard, CheckCircle2,
-  Users, Receipt, MessageCircle, ArrowLeft, Loader2, FileText
+  Users, Receipt, MessageCircle, ArrowLeft, Loader2, FileText, Download, Building2
 } from 'lucide-react';
 
 export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExitoso, carrito = [], esVentaRapida = false, ordenId = null }) {
@@ -36,6 +36,11 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const [itemsSeleccionados, setItemsSeleccionados] = useState({});
   const [pagosAcumulados, setPagosAcumulados]       = useState([]);
   const [telefonoTicket, setTelefonoTicket]         = useState('');
+  // Emisión inline del comprobante (boleta) en la pantalla de éxito
+  const [dniBoleta, setDniBoleta]                   = useState('');
+  const [emitiendoComp, setEmitiendoComp]           = useState(false);
+  const [resultadoComp, setResultadoComp]           = useState(null);
+  const [errorComp, setErrorComp]                   = useState(null);
 
   // ─── Estados Yape / Plin automático ──────────────────────────
   const [notificaciones, setNotificaciones]           = useState([]);
@@ -92,6 +97,10 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       setComprobanteOrdenId(null);
       cobroComprometidoRef.current = false;
       ticketEnviadoRef.current = false;
+      setDniBoleta('');
+      setEmitiendoComp(false);
+      setResultadoComp(null);
+      setErrorComp(null);
       if (esperaTimeoutRef.current) clearTimeout(esperaTimeoutRef.current);
     }
     return () => {
@@ -239,17 +248,40 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     try { await enviarTicketWhatsapp(id, tel); } catch (_) { /* fire-and-forget */ }
   };
 
-  // "Finalizar": comitea y, si hay facturación activa, abre el comprobante.
-  // (El cierre del modal de cobro ocurre al cerrar el comprobante.)
+  // "Finalizar" (modo desactivado): comitea, manda ticket de texto y cierra.
   const finalizarCobro = async () => {
     let id;
     try { id = await comprometerCobro(); } catch { return; }   // si falla, no cierra
-    if (facturacionEmision !== 'desactivado') {
-      setMostrarComprobante(true);   // el ticket (PDF) se envía al cerrar el comprobante
-    } else {
-      await dispararTicket(id);      // sin comprobante → recibo de texto
-      onClose({ pagado: true });
+    await dispararTicket(id);      // sin comprobante → recibo de texto
+    onClose({ pagado: true });
+  };
+
+  // "Finalizar y emitir boleta": comitea, emite la boleta inline (DNI opcional),
+  // muestra el resultado en el mismo modal y manda el PDF por WhatsApp.
+  const finalizarConBoleta = async () => {
+    if (dniBoleta && dniBoleta.length !== 8) {
+      setErrorComp('El DNI debe tener 8 dígitos (o déjalo vacío).');
+      return;
     }
+    let id;
+    try { id = await comprometerCobro(); } catch { return; }
+    setErrorComp(null); setEmitiendoComp(true);
+    try {
+      const receptor = dniBoleta ? { num_doc: dniBoleta } : {};
+      const r = await emitirComprobante(id, { tipo: 'boleta', receptor });
+      setResultadoComp(r.data);
+      dispararTicket(id);   // ya hay comprobante → manda el PDF por WhatsApp
+    } catch (e) {
+      setErrorComp(e?.response?.data?.error || 'No se pudo emitir la boleta.');
+    } finally {
+      setEmitiendoComp(false);
+    }
+  };
+
+  // "¿Factura con RUC?": comitea y abre el modal completo (RUC + razón social).
+  const abrirFactura = async () => {
+    try { await comprometerCobro(); } catch { return; }
+    setMostrarComprobante(true);
   };
 
   // "Cerrar" / "Finalizar sin comprobante": comitea y cierra, sin emitir.
@@ -643,7 +675,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     return (
       <>
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
+        <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-y-auto max-h-[95vh] ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
           <div className="p-8 text-center">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500 mb-6 shadow-lg shadow-green-500/50">
               <CheckCircle2 size={40} className="text-white" strokeWidth={3} />
@@ -670,6 +702,16 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               )}
             </div>
 
+            {/* Banner: comprobante emitido */}
+            {resultadoComp && (
+              <div className={`p-4 rounded-2xl mb-6 flex items-center gap-3 ${isDark ? 'bg-green-500/10' : 'bg-green-50'}`}>
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
+                <span className={`text-sm font-bold text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {resultadoComp.tipo === 'factura' ? 'Factura' : 'Boleta'} {resultadoComp.serie}-{resultadoComp.numero} emitida
+                </span>
+              </div>
+            )}
+
             {/* Ticket WhatsApp */}
             <div className={`p-6 rounded-2xl mb-6 ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}>
               <div className="flex items-center gap-3 mb-4">
@@ -689,17 +731,71 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
               </div>
             </div>
 
+            {/* DNI opcional (boleta) — solo si hay facturación y antes de emitir */}
+            {facturacionEmision !== 'desactivado' && !resultadoComp && (
+              <div className={`p-6 rounded-2xl mb-6 ${isDark ? 'bg-[#111]' : 'bg-gray-50'}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                    <FileText size={20} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>DNI del cliente</p>
+                    <p className={`text-xs ${isDark ? 'text-neutral-500' : 'text-gray-500'}`}>Para la boleta (opcional)</p>
+                  </div>
+                </div>
+                <div className={`flex items-center gap-2 p-3 rounded-xl border ${isDark ? 'bg-[#0a0a0a] border-[#1a1a1a]' : 'bg-white border-gray-200'}`}>
+                  <input type="tel" maxLength={8} value={dniBoleta}
+                    onChange={(e) => setDniBoleta(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Sin DNI = consumidor varios"
+                    className={`flex-1 bg-transparent font-bold focus:outline-none ${isDark ? 'text-white placeholder:text-neutral-700' : 'text-gray-900 placeholder:text-gray-300'}`} />
+                </div>
+              </div>
+            )}
+
+            {/* Error de emisión */}
+            {errorComp && !resultadoComp && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 text-red-500 text-sm font-bold text-left">{errorComp}</div>
+            )}
+
             <div className="space-y-3">
-              <button onClick={finalizarCobro} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: colorPrimario }}>
-                {facturacionEmision !== 'desactivado'
-                  ? <><FileText size={16} /> Finalizar y emitir comprobante</>
-                  : (telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar')}
-              </button>
-              {/* En automático toda venta se factura: no hay salida "sin comprobante". */}
-              {facturacionEmision !== 'automatico' && (
-                <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
-                  {facturacionEmision !== 'desactivado' ? 'Finalizar sin comprobante' : 'Cerrar'}
-                </button>
+              {resultadoComp ? (
+                <>
+                  {resultadoComp.enlace_pdf && (
+                    <a href={resultadoComp.enlace_pdf} target="_blank" rel="noreferrer"
+                      className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: colorPrimario }}>
+                      <Download size={16} /> Ver / Descargar PDF
+                    </a>
+                  )}
+                  <button onClick={() => onClose({ pagado: true })} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                    Cerrar
+                  </button>
+                </>
+              ) : facturacionEmision === 'desactivado' ? (
+                <>
+                  <button onClick={finalizarCobro} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ backgroundColor: colorPrimario }}>
+                    {telefonoTicket ? 'Enviar Ticket y Finalizar' : 'Finalizar'}
+                  </button>
+                  <button onClick={cerrarCobro} className={`w-full py-3 rounded-xl font-bold text-sm ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                    Cerrar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={finalizarConBoleta} disabled={emitiendoComp}
+                    className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60" style={{ backgroundColor: colorPrimario }}>
+                    {emitiendoComp ? <Loader2 size={18} className="animate-spin" /> : <><FileText size={16} /> Finalizar y emitir boleta</>}
+                  </button>
+                  <button onClick={abrirFactura} disabled={emitiendoComp}
+                    className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${isDark ? 'bg-[#111] text-neutral-400' : 'bg-gray-100 text-gray-600'}`}>
+                    <Building2 size={14} /> ¿Necesita factura con RUC?
+                  </button>
+                  {/* "Finalizar sin comprobante": siempre en opcional; en automático solo si la emisión falló. */}
+                  {(facturacionEmision === 'opcional' || !!errorComp) && (
+                    <button onClick={cerrarCobro} disabled={emitiendoComp} className={`w-full py-2.5 rounded-xl font-bold text-xs ${isDark ? 'text-neutral-500' : 'text-gray-400'}`}>
+                      Finalizar sin comprobante
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
