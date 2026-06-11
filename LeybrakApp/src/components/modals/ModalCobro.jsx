@@ -56,6 +56,7 @@ export default function ModalCobro({
   const [mostrarComprobante, setMostrarComprobante] = useState(false);
   const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
   const cobroComprometidoRef = useRef(false);
+  const autoEmitRef = useRef(false);   // evita doble emisión en modo automático
   // Emisión inline de boleta desde la pantalla de éxito
   const [dniBoleta, setDniBoleta]         = useState('');
   const [emitiendoComp, setEmitiendoComp] = useState(false);
@@ -85,6 +86,7 @@ export default function ModalCobro({
       setMostrarComprobante(false);
       setComprobanteOrdenId(null);
       cobroComprometidoRef.current = false;
+      autoEmitRef.current = false;
       setDniBoleta('');
       setEmitiendoComp(false);
       setResultadoComp(null);
@@ -255,6 +257,15 @@ export default function ModalCobro({
     try { await comprometerCobro(); } catch { return; }
     setMostrarComprobante(true);
   };
+
+  // Modo AUTOMÁTICO: al llegar a la pantalla de éxito, emite la boleta sola
+  // (sin DNI). El dueño no decide nada; sólo ve el resultado y cierra.
+  useEffect(() => {
+    if (paso === 'exito' && facturacionEmision === 'automatico' && !autoEmitRef.current) {
+      autoEmitRef.current = true;
+      finalizarConBoleta();
+    }
+  }, [paso, facturacionEmision]);
 
   const metodosDisponibles = [
     { id: 'efectivo', nombre: 'Efectivo', icono: 'money',       color: '#10b981' },
@@ -833,7 +844,9 @@ export default function ModalCobro({
               <Text style={[s.btnManualText, { color: t.textSec }]}>¿Necesita factura con RUC?</Text>
             </TouchableOpacity>
 
-            {facturacionEmision === 'opcional' && (
+            {/* "Finalizar sin comprobante": siempre en opcional; en automático
+                solo como escape si la emisión falló (SUNAT/Nubefact caído). */}
+            {(facturacionEmision === 'opcional' || !!errorComp) && (
               <TouchableOpacity
                 style={[s.btnManual, { backgroundColor: 'transparent' }]}
                 onPress={cerrarCobro}

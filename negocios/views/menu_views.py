@@ -1,12 +1,18 @@
 import logging
 import os
+import io
+import base64
+import requests
+from PIL import Image, ImageEnhance, ImageOps
+from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .helpers import es_valor_nulo, get_empleado_desde_header
 from ..models import (
     ComponenteCombo, Mesa, Producto, Categoria, GrupoVariacion, OpcionVariacion,
@@ -20,6 +26,70 @@ from ..serializers import (
 from ..permissions import EsDuenioOsoloLectura
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# 🎨 MEJORA DE FOTOS DE PRODUCTOS (realce Pillow + IA Gemini)
+# ============================================================
+
+def _realce_pillow(data: bytes) -> bytes:
+    """
+    Realce determinístico (sin IA, sin costo): autocontraste + más color,
+    contraste, brillo y nitidez para que la comida se vea más apetitosa.
+    Devuelve JPEG en bytes. No inventa ni cambia el plato.
+    """
+    img = Image.open(io.BytesIO(data)).convert('RGB')
+    img = ImageOps.exif_transpose(img)          # respeta la orientación de la cámara
+    img = ImageOps.autocontrast(img, cutoff=1)  # estira el histograma
+    img = ImageEnhance.Color(img).enhance(1.22)
+    img = ImageEnhance.Contrast(img).enhance(1.10)
+    img = ImageEnhance.Brightness(img).enhance(1.04)
+    img = ImageEnhance.Sharpness(img).enhance(1.4)
+    out = io.BytesIO()
+    img.save(out, format='JPEG', quality=88, optimize=True)
+    return out.getvalue()
+
+
+def _mejorar_gemini(data: bytes):
+    """
+    Mejora generativa con Gemini ('Nano Banana'). Devuelve (bytes, None) si OK,
+    o (None, mensaje_error) si falta la API key o la IA no devolvió imagen.
+    """
+    key = getattr(settings, 'GEMINI_API_KEY', '')
+    if not key:
+        return None, 'La mejora con IA no está configurada (falta GEMINI_API_KEY en el servidor).'
+    model = getattr(settings, 'GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image-preview')
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
+    body = {
+        'contents': [{'parts': [
+            {'text': (
+                'Edita esta foto de comida para un menú profesional: mejora la iluminación, '
+                'el color, la nitidez y el fondo para que se vea muy apetitosa y de alta calidad. '
+                'NO agregues ni quites ingredientes, NO cambies el plato ni inventes elementos; '
+                'mantén exactamente la misma comida.'
+            )},
+            {'inline_data': {'mime_type': 'image/jpeg', 'data': base64.b64encode(data).decode()}},
+        ]}],
+        'generationConfig': {'responseModalities': ['IMAGE']},
+    }
+    try:
+        r = requests.post(url, json=body, timeout=90)
+        j = r.json()
+    except requests.RequestException as e:
+        logger.error('Error de red llamando a Gemini: %s', e)
+        return None, 'No se pudo contactar a la IA. Intenta de nuevo.'
+    except ValueError:
+        return None, 'La IA devolvió una respuesta inválida.'
+    try:
+        for part in j['candidates'][0]['content']['parts']:
+            inline = part.get('inline_data') or part.get('inlineData')
+            if inline and inline.get('data'):
+                return base64.b64decode(inline['data']), None
+    except (KeyError, IndexError, TypeError):
+        pass
+    msg = (j.get('error') or {}).get('message') or 'La IA no devolvió ninguna imagen.'
+    logger.warning('Gemini no devolvió imagen: %s', msg)
+    return None, msg
 
 
 # ============================================================
@@ -193,7 +263,71 @@ class ProductoViewSet(viewsets.ModelViewSet):
         # Devolvemos la URL absoluta para que React la pinte al instante
         url = request.build_absolute_uri(producto.imagen.url)
         return Response({'ok': True, 'url': url})
-    
+
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='mejorar_imagen',
+        parser_classes=[MultiPartParser, FormParser, JSONParser],
+    )
+    def mejorar_imagen(self, request, pk=None):
+        """
+        Genera una versión MEJORADA de la foto del producto y la devuelve como
+        preview (data URL base64) SIN guardarla todavía. El dueño confirma con
+        'aplicar_imagen'. Si manda 'imagen' (archivo) usa esa; si no, la actual.
+        modo: 'realce' (Pillow, gratis) | 'ia' (Gemini generativo).
+        """
+        producto = self.get_object()
+        modo = (request.data.get('modo') or 'realce').lower()
+
+        archivo = request.FILES.get('imagen')
+        if archivo:
+            data = archivo.read()
+        elif producto.imagen:
+            producto.imagen.open('rb')
+            data = producto.imagen.read()
+            producto.imagen.close()
+        else:
+            return Response({'error': 'No hay imagen para mejorar. Sube una foto primero.'}, status=400)
+
+        if modo == 'ia':
+            mejorada, err = _mejorar_gemini(data)
+            if err:
+                return Response({'error': err}, status=400)
+        else:
+            try:
+                mejorada = _realce_pillow(data)
+            except Exception:
+                logger.error('Error en realce Pillow para producto %s', producto.pk, exc_info=True)
+                return Response({'error': 'No se pudo procesar la imagen.'}, status=400)
+
+        preview = 'data:image/jpeg;base64,' + base64.b64encode(mejorada).decode()
+        return Response({'preview': preview, 'modo': modo})
+
+    @action(detail=True, methods=['post'], url_path='aplicar_imagen')
+    def aplicar_imagen(self, request, pk=None):
+        """
+        Guarda definitivamente una imagen (la mejorada) que viene en base64.
+        Reemplaza la foto actual del producto.
+        """
+        producto = self.get_object()
+        b64 = request.data.get('imagen_base64') or ''
+        if ',' in b64:
+            b64 = b64.split(',', 1)[1]
+        try:
+            data = base64.b64decode(b64)
+        except (ValueError, TypeError):
+            return Response({'error': 'Imagen inválida.'}, status=400)
+        if not data:
+            return Response({'error': 'Imagen vacía.'}, status=400)
+
+        if producto.imagen:
+            producto.imagen.delete(save=False)
+        producto.imagen.save(f'producto_{producto.id}_ia.jpg', ContentFile(data), save=True)
+
+        url = request.build_absolute_uri(producto.imagen.url)
+        return Response({'ok': True, 'url': url})
+
     @action(detail=True, methods=['post'], url_path='actualizar_items_combo')
     @transaction.atomic
     def actualizar_items_combo(self, request, pk=None):
