@@ -161,6 +161,15 @@ def emitir_comprobante(request, orden_id):
         logger.error('Facturación: fallo del proveedor: %s', e)
         return Response({'error': str(e), 'comprobante': _serializar(comprobante)},
                         status=status.HTTP_502_BAD_GATEWAY)
+    except Exception as e:
+        # Cualquier otro error (config Nubefact incompleta, red, parseo de respuesta…)
+        # NO debe caer en un 500 mudo: devolvemos el motivo para que el cajero lo vea.
+        comprobante.estado_sunat = 'rechazado'
+        comprobante.sunat_description = f'Error inesperado: {e}'
+        comprobante.save(update_fields=['estado_sunat', 'sunat_description'])
+        logger.error('Facturación: error inesperado al emitir: %s', e, exc_info=True)
+        return Response({'error': f'No se pudo emitir: {e}', 'comprobante': _serializar(comprobante)},
+                        status=status.HTTP_502_BAD_GATEWAY)
 
     comprobante.estado_sunat = res['estado_sunat']
     comprobante.aceptado_por_sunat = res['aceptado']
