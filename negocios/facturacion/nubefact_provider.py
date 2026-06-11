@@ -24,6 +24,11 @@ class NubefactProvider(FacturacionProvider):
     def emitir(self, payload):
         if not self.ruta or not self.token:
             raise FacturacionProviderError('Faltan credenciales de Nubefact (ruta/token).')
+        if not str(self.ruta).startswith(('http://', 'https://')):
+            raise FacturacionProviderError(
+                f'La URL (ruta) de Nubefact no es válida: "{self.ruta}". '
+                'Corrígela en ERP → Facturación; debe empezar con https:// '
+                '(o deja la ruta vacía para usar las credenciales demo).')
 
         headers = {
             'Authorization': f'Token token="{self.token}"',
