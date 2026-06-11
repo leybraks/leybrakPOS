@@ -28,6 +28,66 @@ from django.db.models import Sum, Count
 logger = logging.getLogger(__name__)
 
 
+def _normalizar_telefono(telefono):
+    """Deja solo dígitos. '932 264 014' → '932264014', '+51 932...' → '51932...'."""
+    return ''.join(ch for ch in (telefono or '') if ch.isdigit())
+
+
+def _buscar_o_crear_cliente(negocio, telefono, nombre=None):
+    """
+    Busca el cliente del negocio por los últimos 9 dígitos del teléfono (igual que
+    el bot), para que POS y WhatsApp compartan el MISMO registro y los puntos no se
+    repartan entre duplicados. Si no existe, lo crea. Devuelve (cliente, creado) o
+    (None, False) si el teléfono es inválido.
+    """
+    from ..models import Cliente
+    limpio = _normalizar_telefono(telefono)
+    if len(limpio) < 9:
+        return None, False
+    sufijo = limpio[-9:]
+    cliente = Cliente.objects.filter(negocio=negocio, telefono__icontains=sufijo).first()
+    if cliente:
+        return cliente, False
+    cliente = Cliente.objects.create(negocio=negocio, telefono=limpio, nombre=nombre or 'Cliente POS')
+    return cliente, True
+
+
+def acreditar_compra_cliente(orden):
+    """
+    Registra la compra en el CRM y acredita puntos al cliente. SIEMPRE corre
+    (crear cliente y sumar puntos no dependen de `puntos_activo`; ese flag solo
+    controla que el bot mencione/permita canjear). Idempotente vía
+    `orden.puntos_otorgados`, así no acredita dos veces aunque la orden pase por
+    varias vías (POS, Yape, bot). No-op si no hay teléfono válido.
+    """
+    if getattr(orden, 'puntos_otorgados', False):
+        return
+    negocio = orden.sede.negocio
+    cliente, _creado = _buscar_o_crear_cliente(negocio, orden.cliente_telefono, orden.cliente_nombre)
+    if cliente is None:
+        return
+
+    creado = _creado
+    cliente.cantidad_pedidos += 1
+    cliente.total_gastado = Decimal(str(cliente.total_gastado)) + Decimal(str(orden.total))
+    cliente.ultima_compra = timezone.now()
+    # Puntos: siempre se acumulan (puntos_por_sol default = 1).
+    cliente.puntos_acumulados += int(Decimal(str(orden.total)) * negocio.puntos_por_sol)
+
+    tags = cliente.tags if isinstance(cliente.tags, list) else []
+    if cliente.total_gastado >= Decimal('500.00') and 'VIP' not in tags:
+        tags.append('VIP')
+    if creado and 'Nuevo' not in tags:
+        tags.append('Nuevo')
+    elif not creado and 'Nuevo' in tags:
+        tags.remove('Nuevo')
+    cliente.tags = tags
+    cliente.save()
+
+    orden.puntos_otorgados = True
+    orden.save(update_fields=['puntos_otorgados', 'cliente_telefono'])
+
+
 def _calcular_descuento_puntos(negocio, cliente, puntos_solicitados):
     """
     Valida un canje de puntos. Devuelve (puntos_a_usar, descuento_soles, error).
@@ -223,6 +283,9 @@ class OrdenViewSet(viewsets.ModelViewSet):
                     orden.total = max(orden.total - desc_p, Decimal('0.00'))
 
             orden.save()
+
+            # CRM + puntos por la compra del bot (mismo helper idempotente que el POS).
+            acreditar_compra_cliente(orden)
 
         orden_data = self.get_serializer(orden).data
         channel_layer = get_channel_layer()
@@ -615,37 +678,13 @@ class OrdenViewSet(viewsets.ModelViewSet):
                         .aggregate(Sum('monto'))['monto__sum'] or Decimal('0.00')
                     )
 
-                # ── CRM — siempre se ejecuta ───────────────────────────
-                if orden.sede.negocio.mod_clientes_activo:
-                    if telefono_crm and len(telefono_crm) >= 9:
-                        orden.cliente_telefono = telefono_crm
-
-                        cliente, creado = Cliente.objects.get_or_create(
-                            negocio=orden.sede.negocio,
-                            telefono=telefono_crm,
-                            defaults={'nombre': orden.cliente_nombre or 'Cliente POS'}
-                        )
-
-                        cliente.cantidad_pedidos += 1
-                        cliente.total_gastado    = Decimal(str(cliente.total_gastado)) + Decimal(str(orden.total))
-                        cliente.ultima_compra    = timezone.now()
-
-                        # Puntos: gana según la config del programa (puntos por sol), solo si está activo.
-                        if orden.sede.negocio.puntos_activo:
-                            puntos_ganados = int(Decimal(str(orden.total)) * orden.sede.negocio.puntos_por_sol)
-                            cliente.puntos_acumulados += puntos_ganados
-
-                        tags_actuales = cliente.tags if isinstance(cliente.tags, list) else []
-
-                        if cliente.total_gastado >= Decimal('500.00') and 'VIP' not in tags_actuales:
-                            tags_actuales.append('VIP')
-                        if creado and 'Nuevo' not in tags_actuales:
-                            tags_actuales.append('Nuevo')
-                        elif not creado and 'Nuevo' in tags_actuales:
-                            tags_actuales.remove('Nuevo')
-
-                        cliente.tags = tags_actuales
-                        cliente.save()
+                # ── CRM + puntos — SIEMPRE se ejecuta (no depende de
+                #    mod_clientes_activo ni de puntos_activo; ese flag solo controla
+                #    que el bot mencione/permita canjear). ────────────────────────
+                telefono_norm = _normalizar_telefono(telefono_crm)
+                if len(telefono_norm) >= 9:
+                    orden.cliente_telefono = telefono_norm
+                acreditar_compra_cliente(orden)
 
                 orden.save()
 
