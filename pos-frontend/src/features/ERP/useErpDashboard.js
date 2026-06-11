@@ -264,6 +264,7 @@ export const useErpDashboard = () => {
           confirmacion_automatica: configData.confirmacion_automatica,
           device_token:            configData.device_token,
           negocio_id:              configData.negocio_id,
+          facturacion_emision:     datosBD.facturacion_emision || 'desactivado',
           modulos: {
             salon:           configData.modSalon,
             cocina:          configData.modCocina      && (plan.modulo_kds        ?? false),
