@@ -74,6 +74,10 @@ de consumo por WhatsApp, sin valor legal) es **otra cosa** y ya existía aparte.
 - **Frontend web:** config en `Erp_TabFacturacion.jsx`, emisión en `ModalEmitirComprobante.jsx`
   (se dispara al **Finalizar** el cobro, no antes). **Móvil:** mismo flujo en
   `LeybrakApp/src/components/modals/ModalEmitirComprobante.jsx` + integración en `ModalCobro.jsx`.
+- **Móvil — modo `automatico`:** al llegar a la pantalla de éxito, `ModalCobro.jsx` emite la
+  boleta sola (sin DNI) vía `useEffect` + `autoEmitRef` (evita doble emisión); si la emisión falla
+  (Nubefact/SUNAT caído) aparece "Finalizar sin comprobante" como escape. Sin esto, `automatico`
+  se veía igual que `opcional`.
 - **Tests:** `negocios/test_facturacion.py` (10 tests).
 - **Reglas IGV (SUNAT):** los precios **incluyen** IGV 18%. El IGV se calcula `base × 0.18`
   (NO por resta), cada ítem lleva su `subtotal` (base sin IGV). El redondeo por línea genera
@@ -100,6 +104,43 @@ al webhook de n8n y n8n arma el prompt del LLM consultando `GET /api/negocios/in
   3. `POST /api/bot/historias-marcar/` con `{id, resultado:'publicada'|'error', error?}`.
   Endpoints en `negocios/views/historia_views.py`. CRUD web: `GET/POST /api/historias/` (multipart)
   y `POST /api/historias/<id>/cancelar/`.
+
+## Mejora de fotos de productos con IA — implementado
+
+Botón **"Mejorar con IA"** en cada foto de plato para que se vea más apetitosa. **Dos modos**:
+realce determinístico (Pillow, gratis) y generativo (Gemini, requiere key).
+
+- **Endpoints** (`ProductoViewSet` en `negocios/views/menu_views.py`, se enrutan solos por el router):
+  - `POST /api/productos/<id>/mejorar_imagen/` (`modo: realce|ia`) → devuelve un **preview base64
+    sin guardar**. `realce` = `_realce_pillow` (autocontraste + color/contraste/brillo/nitidez).
+    `ia` = `_mejorar_gemini` (REST `generateContent`, el prompt prohíbe agregar/quitar ingredientes).
+  - `POST /api/productos/<id>/aplicar_imagen/` (`imagen_base64`) → guarda definitivo (borra la anterior).
+- **Frontend web:** ERP → Carta QR → pestaña **"Fotos Platos"** (`DashboardCartaQR/VistaEditor.jsx`):
+  botón "Mejorar con IA" + modal con comparación Antes/Después y confirmación ("Usar esta foto").
+- **Config:** `GEMINI_API_KEY` (vacío → solo funciona el realce; el modo IA da error claro) y
+  `GEMINI_IMAGE_MODEL` (default `gemini-2.5-flash-image-preview`, el "Nano Banana"). Pillow ya está
+  instalado. **Solo en la web** (la config pesada de carta vive en web).
+
+## Ticket/boleta por WhatsApp al cobrar — implementado
+
+Al **finalizar** el cobro, el campo "Ticket Digital" (teléfono) ahora **envía el comprobante por
+WhatsApp sin salir de la app**, en vez de abrir el chat. Móvil **y** web.
+
+- **Arquitectura:** el backend NO llama a Evolution directo: **dispara un webhook de n8n**
+  (`N8N_TICKET_WEBHOOK_URL`) y n8n hace el envío vía Evolution API.
+- **Helper:** `negocios/whatsapp_ticket.py` → `enviar_ticket_whatsapp(orden, telefono, comprobante)`.
+  Normaliza el teléfono (9 díg. → `51…`), resuelve la `whatsapp_instancia` de la sede, arma el
+  payload y hace POST fire-and-forget (header `X-Bot-Token`). Si está vacío el webhook, se omite sin error.
+- **Endpoint:** `POST /api/ordenes/<id>/enviar-ticket/` (`{telefono}`) en `facturacion_views.py`.
+  **Decide solo** PDF vs texto: si la orden ya tiene `Comprobante` con `enlace_pdf` → manda el
+  documento; si no → recibo de **texto** del consumo.
+- **Frontend:** `ModalCobro.jsx` (web y móvil) llama `enviarTicketWhatsapp(ordenId, telefono)` una
+  sola vez (`ticketEnviadoRef`): en cerrar/finalizar-sin-comprobante → texto; tras emitir boleta/
+  factura → PDF.
+- **Contrato del webhook (n8n):** recibe `{instancia, telefono, negocio, orden_id, tipo}` + (`tipo:
+  documento` → `pdf_url, nombre_archivo, caption`) o (`tipo: texto` → `texto`). n8n: documento →
+  `POST {EVO_API_URL}/message/sendMedia/{instancia}` (mediatype `document`); texto →
+  `…/message/sendText/{instancia}`. **n8n debe wirearse a mano** (Webhook + switch por `tipo`).
 
 ## ⚠️ Gotchas (errores que ya costaron tiempo)
 
@@ -177,6 +218,11 @@ NUBEFACT_DEMO_RUTA   # URL de la cuenta Nubefact (demo o prod)
 NUBEFACT_DEMO_TOKEN  # token Nubefact (si el negocio no tiene los suyos en BD)
 # WhatsApp / SUNAT (consultas RUC/DNI vía decolecta/apis.net.pe)
 EVO_API_URL, EVO_GLOBAL_KEY, APIS_NET_PE_TOKEN
+# Ticket/boleta por WhatsApp al cobrar (backend → webhook n8n → Evolution)
+N8N_TICKET_WEBHOOK_URL   # vacío → el envío se omite sin error
+# Mejorar fotos de productos con IA (opcional; vacío → solo realce Pillow)
+GEMINI_API_KEY
+GEMINI_IMAGE_MODEL       # default: gemini-2.5-flash-image-preview
 ```
 
 ## Comandos
