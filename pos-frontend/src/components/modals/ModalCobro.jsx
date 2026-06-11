@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import usePosStore from '../../store/usePosStore';
 import { useToast } from '../../context/ToastContext';
-import api from '../../api/api';
+import api, { enviarTicketWhatsapp } from '../../api/api';
 import { usePagosWS } from '../../features/POS/hooks/usePagosWS';
 import ModalEmitirComprobante from './ModalEmitirComprobante';
 import {
@@ -26,6 +26,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
   const [mostrarComprobante, setMostrarComprobante] = useState(false);
   const [comprobanteOrdenId, setComprobanteOrdenId] = useState(null);
   const cobroComprometidoRef = useRef(false);
+  const ticketEnviadoRef = useRef(false);   // evita doble envío del ticket por WhatsApp
   // ─── Estados principales ─────────────────────────────────────
   const [paso, setPaso]                             = useState('cobro');
   const [tab, setTab]                               = useState('completo');
@@ -90,6 +91,7 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
       setMostrarComprobante(false);
       setComprobanteOrdenId(null);
       cobroComprometidoRef.current = false;
+      ticketEnviadoRef.current = false;
       if (esperaTimeoutRef.current) clearTimeout(esperaTimeoutRef.current);
     }
     return () => {
@@ -228,20 +230,33 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
     }
   };
 
+  // Dispara el envío del ticket por WhatsApp (una sola vez). El backend decide
+  // si manda el PDF de la boleta o un recibo de texto, según exista comprobante.
+  const dispararTicket = async (id) => {
+    const tel = (telefonoTicket || '').trim();
+    if (!tel || !id || ticketEnviadoRef.current) return;
+    ticketEnviadoRef.current = true;
+    try { await enviarTicketWhatsapp(id, tel); } catch (_) { /* fire-and-forget */ }
+  };
+
   // "Finalizar": comitea y, si hay facturación activa, abre el comprobante.
   // (El cierre del modal de cobro ocurre al cerrar el comprobante.)
   const finalizarCobro = async () => {
-    try { await comprometerCobro(); } catch { return; }   // si falla, no cierra
+    let id;
+    try { id = await comprometerCobro(); } catch { return; }   // si falla, no cierra
     if (facturacionEmision !== 'desactivado') {
-      setMostrarComprobante(true);
+      setMostrarComprobante(true);   // el ticket (PDF) se envía al cerrar el comprobante
     } else {
+      await dispararTicket(id);      // sin comprobante → recibo de texto
       onClose({ pagado: true });
     }
   };
 
-  // "Cerrar": comitea y cierra, sin comprobante.
+  // "Cerrar" / "Finalizar sin comprobante": comitea y cierra, sin emitir.
   const cerrarCobro = async () => {
-    try { await comprometerCobro(); } catch { return; }
+    let id;
+    try { id = await comprometerCobro(); } catch { return; }
+    await dispararTicket(id);   // sin comprobante → recibo de texto
     onClose({ pagado: true });
   };
 
@@ -693,7 +708,11 @@ export default function ModalCobroMejorado({ isOpen, onClose, total, onCobroExit
 
       <ModalEmitirComprobante
         isOpen={mostrarComprobante}
-        onClose={() => { setMostrarComprobante(false); onClose({ pagado: true }); }}
+        onClose={() => {
+          setMostrarComprobante(false);
+          dispararTicket(comprobanteOrdenId || ordenId);   // comprobante emitido → PDF por WhatsApp
+          onClose({ pagado: true });
+        }}
         ordenId={comprobanteOrdenId || ordenId}
         isDark={isDark}
         colorPrimario={colorPrimario}
