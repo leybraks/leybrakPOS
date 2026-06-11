@@ -142,6 +142,20 @@ WhatsApp sin salir de la app**, en vez de abrir el chat. Móvil **y** web.
   `POST {EVO_API_URL}/message/sendMedia/{instancia}` (mediatype `document`); texto →
   `…/message/sendText/{instancia}`. **n8n debe wirearse a mano** (Webhook + switch por `tipo`).
 
+## CRM + puntos — siempre activos
+
+Crear/actualizar el cliente y **acumular puntos** ocurre **SIEMPRE** en toda venta con teléfono
+(POS y bot), sin importar `mod_clientes_activo` ni `puntos_activo`. El flag `puntos_activo` solo
+controla que el **bot** mencione/permita **canjear** (no la acumulación).
+
+- **Helper único** `acreditar_compra_cliente(orden)` en `negocios/views/orden_views.py`:
+  idempotente vía `Orden.puntos_otorgados` (mig. `0077`), así no acredita dos veces aunque la
+  orden pase por varias vías. Llamado en `cobrar_orden` (POS) y `perform_create` (bot).
+- **Matcheo de cliente** unificado por los **últimos 9 dígitos** (`_buscar_o_crear_cliente` +
+  `_normalizar_telefono`) — POS y bot comparten el mismo registro; antes el POS hacía
+  `get_or_create` con match exacto y duplicaba clientes (puntos repartidos). Los duplicados
+  **previos** en BD no se fusionan solos.
+
 ## ⚠️ Gotchas (errores que ya costaron tiempo)
 
 1. **`PagoSuscripcion.estado` canónico es `'pagado'`** — NO `'confirmado'`. El `'confirmado'`

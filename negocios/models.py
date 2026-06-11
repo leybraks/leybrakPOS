@@ -472,6 +472,8 @@ class Orden(models.Model):
     cliente_telefono = models.CharField(max_length=20, null=True, blank=True)
     motivo_cancelacion = models.CharField(max_length=255, null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+    # Evita acreditar puntos/CRM dos veces si la orden pasa por varias vías de pago.
+    puntos_otorgados = models.BooleanField(default=False)
 
     class Meta:
         indexes = [
