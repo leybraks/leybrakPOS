@@ -274,6 +274,11 @@ APIS_NET_PE_TOKEN = os.environ.get('APIS_NET_PE_TOKEN', '')
 # Si no se define, los views usan EVO_GLOBAL_KEY como fallback.
 BOT_API_TOKEN = os.environ.get('BOT_API_TOKEN', '')
 
+# 🎨 Gemini para mejorar fotos de productos con IA (opcional).
+# Si GEMINI_API_KEY está vacío, solo funciona el realce determinístico (Pillow).
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image-preview')
+
 # settings.py
 # Reemplaza las últimas líneas de email por esto:
 EMAIL_BACKEND     = 'django.core.mail.backends.smtp.EmailBackend'

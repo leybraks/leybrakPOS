@@ -18,6 +18,12 @@ const subirFotoProducto = (id, file) => {
   form.append('imagen', file);
   return api.post(`/productos/${id}/subir_imagen/`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
+// Genera un preview mejorado (no guarda todavía). modo: 'realce' | 'ia'
+const mejorarFotoProducto = (id, modo) =>
+  api.post(`/productos/${id}/mejorar_imagen/`, { modo });
+// Guarda definitivamente el preview (base64) como la foto del producto
+const aplicarFotoProducto = (id, imagen_base64) =>
+  api.post(`/productos/${id}/aplicar_imagen/`, { imagen_base64 });
 
 export default function VistaEditor({ esDueño, colorPrimario, isDark }) {
   const cardCls  = isDark ? 'bg-[#141414] border-[#222]' : 'bg-white border-gray-200 shadow-sm';
@@ -41,6 +47,10 @@ export default function VistaEditor({ esDueño, colorPrimario, isDark }) {
   const logoRef = useRef(null);
   const fotoRef = useRef(null);
   const [productoEditandoId, setProductoEditandoId] = useState(null);
+
+  // Estado del modal "Mejorar con IA"
+  // { producto, preview, modo, cargando, guardando }
+  const [mejora, setMejora] = useState(null);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -109,6 +119,39 @@ export default function VistaEditor({ esDueño, colorPrimario, isDark }) {
       const res = await subirFotoProducto(productoEditandoId, file);
       setProductos(prev => prev.map(p => p.id === productoEditandoId ? { ...p, imagen: res.data.url } : p));
     } catch (err) { console.error('Error subiendo foto:', err); }
+  };
+
+  // ── Mejorar con IA ──
+  const abrirMejora = (producto) => setMejora({ producto, preview: null, modo: null, cargando: false, guardando: false });
+  const cerrarMejora = () => setMejora(null);
+
+  const generarMejora = async (modo) => {
+    if (!mejora) return;
+    setMejora(m => ({ ...m, modo, cargando: true, preview: null }));
+    try {
+      const res = await mejorarFotoProducto(mejora.producto.id, modo);
+      setMejora(m => ({ ...m, cargando: false, preview: res.data.preview }));
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'No se pudo generar la mejora.';
+      setMejora(m => ({ ...m, cargando: false }));
+      setNotificacion({ mostrar: true, mensaje: msg, tipo: 'error' });
+    }
+  };
+
+  const aplicarMejora = async () => {
+    if (!mejora?.preview) return;
+    setMejora(m => ({ ...m, guardando: true }));
+    try {
+      const res = await aplicarFotoProducto(mejora.producto.id, mejora.preview);
+      const nuevaUrl = `${res.data.url}?t=${Date.now()}`; // cache-bust
+      setProductos(prev => prev.map(p => p.id === mejora.producto.id ? { ...p, imagen: nuevaUrl } : p));
+      setNotificacion({ mostrar: true, mensaje: '¡Foto mejorada y guardada!', tipo: 'success' });
+      cerrarMejora();
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'No se pudo guardar la foto.';
+      setMejora(m => ({ ...m, guardando: false }));
+      setNotificacion({ mostrar: true, mensaje: msg, tipo: 'error' });
+    }
   };
 
   if (!esDueño) return <div className="text-center p-10">Solo el dueño puede editar la carta.</div>;
@@ -249,13 +292,22 @@ export default function VistaEditor({ esDueño, colorPrimario, isDark }) {
                         }
                       </div>
                       <p className={`text-xs font-bold text-center line-clamp-1 px-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{plato.nombre}</p>
-                      <button 
+                      <button
                         onClick={() => { setProductoEditandoId(plato.id); fotoRef.current.click(); }}
                         className="w-full py-1.5 text-xs font-bold rounded-lg border transition-all"
                         style={{ borderColor: colorPrimario, color: colorPrimario }}
                       >
                         {plato.imagen ? 'Cambiar Foto' : 'Subir Foto'}
                       </button>
+                      {plato.imagen && (
+                        <button
+                          onClick={() => abrirMejora(plato)}
+                          className="w-full py-1.5 text-xs font-bold rounded-lg text-white transition-all flex items-center justify-center gap-1.5"
+                          style={{ background: 'linear-gradient(90deg, #8b5cf6, #ec4899)' }}
+                        >
+                          <i className="fi fi-rr-magic-wand" />Mejorar con IA
+                        </button>
+                      )}
                     </div>
                   ))}
                   <input ref={fotoRef} type="file" hidden accept="image/*" onChange={onUploadFotoProducto} />
@@ -268,12 +320,92 @@ export default function VistaEditor({ esDueño, colorPrimario, isDark }) {
       </div>
 
       {/* ── PANEL DERECHO (VISTA PREVIA) ── */}
-      <VistaPrevia 
-      carta={carta} 
-      colorPrimario={colorPrimario} 
+      <VistaPrevia
+      carta={carta}
+      colorPrimario={colorPrimario}
       isDark={isDark}
-      productos={productos} 
+      productos={productos}
       />
+
+      {/* ── MODAL: MEJORAR CON IA ── */}
+      {mejora && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={cerrarMejora}>
+          <div
+            className={`w-full max-w-2xl rounded-3xl border p-6 ${isDark ? 'bg-[#141414] border-[#222]' : 'bg-white border-gray-200'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-1">
+              <h3 className={`text-lg font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <i className="fi fi-rr-magic-wand mr-2" style={{ color: '#a855f7' }} />Mejorar foto con IA
+              </h3>
+              <button onClick={cerrarMejora} className="text-gray-400 hover:text-gray-200 text-xl leading-none">&times;</button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4 line-clamp-1">{mejora.producto.nombre}</p>
+
+            {/* Comparación Antes / Después */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-wider mb-1.5 ${labelCls}`}>Original</p>
+                <div className="aspect-square rounded-2xl overflow-hidden bg-black/20">
+                  <img src={mejora.producto.imagen} className="w-full h-full object-cover" alt="original" />
+                </div>
+              </div>
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-wider mb-1.5 ${labelCls}`}>Mejorada</p>
+                <div className="aspect-square rounded-2xl overflow-hidden bg-black/20 flex items-center justify-center">
+                  {mejora.cargando
+                    ? <div className="flex flex-col items-center gap-2 text-gray-400"><i className="fi fi-rr-spinner animate-spin text-2xl" /><span className="text-xs">Mejorando…</span></div>
+                    : mejora.preview
+                      ? <img src={mejora.preview} className="w-full h-full object-cover" alt="mejorada" />
+                      : <span className="text-xs text-gray-500 px-4 text-center">Elige un modo para generar la versión mejorada</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Selector de modo */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                onClick={() => generarMejora('realce')}
+                disabled={mejora.cargando || mejora.guardando}
+                className={`p-3 rounded-2xl border-2 text-left transition-all disabled:opacity-50 ${mejora.modo === 'realce' ? '' : (isDark ? 'border-[#333]' : 'border-gray-200')}`}
+                style={{ borderColor: mejora.modo === 'realce' ? '#a855f7' : undefined }}
+              >
+                <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>✨ Realce automático</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">Ajusta luz, color y nitidez. Rápido y gratis.</p>
+              </button>
+              <button
+                onClick={() => generarMejora('ia')}
+                disabled={mejora.cargando || mejora.guardando}
+                className={`p-3 rounded-2xl border-2 text-left transition-all disabled:opacity-50 ${mejora.modo === 'ia' ? '' : (isDark ? 'border-[#333]' : 'border-gray-200')}`}
+                style={{ borderColor: mejora.modo === 'ia' ? '#ec4899' : undefined }}
+              >
+                <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>🤖 Generativa (IA)</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">La IA reilumina la foto tipo estudio.</p>
+              </button>
+            </div>
+
+            {/* Acciones */}
+            <div className="flex gap-3">
+              <button
+                onClick={cerrarMejora}
+                disabled={mejora.guardando}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50 ${isDark ? 'border-[#333] text-gray-300' : 'border-gray-200 text-gray-600'}`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={aplicarMejora}
+                disabled={!mejora.preview || mejora.cargando || mejora.guardando}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+                style={{ background: 'linear-gradient(90deg, #8b5cf6, #ec4899)' }}
+              >
+                {mejora.guardando ? 'Guardando…' : 'Usar esta foto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
