@@ -147,4 +147,42 @@ def actualizar_estado_delivery(request, orden_id):
         orden.estado = 'completado'   # cocina: entregado
         campos.append('estado')
     orden.save(update_fields=campos)
+
+    # Al iniciar la ruta avisamos solos al cliente por WhatsApp (vía n8n → Evolution).
+    if nuevo == 'en_camino' and orden.cliente_telefono:
+        from ..whatsapp_ticket import enviar_mensaje_whatsapp
+        texto = (f"🛵 ¡Tu pedido de *{orden.sede.negocio.nombre}* ya va en camino! "
+                 f"El repartidor está saliendo hacia tu dirección.")
+        enviar_mensaje_whatsapp(orden, orden.cliente_telefono, texto)
+
     return Response(_serializar_pedido(orden), status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def avisar_cliente(request, orden_id):
+    """El repartidor manda un WhatsApp al cliente desde la app (mensaje libre/preset)."""
+    from ..models import Orden
+    from ..whatsapp_ticket import enviar_mensaje_whatsapp
+
+    negocio = getattr(request.user, 'negocio', None)
+    repartidor = _repartidor_de(request)
+    if repartidor is None:
+        return Response({'error': 'Solo un repartidor puede avisar al cliente.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    orden = (Orden.objects
+             .filter(id=orden_id, sede__negocio=negocio, tipo='delivery')
+             .select_related('sede', 'sede__negocio').first())
+    if not orden:
+        return Response({'error': 'Pedido no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+    if not orden.cliente_telefono:
+        return Response({'error': 'El pedido no tiene teléfono del cliente.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    mensaje = (request.data.get('mensaje') or '').strip()[:500]
+    if not mensaje:
+        return Response({'error': 'Mensaje vacío.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    enviado = enviar_mensaje_whatsapp(orden, orden.cliente_telefono, mensaje)
+    return Response({'enviado': enviado}, status=status.HTTP_200_OK)

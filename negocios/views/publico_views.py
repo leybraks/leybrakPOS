@@ -196,10 +196,12 @@ def login_empleado_pin(request):
     # Token único por sesión, guardado en Redis con TTL de 12 horas
     session_token = secrets.token_hex(32)
     session_key = f"empleado_session_{session_token}"
+    puede_repartir = bool(empleado_valido.rol and empleado_valido.rol.puede_repartir)
     session_data = {
         'empleado_id': empleado_valido.id,
         'nombre': empleado_valido.nombre,
         'rol': empleado_valido.rol.nombre if empleado_valido.rol else 'Empleado',
+        'puede_repartir': puede_repartir,
         'sede_id': sede_id,
         'negocio_id': str(empleado_valido.negocio_id),
     }
@@ -211,8 +213,10 @@ def login_empleado_pin(request):
         empleado_valido.save(update_fields=['ultimo_ingreso'])
 
     response = Response({
+        'id': empleado_valido.id,                 # ← lo necesita el header X-Empleado-ID
         'nombre': empleado_valido.nombre,
         'rol': empleado_valido.rol.nombre if empleado_valido.rol else 'Empleado',
+        'puede_repartir': puede_repartir,         # ← rutea al repartidor a su app dedicada
         'sede_id': sede_id,
     })
     # Cookie HttpOnly igual que los JWT del dueño

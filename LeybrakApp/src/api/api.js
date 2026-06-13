@@ -214,6 +214,7 @@ export const enviarTicketWhatsapp = (ordenId, telefono) => api.post(`/ordenes/${
 export const getPedidosDelivery       = ()                 => api.get('/delivery/pedidos/');
 export const tomarPedidoDelivery      = (ordenId)          => api.post(`/delivery/pedidos/${ordenId}/tomar/`);
 export const actualizarEstadoDelivery = (ordenId, estado)  => api.post(`/delivery/pedidos/${ordenId}/estado/`, { estado });
+export const avisarClienteDelivery     = (ordenId, mensaje) => api.post(`/delivery/pedidos/${ordenId}/avisar/`, { mensaje });
 export const getComprobante    = (ordenId)          => api.get(`/ordenes/${ordenId}/comprobante/`);
 export const getComprobantes   = (params)           => api.get('/comprobantes/', { params });
 export const consultarRuc      = (ruc)              => api.get(`/negocios/consultar_ruc/${ruc}/`);

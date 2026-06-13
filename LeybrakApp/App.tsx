@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LoginScreen from './src/screens/Auth/LoginScreen';
 import AppNavigator from './src/navigation/AppNavigator';
+import RepartidorScreen from './src/screens/Delivery/RepartidorScreen';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { getNegocio } from './src/api/api';
 import useAppStore from './src/store/useAppStore';
@@ -25,9 +26,10 @@ export default function App() {
         const token   = await EncryptedStorage.getItem('access_token');
         const rol     = await EncryptedStorage.getItem('usuario_rol') || '';
         const negocioId = await EncryptedStorage.getItem('negocio_id');
+        const esRepartidor = (await EncryptedStorage.getItem('es_repartidor')) === '1';
 
         if (token && negocioId) {
-          setSesion({ rol, negocioId, restaurado: true });
+          setSesion({ rol, negocioId, restaurado: true, es_repartidor: esRepartidor });
         }
       } catch (e) {
         console.log('Sin sesión guardada');
@@ -126,8 +128,20 @@ export default function App() {
   await EncryptedStorage.removeItem('sede_nombre');
   await EncryptedStorage.removeItem('empleado_id');
   await EncryptedStorage.removeItem('empleado_nombre');
+  await EncryptedStorage.removeItem('es_repartidor');
   setSesion(null);
 };
+
+  // 🛵 El repartidor entra a su app dedicada (no ve el ERP/POS).
+  if (sesion.es_repartidor) {
+    return (
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+        <RepartidorScreen onLogout={handleLogout} />
+      </>
+    );
+  }
+
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
