@@ -17,7 +17,7 @@ from negocios.views.pago_yape_views import recibir_notificacion_yape, confirmar_
 from negocios.views.suscripcion_billing_views import generar_pago_suscripcion, webhook_mercadopago
 from negocios.views.app_version_views import app_version
 from negocios.views.facturacion_views import emitir_comprobante, obtener_comprobante, listar_comprobantes, enviar_ticket_whatsapp_view
-from negocios.views.delivery_views import pedidos_delivery, tomar_pedido, actualizar_estado_delivery
+from negocios.views.delivery_views import pedidos_delivery, tomar_pedido, actualizar_estado_delivery, avisar_cliente
 from negocios.views.historia_views import historias, cancelar_historia, historias_pendientes_bot, marcar_historia_bot
 from negocios.views.cliente_views import geocodificar_bot, registrar_feedback_bot, listar_canjes, stickers_view, eliminar_sticker
 from .serializers_jwt import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView, refresh_movil,login_movil
@@ -122,6 +122,7 @@ urlpatterns = [
     path('delivery/pedidos/',                       pedidos_delivery,            name='delivery-pedidos'),
     path('delivery/pedidos/<int:orden_id>/tomar/',  tomar_pedido,                name='delivery-tomar'),
     path('delivery/pedidos/<int:orden_id>/estado/', actualizar_estado_delivery,  name='delivery-estado'),
+    path('delivery/pedidos/<int:orden_id>/avisar/', avisar_cliente,              name='delivery-avisar'),
 
     # ==========================================
     # 📲 HISTORIAS PROGRAMADAS (Bot WhatsApp)

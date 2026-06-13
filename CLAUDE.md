@@ -142,27 +142,32 @@ WhatsApp sin salir de la app**, en vez de abrir el chat. Móvil **y** web.
   `POST {EVO_API_URL}/message/sendMedia/{instancia}` (mediatype `document`); texto →
   `…/message/sendText/{instancia}`. **n8n debe wirearse a mano** (Webhook + switch por `tipo`).
 
-## Delivery — app del repartidor (Fase 1) — implementado
+## Delivery — app dedicada del repartidor — implementado
 
-El repartidor (un `Empleado` con `Rol.puede_repartir=True`) ve los pedidos de delivery de su
-sede en la **app móvil**, toma uno, navega con la ubicación del cliente (lat/lng que ya guardaba
-la orden) y marca el avance. **Sin tracking GPS en vivo** (eso sería Fase 2).
+El repartidor (un `Empleado` con `Rol.puede_repartir=True`) entra con su **PIN** y la app lo lleva
+a una **pantalla dedicada estilo Rappi/inDrive** (NO ve el ERP/POS). Ve los pedidos de delivery de
+su sede, los toma, navega y avisa al cliente. **Sin tracking GPS en vivo** (eso sería Fase 2).
 
 - **Modelo** (mig. `0078`): `Orden.repartidor` (FK Empleado), `Orden.estado_delivery`
   (`pendiente→asignado→en_camino→entregado`), `Rol.puede_repartir`. La orden ya tenía
   `direccion_entrega`, `latitud`, `longitud`, `costo_envio`, `tipo='delivery'`.
+- **Ruteo:** `login_empleado_pin` devuelve `id` (¡antes faltaba → `X-Empleado-ID` iba `undefined`!)
+  y `puede_repartir`. `App.tsx`: si `sesion.es_repartidor` → renderiza `RepartidorScreen` en vez de
+  `AppNavigator`. El rol repartidor se marca en Django admin (modelo `Rol`).
 - **Endpoints** (`negocios/views/delivery_views.py`, gate por `get_empleado_verificado` +
   `rol.puede_repartir`):
-  - `GET /api/delivery/pedidos/` → disponibles (sin asignar) de su sede + los que tomó él.
-  - `POST /api/delivery/pedidos/<id>/tomar/` → se lo asigna (`asignado`).
-  - `POST /api/delivery/pedidos/<id>/estado/` (`estado: en_camino|entregado`) → solo el
-    repartidor asignado; al `entregado` la orden pasa a `completado`.
-- **Móvil:** `screens/Delivery/RepartidorScreen.jsx` (lista + navegar con Google Maps + botones
-  Tomar/En camino/Entregado, refresco cada 20s). Entra por el drawer **"Reparto"** (visible si el
-  módulo delivery está activo). Helpers en `api.js`. El dueño marca el rol repartidor en Django
-  admin (modelo `Rol`) o donde edite roles.
-- **Tests:** `negocios/test_delivery.py` (6 tests). **Sin WebSocket aún** (la app refresca por
-  polling); el push en vivo al POS/cocina queda como mejora.
+  - `GET /api/delivery/pedidos/` → disponibles + los que tomó él.
+  - `POST .../tomar/` → se lo asigna; `POST .../estado/` (`en_camino|entregado`) → solo el asignado;
+    al `entregado` la orden pasa a `completado`. Al `en_camino` **avisa solo al cliente** por WhatsApp.
+  - `POST .../avisar/` (`mensaje`) → el repartidor manda un WhatsApp al cliente (mensajes preset).
+- **WhatsApp:** reusa el webhook de n8n de tickets (`enviar_mensaje_whatsapp` en `whatsapp_ticket.py`,
+  rama `tipo:'texto'`). **No requiere wiring n8n nuevo.** Llamadas de voz por WhatsApp NO se pueden
+  (Evolution/Baileys no inicia llamadas); el botón "Llamar" usa `tel:` (llamada normal).
+- **Móvil:** `screens/Delivery/RepartidorScreen.jsx` — header con nombre + Salir, **"Iniciar ruta"**
+  (marca asignados→en_camino y abre Google Maps con todas las paradas como waypoints), por pedido:
+  **Navegar** (elige Google Maps o Waze, estilo inDrive), **Llamar** (`tel:`), **WhatsApp** (mensajes
+  preset → endpoint `avisar`), y Tomar/En camino/Entregado. Refresco cada 20s.
+- **Tests:** `negocios/test_delivery.py` (6 tests). **Sin WebSocket aún** (polling).
 
 ## CRM + puntos — siempre activos
 

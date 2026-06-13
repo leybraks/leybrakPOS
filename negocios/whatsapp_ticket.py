@@ -35,6 +35,40 @@ def _construir_texto_ticket(orden):
     return "\n".join(lineas)
 
 
+def enviar_mensaje_whatsapp(orden, telefono, texto):
+    """
+    Manda un texto libre al cliente por el MISMO webhook de n8n (rama 'texto' →
+    Evolution sendText). Lo usa el repartidor (avisos "en camino", "llegué", etc.).
+    Fire-and-forget: devuelve True si se despachó.
+    """
+    url = getattr(settings, 'N8N_TICKET_WEBHOOK_URL', '')
+    if not url:
+        return False
+    tel = _normalizar_telefono(telefono)
+    instancia = (orden.sede.whatsapp_instancia or '').strip()
+    if not tel or not instancia or not texto:
+        return False
+
+    payload = {
+        'instancia': instancia,
+        'telefono': tel,
+        'negocio': orden.sede.negocio.nombre,
+        'orden_id': orden.id,
+        'tipo': 'texto',
+        'texto': texto,
+    }
+    headers = {}
+    token = getattr(settings, 'BOT_API_TOKEN', '') or getattr(settings, 'EVO_GLOBAL_KEY', '')
+    if token:
+        headers['X-Bot-Token'] = token
+    try:
+        requests.post(url, json=payload, headers=headers, timeout=8)
+        return True
+    except requests.RequestException as e:
+        logger.warning('No se pudo despachar mensaje WhatsApp a n8n: %s', e)
+        return False
+
+
 def enviar_ticket_whatsapp(orden, telefono, comprobante=None):
     """
     Despacha el ticket al webhook de n8n. Si hay `comprobante` con PDF, manda

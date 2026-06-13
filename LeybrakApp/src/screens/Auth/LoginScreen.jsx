@@ -197,7 +197,7 @@ export default function LoginScreen({ onLoginExitoso }) {
   };
 
   const procesarPin = async () => {
-    if (pin.length !== 6 || bloqueadoSeg > 0) return;
+    if (pin.length !== 4 || bloqueadoSeg > 0) return;
     setCargando(true);
     try {
       const sedeId = await EncryptedStorage.getItem('sede_id');
@@ -208,9 +208,10 @@ export default function LoginScreen({ onLoginExitoso }) {
       await EncryptedStorage.setItem('empleado_id',     String(empleado.id));
       await EncryptedStorage.setItem('empleado_nombre', empleado.nombre);
       await EncryptedStorage.setItem('usuario_rol',     empleado.rol);
+      await EncryptedStorage.setItem('es_repartidor',   empleado.puede_repartir ? '1' : '0');
 
       setPin('');
-      onLoginExitoso({ ...empleado, tipo: 'empleado' });
+      onLoginExitoso({ ...empleado, tipo: 'empleado', es_repartidor: !!empleado.puede_repartir });
     } catch (error) {
       const seg = error.response?.data?.segundos_restantes;
       if (error.response?.status === 429) setBloqueadoSeg(seg || 120);
@@ -411,8 +412,10 @@ export default function LoginScreen({ onLoginExitoso }) {
             <Text style={s.sedeNombre}>{sedeNombre}</Text>
 
             <View style={s.estadoBadge}>
-               <View style={[s.estadoDot, { backgroundColor: '#6b7280' }]} />
-               <Text style={s.estadoText}>CONECTANDO...</Text>
+               <View style={[s.estadoDot, { backgroundColor: bloqueadoSeg > 0 ? '#ef4444' : cargando ? '#f59e0b' : '#10b981' }]} />
+               <Text style={s.estadoText}>
+                 {bloqueadoSeg > 0 ? 'BLOQUEADO' : cargando ? 'VERIFICANDO...' : 'LISTO PARA INGRESAR'}
+               </Text>
             </View>
 
             <View style={s.clockContainer}>
@@ -423,7 +426,7 @@ export default function LoginScreen({ onLoginExitoso }) {
 
           {/* Puntos PIN */}
           <View style={s.pinDots}>
-            {[0, 1, 2, 3, 4, 5].map(i => {
+            {[0, 1, 2, 3].map(i => {
               const isActive = pin.length > i;
               return (
                 <View
@@ -447,13 +450,13 @@ export default function LoginScreen({ onLoginExitoso }) {
 
           <TecladoPin
             pin={pin}
-            onTecla={(t) => pin.length < 6 && setPin(pin + t)}
+            onTecla={(t) => pin.length < 4 && setPin(pin + t)}
             onBorrar={() => setPin(pin.slice(0, -1))}
             onLimpiar={() => setPin('')}
           />
 
           <TouchableOpacity
-            style={[s.buttonPrimary, (pin.length < 6 || bloqueadoSeg > 0 || cargando) && s.buttonDisabled]}
+            style={[s.buttonPrimary, (pin.length < 4 || bloqueadoSeg > 0 || cargando) && s.buttonDisabled]}
             onPress={procesarPin}
             disabled={pin.length < 6 || bloqueadoSeg > 0 || cargando}
             activeOpacity={0.8}
