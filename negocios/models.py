@@ -457,7 +457,19 @@ class Orden(models.Model):
     latitud = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     longitud = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     costo_envio = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
-    
+
+    # 🛵 REPARTO (Fase 1 — app del repartidor)
+    ESTADOS_DELIVERY = [
+        ('pendiente', 'Sin asignar'),
+        ('asignado',  'Asignado'),
+        ('en_camino', 'En camino'),
+        ('entregado', 'Entregado'),
+    ]
+    repartidor = models.ForeignKey(
+        Empleado, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='entregas', help_text="Repartidor que tomó el pedido de delivery")
+    estado_delivery = models.CharField(max_length=12, choices=ESTADOS_DELIVERY, default='pendiente')
+
     # 💳 MÉTODO DE PAGO ESPERADO (Para saber si el motorizado lleva POS o Vuelto)
     metodo_pago_esperado = models.CharField(max_length=50, null=True, blank=True, help_text="Ej: Yape, Efectivo (con vuelto de S/50)")
     pago_validado_bot = models.BooleanField(default=False, help_text="¿Gemini validó la captura?")
@@ -625,6 +637,7 @@ class Rol(models.Model):
     # Aquí podrías agregar booleanos para permisos específicos si quieres algo muy granular
     puede_cobrar = models.BooleanField(default=False)
     puede_configurar = models.BooleanField(default=False)
+    puede_repartir = models.BooleanField(default=False, help_text="¿Es repartidor? Ve la pantalla de reparto.")
 
     def __str__(self):
         return self.nombre

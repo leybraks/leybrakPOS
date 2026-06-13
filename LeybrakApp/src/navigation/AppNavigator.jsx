@@ -18,6 +18,7 @@ import InventarioScreen    from '../screens/ERP/InventarioScreen';
 import SedesScreen         from '../screens/ERP/SedesScreen';
 import ClientesScreen      from '../screens/ERP/ClientesScreen';
 import FacturacionScreen   from '../screens/ERP/FacturacionScreen';
+import RepartidorScreen    from '../screens/Delivery/RepartidorScreen';
 import SalonScreen         from '../screens/POS/SalonScreen';
 import useAppStore         from '../store/useAppStore';
 import PosScreen           from '../screens/POS/PosScreen';
@@ -52,11 +53,13 @@ const SCREENS_META = {
   configuracion:{ icono: 'cog',        nombre: 'Ajustes'    },
   crm:          { icono: 'heart',      nombre: 'Clientes'   },
   facturacion:  { icono: 'file-text',  nombre: 'Facturación'},
+  reparto:      { icono: 'motorcycle', nombre: 'Reparto'    },
 };
 
 const TAB_ITEMS = ['dashboard', 'menu', 'personal'];
 
 const ALL_DRAWER_ITEMS = [
+  { id: 'reparto',       grupo: 'OPERACIÓN', moduloKey: 'delivery'   },
   { id: 'inventario',    grupo: 'CATÁLOGO', moduloKey: 'inventario' },
   { id: 'sedes',         grupo: 'ADMIN',     moduloKey: null         },
   { id: 'configuracion', grupo: 'ADMIN',     moduloKey: null         },
@@ -204,6 +207,7 @@ function ERPLayout({ onIrAlPos, onLogout }) {
         {vistaActiva === 'sedes'         && <SedesScreen />}
         {vistaActiva === 'crm'           && <ClientesScreen />}
         {vistaActiva === 'facturacion'   && <FacturacionScreen />}
+        {vistaActiva === 'reparto'       && <RepartidorScreen />}
       </View>
 
       {/* Tab Bar */}

@@ -100,11 +100,9 @@ def emitir_comprobante(request, orden_id):
     if orden.estado_pago != 'pagado':
         return Response({'error': 'La orden aún no está pagada.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # MVP: bloquear órdenes con ajustes que descuadran línea-vs-total ante SUNAT
-    if (orden.costo_envio or 0) > 0 or (orden.descuento_total or 0) > 0 or (orden.recargo_total or 0) > 0:
-        return Response(
-            {'error': 'Esta versión no factura órdenes con delivery, descuento o recargo.'},
-            status=status.HTTP_400_BAD_REQUEST)
+    # Nota: las órdenes con descuento (p.ej. canje de puntos), delivery o recargo SÍ
+    # se facturan — el descuento se prorratea entre líneas y delivery/recargo van como
+    # líneas de servicio (ver calcular_montos), de modo que las líneas suman el total.
 
     # Idempotencia
     existente = Comprobante.objects.filter(orden=orden).first()

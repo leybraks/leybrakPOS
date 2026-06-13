@@ -142,6 +142,28 @@ WhatsApp sin salir de la app**, en vez de abrir el chat. Móvil **y** web.
   `POST {EVO_API_URL}/message/sendMedia/{instancia}` (mediatype `document`); texto →
   `…/message/sendText/{instancia}`. **n8n debe wirearse a mano** (Webhook + switch por `tipo`).
 
+## Delivery — app del repartidor (Fase 1) — implementado
+
+El repartidor (un `Empleado` con `Rol.puede_repartir=True`) ve los pedidos de delivery de su
+sede en la **app móvil**, toma uno, navega con la ubicación del cliente (lat/lng que ya guardaba
+la orden) y marca el avance. **Sin tracking GPS en vivo** (eso sería Fase 2).
+
+- **Modelo** (mig. `0078`): `Orden.repartidor` (FK Empleado), `Orden.estado_delivery`
+  (`pendiente→asignado→en_camino→entregado`), `Rol.puede_repartir`. La orden ya tenía
+  `direccion_entrega`, `latitud`, `longitud`, `costo_envio`, `tipo='delivery'`.
+- **Endpoints** (`negocios/views/delivery_views.py`, gate por `get_empleado_verificado` +
+  `rol.puede_repartir`):
+  - `GET /api/delivery/pedidos/` → disponibles (sin asignar) de su sede + los que tomó él.
+  - `POST /api/delivery/pedidos/<id>/tomar/` → se lo asigna (`asignado`).
+  - `POST /api/delivery/pedidos/<id>/estado/` (`estado: en_camino|entregado`) → solo el
+    repartidor asignado; al `entregado` la orden pasa a `completado`.
+- **Móvil:** `screens/Delivery/RepartidorScreen.jsx` (lista + navegar con Google Maps + botones
+  Tomar/En camino/Entregado, refresco cada 20s). Entra por el drawer **"Reparto"** (visible si el
+  módulo delivery está activo). Helpers en `api.js`. El dueño marca el rol repartidor en Django
+  admin (modelo `Rol`) o donde edite roles.
+- **Tests:** `negocios/test_delivery.py` (6 tests). **Sin WebSocket aún** (la app refresca por
+  polling); el push en vivo al POS/cocina queda como mejora.
+
 ## CRM + puntos — siempre activos
 
 Crear/actualizar el cliente y **acumular puntos** ocurre **SIEMPRE** en toda venta con teléfono
@@ -278,6 +300,8 @@ cd LeybrakApp && npm run android
 - `negocios/views_backup.py` (~1700 líneas) es código muerto, se puede borrar.
 - `APP_VERSION_CODE` es una constante manual (`src/config/version.js`); idealmente leer el
   versionCode nativo con `react-native-device-info` para no desincronizar (ver Gotcha #4).
-- Facturación: el redondeo de IGV por línea deja diferencias de céntimos; reglas no contemplan
-  órdenes con delivery/descuento/recargo (esas se bloquean al emitir).
+- Facturación: el redondeo de IGV por línea deja diferencias de céntimos. Las órdenes con
+  **descuento** (p.ej. canje de puntos) ahora SÍ se facturan — el descuento se prorratea entre
+  las líneas de producto; **delivery y recargo** van como líneas de servicio gravadas
+  (`calcular_montos` en `facturacion/payload.py`). Las líneas siempre suman el total.
 - Logging con `print()` en consumers/middleware en vez de `logging`.
