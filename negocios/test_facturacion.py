@@ -75,6 +75,39 @@ class FacturacionTest(APITestCase):
         self.assertEqual(m['total_igv'], Decimal('1.80'))
         self.assertEqual(m['lineas'][0]['valor_unitario'], 10.00)
 
+    # ── Math con ajustes: descuento (puntos), delivery, recargo ────
+    def test_math_descuento_prorrateado(self):
+        # 2 × 11.80 = 23.60; descuento 3.60 → total ~20.00 (±céntimo por redondeo).
+        orden = self._orden_pagada(precio='11.80', cantidad=2)
+        orden.descuento_total = Decimal('3.60')
+        orden.save()
+        m = calcular_montos(orden)
+        self.assertLessEqual(abs(m['total'] - Decimal('20.00')), Decimal('0.02'))
+        # Las líneas siempre cuadran con el total (gravada + IGV == total).
+        self.assertEqual(m['total_gravada'] + m['total_igv'], m['total'])
+
+    def test_math_delivery_y_recargo_como_lineas(self):
+        orden = self._orden_pagada(precio='11.80', cantidad=1)   # 11.80
+        orden.costo_envio = Decimal('5.90')
+        orden.recargo_total = Decimal('1.18')
+        orden.save()
+        m = calcular_montos(orden)
+        self.assertEqual(m['total'], Decimal('18.88'))           # 11.80 + 5.90 + 1.18
+        self.assertEqual(len(m['lineas']), 3)                    # producto + delivery + recargo
+        self.assertEqual(m['total_gravada'] + m['total_igv'], m['total'])
+
+    @patch(PROVIDER_PATH)
+    def test_emitir_con_descuento_ok(self, mock_gp):
+        # Antes se bloqueaba; ahora una orden con descuento (canje de puntos) emite.
+        mock_gp.return_value = _fake_provider(aceptado=True)
+        orden = self._orden_pagada(precio='11.80', cantidad=2)
+        orden.descuento_total = Decimal('3.60')
+        orden.save()
+        self._auth()
+        r = self.client.post(_url(orden.id), {'tipo': 'boleta', 'receptor': {}}, format='json')
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data['estado_sunat'], 'aceptado')
+
     # ── Emisión OK ─────────────────────────────────────────────────
     @patch(PROVIDER_PATH)
     def test_emitir_boleta_ok(self, mock_gp):
@@ -164,7 +197,9 @@ class FacturacionTest(APITestCase):
         orden = self._orden_pagada()
         self._auth()
         r = self.client.post(_url(orden.id), {'tipo': 'boleta', 'receptor': {}}, format='json')
-        self.assertEqual(r.status_code, 502)
+        # 400 (no 502): un 5xx lo enmascara Cloudflare y el cajero no vería el motivo.
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.data)
         comp = Comprobante.objects.get(orden=orden)
         self.assertEqual(comp.estado_sunat, 'rechazado')
 

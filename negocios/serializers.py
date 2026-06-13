@@ -273,7 +273,7 @@ class PagoSerializer(serializers.ModelSerializer):
 class RolSerializer(serializers.ModelSerializer):
     class Meta:
         model = Rol
-        fields = ['id', 'nombre', 'puede_cobrar', 'puede_configurar']
+        fields = ['id', 'nombre', 'puede_cobrar', 'puede_configurar', 'puede_repartir']
 
 class EmpleadoSerializer(serializers.ModelSerializer):
     rol_nombre = serializers.CharField(source='rol.nombre', read_only=True)
