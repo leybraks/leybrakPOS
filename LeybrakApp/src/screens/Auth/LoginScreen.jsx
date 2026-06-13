@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import EncryptedStorage from 'react-native-encrypted-storage';
-import { loginMovil, loginPinEmpleado, getSedes, guardarTokens } from '../../api/api';
+import { loginMovil, loginPinEmpleado, getSedes, guardarTokens, getEstadoCaja } from '../../api/api';
 
 // ─── Teclado PIN ──────────────────────────────────────────────
 function TecladoPin({ pin, onTecla, onBorrar, onLimpiar }) {
@@ -99,6 +99,7 @@ export default function LoginScreen({ onLoginExitoso }) {
   const [bloqueadoSeg, setBloqueadoSeg]     = useState(0);
   const [hora, setHora]                     = useState('');
   const [fecha, setFecha]                   = useState('');
+  const [cajaAbierta, setCajaAbierta]       = useState(null);   // null=desconocido
 
   // Reloj
   useEffect(() => {
@@ -133,6 +134,23 @@ export default function LoginScreen({ onLoginExitoso }) {
     };
     init();
   }, []);
+
+  // Estado de la caja (badge + saber si está cerrada). Solo en la pantalla de PIN.
+  useEffect(() => {
+    if (modo !== 'pin') return;
+    let activo = true;
+    const check = async () => {
+      try {
+        const sedeId = await EncryptedStorage.getItem('sede_id');
+        if (!sedeId) return;
+        const res = await getEstadoCaja({ sede_id: sedeId });
+        if (activo) setCajaAbierta(res.data?.estado === 'abierto');
+      } catch (_) { /* sin info → badge neutro, el server decide al ingresar */ }
+    };
+    check();
+    const id = setInterval(check, 12000);
+    return () => { activo = false; clearInterval(id); };
+  }, [modo]);
 
   const handleLogin = async () => {
     if (!usuario.trim() || !password.trim()) {
@@ -213,9 +231,16 @@ export default function LoginScreen({ onLoginExitoso }) {
       setPin('');
       onLoginExitoso({ ...empleado, tipo: 'empleado', es_repartidor: !!empleado.puede_repartir });
     } catch (error) {
-      const seg = error.response?.data?.segundos_restantes;
-      if (error.response?.status === 429) setBloqueadoSeg(seg || 120);
-      Alert.alert('Error', 'PIN incorrecto. Inténtalo de nuevo.');
+      const data = error.response?.data || {};
+      if (error.response?.status === 429) {
+        setBloqueadoSeg(data.segundos_restantes || 120);
+        Alert.alert('Bloqueado', data.error || 'Terminal bloqueada. Espera unos minutos.');
+      } else if (error.response?.status === 403 && data.caja_cerrada) {
+        setCajaAbierta(false);
+        Alert.alert('Caja cerrada', data.error || 'La caja está cerrada. Pídele al encargado que la abra.');
+      } else {
+        Alert.alert('Error', 'PIN incorrecto. Inténtalo de nuevo.');
+      }
       setPin('');
     } finally {
       setCargando(false);
@@ -412,9 +437,16 @@ export default function LoginScreen({ onLoginExitoso }) {
             <Text style={s.sedeNombre}>{sedeNombre}</Text>
 
             <View style={s.estadoBadge}>
-               <View style={[s.estadoDot, { backgroundColor: bloqueadoSeg > 0 ? '#ef4444' : cargando ? '#f59e0b' : '#10b981' }]} />
+               <View style={[s.estadoDot, { backgroundColor:
+                 bloqueadoSeg > 0 ? '#ef4444'
+                 : cajaAbierta === false ? '#ef4444'
+                 : cajaAbierta ? '#10b981'
+                 : '#6b7280' }]} />
                <Text style={s.estadoText}>
-                 {bloqueadoSeg > 0 ? 'BLOQUEADO' : cargando ? 'VERIFICANDO...' : 'LISTO PARA INGRESAR'}
+                 {bloqueadoSeg > 0 ? 'BLOQUEADO'
+                   : cajaAbierta === false ? 'CAJA CERRADA'
+                   : cajaAbierta ? 'CAJA ABIERTA'
+                   : 'CONECTANDO...'}
                </Text>
             </View>
 

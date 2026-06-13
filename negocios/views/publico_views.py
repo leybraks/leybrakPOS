@@ -161,7 +161,7 @@ def login_empleado_pin(request):
         cache.delete(lock_key)
         cache.delete(fail_key)
     from django.utils import timezone
-    from ..models import Empleado
+    from ..models import Empleado, SesionCaja
     from django.contrib.auth.hashers import check_password, make_password
     
     empleados = Empleado.objects.filter(sede_id=sede_id, activo=True).select_related('rol')
@@ -188,6 +188,20 @@ def login_empleado_pin(request):
             cache.delete(fail_key)
             return Response({'error': f'Terminal bloqueada por {LOCKOUT_S // 60} minutos.'}, status=429)
         return Response({'error': f'PIN incorrecto. Intentos restantes: {MAX_FAILS - fails}.'}, status=401)
+
+    # 🔒 Gate de caja: sin sesión de caja abierta no se trabaja. Quien NO puede abrir
+    # caja (mesero, cocinero, motorizado…) queda bloqueado hasta que el encargado la
+    # abra. El cajero/admin/dueño sí puede entrar (para abrirla). El dueño que entra por
+    # el ERP no pasa por acá.
+    ROLES_CAJA = {'cajero', 'administrador', 'admin', 'dueño', 'dueno', 'gerente', 'encargado'}
+    rol_nombre = (empleado_valido.rol.nombre if empleado_valido.rol else '').strip().lower()
+    puede_abrir_caja = rol_nombre in ROLES_CAJA
+    caja_abierta = SesionCaja.objects.filter(sede_id=sede_id, estado='abierta').exists()
+    if not caja_abierta and not puede_abrir_caja:
+        return Response({
+            'error': 'La caja está cerrada. Pídele al encargado que abra la caja antes de ingresar.',
+            'caja_cerrada': True,
+        }, status=403)
 
     # ✅ PIN válido — generar token de sesión de empleado
     cache.delete(fail_key)
@@ -217,6 +231,7 @@ def login_empleado_pin(request):
         'nombre': empleado_valido.nombre,
         'rol': empleado_valido.rol.nombre if empleado_valido.rol else 'Empleado',
         'puede_repartir': puede_repartir,         # ← rutea al repartidor a su app dedicada
+        'caja_abierta': caja_abierta,
         'sede_id': sede_id,
     })
     # Cookie HttpOnly igual que los JWT del dueño
