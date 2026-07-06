@@ -169,6 +169,15 @@ su sede, los toma, navega y avisa al cliente. **Sin tracking GPS en vivo** (eso 
   preset → endpoint `avisar`), y Tomar/En camino/Entregado. Refresco cada 20s.
 - **Tests:** `negocios/test_delivery.py` (6 tests). **Sin WebSocket aún** (polling).
 
+### Gate de caja en el login por PIN
+`login_empleado_pin` bloquea (403 `caja_cerrada`) a los empleados con PIN que **no pueden abrir
+caja** (mesero, cocinero, **motorizado**) si **no hay sesión de caja abierta** en la sede — sin
+sesión = local cerrado, no se trabaja. Los roles que SÍ pueden abrir caja (cajero/admin/dueño/
+gerente/encargado, por nombre de rol) entran igual para poder abrirla. El **dueño** entra por el
+ERP (sin PIN) y abre la caja desde el POS (`SalonScreen`, gate ya existente). El login móvil
+muestra el badge real (🔴 CAJA CERRADA / 🟢 CAJA ABIERTA) consultando `sesiones_caja/estado_actual/`.
+Tests: `negocios/test_login_caja.py`. La respuesta del login trae `caja_abierta`.
+
 ## CRM + puntos — siempre activos
 
 Crear/actualizar el cliente y **acumular puntos** ocurre **SIEMPRE** en toda venta con teléfono
