@@ -35,39 +35,50 @@ class ClienteViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='buscar_por_telefono', permission_classes=[IsAuthenticated])
     def buscar_por_telefono(self, request):
         """
-        Endpoint que usará n8n para reconocer al cliente de WhatsApp.
+        Endpoint que usa n8n para reconocer al cliente de WhatsApp.
+
+        CREA el cliente si es la primera vez que escribe (antes solo buscaba y
+        devolvía `encontrado:false` sin `id` — el bot no tenía forma de guardarle
+        el nombre ni acreditarle nada hasta su primera COMPRA). Reusa el mismo
+        criterio de matcheo que el POS (últimos 9 dígitos) para no duplicar
+        clientes entre WhatsApp y el mostrador.
         """
+        from .orden_views import _buscar_o_crear_cliente
+        from ..models import Negocio
+
         telefono = request.query_params.get('telefono')
         negocio_id = request.query_params.get('negocio_id')
 
         if not telefono:
             return Response({'error': 'Falta el parámetro telefono'}, status=400)
+        if not negocio_id:
+            return Response({'error': 'Falta el parámetro negocio_id'}, status=400)
 
-        query = Cliente.objects.filter(telefono__icontains=telefono[-9:])
+        negocio = Negocio.objects.filter(id=negocio_id).first()
+        if not negocio:
+            return Response({'error': 'Negocio no encontrado'}, status=404)
 
-        if negocio_id:
-            query = query.filter(negocio_id=negocio_id)
+        cliente, creado = _buscar_o_crear_cliente(negocio, telefono)
+        if cliente is None:
+            return Response({'error': 'Teléfono inválido.'}, status=400)
 
-        cliente = query.first()
+        es_cumple = False
+        if cliente.fecha_nacimiento:
+            hoy = timezone.now().date()
+            es_cumple = (cliente.fecha_nacimiento.day == hoy.day and
+                         cliente.fecha_nacimiento.month == hoy.month)
 
-        if cliente:
-            es_cumple = False
-            if cliente.fecha_nacimiento:
-                hoy = timezone.now().date()
-                es_cumple = (cliente.fecha_nacimiento.day == hoy.day and
-                             cliente.fecha_nacimiento.month == hoy.month)
-
-            return Response({
-                'encontrado': True,
-                'id': cliente.id,
-                'nombre': cliente.nombre or "Cliente POS",
-                'telefono': cliente.telefono,
-                'puntos': cliente.puntos_acumulados,
-                'tags': cliente.tags if isinstance(cliente.tags, list) else [],
-                'es_cumpleanos_hoy': es_cumple
-            })
-
-        return Response({'encontrado': False, 'mensaje': 'Cliente nuevo'})
+        return Response({
+            'encontrado': True,
+            'es_nuevo': creado,
+            'id': cliente.id,
+            'nombre': cliente.nombre or "Cliente POS",
+            'telefono': cliente.telefono,
+            'puntos': cliente.puntos_acumulados,
+            'total_gastado': float(cliente.total_gastado or 0),
+            'tags': cliente.tags if isinstance(cliente.tags, list) else [],
+            'es_cumpleanos_hoy': es_cumple,
+        })
 
 
 # ============================================================
